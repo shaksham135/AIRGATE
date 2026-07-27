@@ -182,17 +182,17 @@ export default function LandingPage() {
         zIndex: 100
       }}>
         <div style={{
-          maxWdith: '1320px',
           maxWidth: '1320px',
           margin: '0 auto',
           padding: '16px 32px',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '24px'
+          gap: '24px',
+          flexWrap: 'wrap'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', flexShrink: 0 }} onClick={() => navigate('/')}>
-            <svg width="52" height="52" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, filter: 'drop-shadow(0 0 15px rgba(56, 189, 248, 0.7))' }}>
+            <svg width="46" height="46" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, filter: 'drop-shadow(0 0 12px rgba(56, 189, 248, 0.6))' }}>
               <defs>
                 <linearGradient id="opt4GradFinal" x1="0%" y1="100%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#00d2ff" />
@@ -245,11 +245,11 @@ export default function LandingPage() {
               <rect x="57" y="83" width="6" height="11" fill="#ffffff" rx="1" />
             </svg>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontFamily: 'var(--font-title)', fontSize: '1.65rem', fontWeight: 800, letterSpacing: '-0.03em', whiteSpace: 'nowrap', lineHeight: 1.1 }}>
+              <span style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.03em', whiteSpace: 'nowrap', lineHeight: 1.1 }}>
                 <span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AIR</span>
                 <span style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>GATE</span>
               </span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <span className="header-tagline" style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Practice · Analyze · Progress
               </span>
             </div>

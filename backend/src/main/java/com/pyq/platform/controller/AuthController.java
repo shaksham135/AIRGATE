@@ -54,49 +54,57 @@ public class AuthController {
     public ResponseEntity<?> authenticateUser(
             @Valid @RequestBody LoginRequest loginRequest,
             HttpServletRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        
-        String role = userDetails.getAuthorities().stream()
-                .findFirst()
-                .map(item -> item.getAuthority().replace("ROLE_", ""))
-                .orElse("STUDENT");
-
-        String jwt = jwtUtils.generateJwtToken(userDetails.getUsername(), role);
-
-        // Save LoginHistory record
         try {
-            User user = userRepository.findById(userDetails.getId()).orElse(null);
-            if (user != null) {
-                String ua = request.getHeader("User-Agent");
-                String ip = getClientIp(request);
-                LoginHistory history = LoginHistory.builder()
-                        .user(user)
-                        .ipAddress(ip)
-                        .userAgent(ua)
-                        .browser(parseBrowser(ua))
-                        .operatingSystem(parseOS(ua))
-                        .deviceType(parseDeviceType(ua))
-                        .build();
-                loginHistoryRepository.save(history);
-            }
-        } catch (Exception e) {
-            // Keep login working even if analytics logging fails
-            log.warn("Failed to save login history for user {}: {}", userDetails.getUsername(), e.getMessage());
-        }
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
-        return ResponseEntity.ok(new JwtResponse(
-                jwt,
-                userDetails.getId(),
-                userDetails.getUsername(),
-                userDetails.getEmail(),
-                role,
-                userDetails.isPremium(),
-                userDetails.getPremiumExpiresAt()
-        ));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            
+            String role = userDetails.getAuthorities().stream()
+                    .findFirst()
+                    .map(item -> item.getAuthority().replace("ROLE_", ""))
+                    .orElse("STUDENT");
+
+            String jwt = jwtUtils.generateJwtToken(userDetails.getUsername(), role);
+
+            // Save LoginHistory record
+            try {
+                User user = userRepository.findById(userDetails.getId()).orElse(null);
+                if (user != null) {
+                    String ua = request.getHeader("User-Agent");
+                    String ip = getClientIp(request);
+                    LoginHistory history = LoginHistory.builder()
+                            .user(user)
+                            .ipAddress(ip)
+                            .userAgent(ua)
+                            .browser(parseBrowser(ua))
+                            .operatingSystem(parseOS(ua))
+                            .deviceType(parseDeviceType(ua))
+                            .build();
+                    loginHistoryRepository.save(history);
+                }
+            } catch (Exception e) {
+                // Keep login working even if analytics logging fails
+                log.warn("Failed to save login history for user {}: {}", userDetails.getUsername(), e.getMessage());
+            }
+
+            return ResponseEntity.ok(new JwtResponse(
+                    jwt,
+                    userDetails.getId(),
+                    userDetails.getUsername(),
+                    userDetails.getEmail(),
+                    role,
+                    userDetails.isPremium(),
+                    userDetails.getPremiumExpiresAt()
+            ));
+        } catch (org.springframework.security.core.AuthenticationException e) {
+            log.warn("Login failed for user '{}': {}", loginRequest.getUsername(), e.getMessage());
+            return ResponseEntity.status(401).body(new MessageResponse("Invalid username or password!"));
+        } catch (Exception e) {
+            log.error("Unexpected error during login for user '{}': ", loginRequest.getUsername(), e);
+            return ResponseEntity.status(500).body(new MessageResponse("Login failed: " + e.getMessage()));
+        }
     }
 
     private String getClientIp(HttpServletRequest request) {
