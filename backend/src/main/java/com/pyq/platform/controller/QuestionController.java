@@ -1,0 +1,592 @@
+package com.pyq.platform.controller;
+
+import com.pyq.platform.dto.*;
+import com.pyq.platform.entity.*;
+import com.pyq.platform.repository.QuestionAIAnalysisRepository;
+import com.pyq.platform.repository.QuestionRepository;
+import com.pyq.platform.repository.SubjectRepository;
+import com.pyq.platform.repository.TopicRepository;
+import com.pyq.platform.repository.UserRepository;
+import com.pyq.platform.security.UserDetailsImpl;
+import com.pyq.platform.service.CloudinaryService;
+import com.pyq.platform.service.QuestionService;
+import com.pyq.platform.mapper.QuestionMapper;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
+import java.awt.image.BufferedImage;
+import java.io.*;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.apache.pdfbox.text.PDFTextStripper;
+import javax.imageio.ImageIO;
+
+@RestController
+@RequestMapping("/api/questions")
+@Slf4j
+public class QuestionController {
+
+    private final QuestionService questionService;
+    private final QuestionRepository questionRepository;
+    private final SubjectRepository subjectRepository;
+    private final TopicRepository topicRepository;
+    private final UserRepository userRepository;
+    private final QuestionAIAnalysisRepository aiAnalysisRepository;
+    private final CloudinaryService cloudinaryService;
+    private final QuestionMapper questionMapper;
+
+    public QuestionController(QuestionService questionService, QuestionRepository questionRepository,
+            SubjectRepository subjectRepository,
+            TopicRepository topicRepository, UserRepository userRepository,
+            QuestionAIAnalysisRepository aiAnalysisRepository,
+            CloudinaryService cloudinaryService,
+            QuestionMapper questionMapper) {
+        this.questionService = questionService;
+        this.questionRepository = questionRepository;
+        this.subjectRepository = subjectRepository;
+        this.topicRepository = topicRepository;
+        this.userRepository = userRepository;
+        this.aiAnalysisRepository = aiAnalysisRepository;
+        this.cloudinaryService = cloudinaryService;
+        this.questionMapper = questionMapper;
+    }
+
+    // Public search with filters (anonymous access mapped in SecurityConfig)
+    @GetMapping
+    @Transactional(readOnly = true)
+    public ResponseEntity<PageDTO<QuestionDTO>> searchQuestions(
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "subjectId", required = false) Long subjectId,
+            @RequestParam(name = "topicId", required = false) Long topicId,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "type", required = false) String questionType,
+            @RequestParam(name = "tag", required = false) String tagName,
+            @RequestParam(name = "solvedStatus", required = false) String solvedStatus,
+            @RequestParam(name = "bookmarked", required = false) Boolean bookmarked,
+            @RequestParam(name = "status", required = false, defaultValue = "APPROVED") String status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+
+        Page<Question> questionsPage = questionService.searchQuestions(query, subjectId, topicId, year, questionType,
+                tagName, status, userId, solvedStatus, bookmarked, pageable);
+
+        List<QuestionDTO> dtos = questionsPage.getContent().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+
+        PageDTO<QuestionDTO> pageDTO = PageDTO.<QuestionDTO>builder()
+                .content(dtos)
+                .pageNumber(questionsPage.getNumber())
+                .pageSize(questionsPage.getSize())
+                .totalElements(questionsPage.getTotalElements())
+                .totalPages(questionsPage.getTotalPages())
+                .last(questionsPage.isLast())
+                .build();
+
+        return ResponseEntity.ok(pageDTO);
+    }
+
+    // Public detail view
+    @GetMapping("/{id}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getQuestionById(@PathVariable("id") Long id) {
+        Optional<Question> questionOpt = questionService.getQuestionById(id);
+        if (questionOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found with ID: " + id));
+        }
+        return ResponseEntity.ok(convertToDTO(questionOpt.get()));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<?> getStats() {
+        long approved = questionRepository.findAll().stream()
+                .filter(q -> "APPROVED".equalsIgnoreCase(q.getStatus()) && !"AI_NIGHTLY_GENERATOR".equalsIgnoreCase(q.getPdfSourceName()))
+                .count();
+        long pending = questionRepository.findAll().stream()
+                .filter(q -> "PENDING".equalsIgnoreCase(q.getStatus()) && !"AI_NIGHTLY_GENERATOR".equalsIgnoreCase(q.getPdfSourceName()))
+                .count();
+        long total = questionRepository.findAll().stream()
+                .filter(q -> !"AI_NIGHTLY_GENERATOR".equalsIgnoreCase(q.getPdfSourceName()))
+                .count();
+
+        java.util.Map<String, Long> stats = new java.util.HashMap<>();
+        stats.put("totalApproved", approved);
+        stats.put("totalPending", pending);
+        stats.put("totalQuestions", total);
+
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/background-stats")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> getBackgroundStats() {
+        long pending = aiAnalysisRepository.countPendingApprovedByModelName("fast-parse");
+        long completed = aiAnalysisRepository.countByModelName("llama-3.1-8b-comprehensive");
+        long fallback = aiAnalysisRepository.countByModelName("fallback");
+        long total = aiAnalysisRepository.count();
+
+        java.util.Map<String, Object> stats = new java.util.HashMap<>();
+        stats.put("pendingSolutions", pending);
+        stats.put("completedSolutions", completed);
+        stats.put("fallbackSolutions", fallback);
+        stats.put("totalSolutions", total);
+
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/years")
+    public ResponseEntity<List<Integer>> getDistinctYears() {
+        return ResponseEntity.ok(questionService.getDistinctYears());
+    }
+
+    // Admin/Editor Create Question
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> createQuestion(@Valid @RequestBody CreateQuestionRequest request) {
+        Subject subject = subjectRepository.findById(request.getSubjectId())
+                .orElse(null);
+        Topic topic = topicRepository.findById(request.getTopicId())
+                .orElse(null);
+
+        if (subject == null || topic == null) {
+            return ResponseEntity.badRequest()
+                    .body(new MessageResponse("Error: Invalid Subject ID or Topic ID provided!"));
+        }
+
+        Question question = Question.builder()
+                .text(request.getText())
+                .questionType(request.getQuestionType())
+                .marks(request.getMarks())
+                .negativeMarks(request.getNegativeMarks())
+                .year(request.getYear())
+                .subject(subject)
+                .topic(topic)
+                .pdfSourceName(request.getPdfSourceName())
+                .pdfSourcePath(request.getPdfSourcePath())
+                .pdfPageNumber(request.getPdfPageNumber())
+                .imagePath(request.getImagePath())
+                .status(request.getStatus())
+                .build();
+
+        try {
+            Question saved = questionService.createQuestion(question, request.getOptions(), request.getTags());
+            
+            // Save initial AI Analysis with user-defined answer/explanation
+            String ans = request.getAiSuggestedAnswer() != null && !request.getAiSuggestedAnswer().trim().isEmpty() 
+                    ? request.getAiSuggestedAnswer() : "A";
+            String exp = request.getAiSuggestedExplanation() != null && !request.getAiSuggestedExplanation().trim().isEmpty() 
+                    ? request.getAiSuggestedExplanation() : "### Detailed Solution\nThe correct answer is **" + ans + "**.";
+            aiAnalysisRepository.save(QuestionAIAnalysis.builder()
+                    .question(saved)
+                    .suggestedAnswer(ans)
+                    .suggestedExplanation(exp)
+                    .confidence(1.0)
+                    .modelName("manual-entry")
+                    .build());
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(convertToDTO(saved));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new MessageResponse(e.getMessage()));
+        }
+    }
+
+    // Admin/Editor Update Question
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> updateQuestion(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody CreateQuestionRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        Subject subject = subjectRepository.findById(request.getSubjectId())
+                .orElse(null);
+        Topic topic = topicRepository.findById(request.getTopicId())
+                .orElse(null);
+
+        if (subject == null || topic == null) {
+            return ResponseEntity.badRequest()
+                    .body(new MessageResponse("Error: Invalid Subject ID or Topic ID provided!"));
+        }
+
+        User editor = userRepository.findById(userDetails.getId()).orElseThrow();
+
+        Question updatedData = Question.builder()
+                .text(request.getText())
+                .questionType(request.getQuestionType())
+                .marks(request.getMarks())
+                .negativeMarks(request.getNegativeMarks())
+                .year(request.getYear())
+                .subject(subject)
+                .topic(topic)
+                .pdfSourceName(request.getPdfSourceName())
+                .pdfSourcePath(request.getPdfSourcePath())
+                .pdfPageNumber(request.getPdfPageNumber())
+                .imagePath(request.getImagePath())
+                .status(request.getStatus())
+                .isCommunityVerified(false) // reset community badge if edited by editor to re-validate
+                .build();
+
+        try {
+            Question updated = questionService.updateQuestion(id, updatedData, request.getOptions(), request.getTags(),
+                    editor);
+
+            // Update or create QuestionAIAnalysis record
+            Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
+                    .findFirstByQuestionIdOrderByCreatedAtDesc(updated.getId());
+            
+            String reqAns = request.getAiSuggestedAnswer();
+            String reqExp = request.getAiSuggestedExplanation();
+
+            if (aiOpt.isPresent()) {
+                QuestionAIAnalysis ai = aiOpt.get();
+                if (reqAns != null && !reqAns.trim().isEmpty()) {
+                    ai.setSuggestedAnswer(reqAns);
+                }
+                if (reqExp != null && !reqExp.trim().isEmpty()) {
+                    ai.setSuggestedExplanation(reqExp);
+                }
+                // If question is approved, we reset modelName to trigger regeneration of insights
+                if ("APPROVED".equalsIgnoreCase(updated.getStatus()) && !"fast-parse".equals(ai.getModelName())) {
+                    ai.setModelName("fast-parse");
+                    if (reqExp == null || reqExp.trim().isEmpty()) {
+                        ai.setSuggestedExplanation("### Detailed Solution\nThe correct answer is **" + ai.getSuggestedAnswer() + "**.");
+                    }
+                    ai.setMentorInsights(null);
+                }
+                aiAnalysisRepository.save(ai);
+            } else {
+                String ans = (reqAns != null && !reqAns.trim().isEmpty()) ? reqAns : "A";
+                String exp = (reqExp != null && !reqExp.trim().isEmpty()) ? reqExp : "### Detailed Solution\nThe correct answer is **" + ans + "**.";
+                aiAnalysisRepository.save(QuestionAIAnalysis.builder()
+                        .question(updated)
+                        .suggestedAnswer(ans)
+                        .suggestedExplanation(exp)
+                        .confidence(1.0)
+                        .modelName("manual-entry")
+                        .build());
+            }
+
+            return ResponseEntity.ok(convertToDTO(updated));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse(e.getMessage()));
+        }
+    }
+
+    // Admin/Editor Delete Question
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> deleteQuestion(@PathVariable("id") Long id) {
+        try {
+            questionService.deleteQuestion(id);
+            return ResponseEntity.ok(new MessageResponse("Question deleted successfully!"));
+        } catch (Exception e) {
+            log.error("Failed to delete question ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Error deleting question: " + e.getMessage()));
+        }
+    }
+
+    // Render the specific PDF source page of this question as a PNG image on the
+    @GetMapping("/{id}/page-image")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<byte[]> getQuestionPageImage(@PathVariable("id") Long id) {
+        Optional<Question> questionOpt = questionService.getQuestionById(id);
+        if (questionOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+
+        Question question = questionOpt.get();
+        String pdfPath = question.getPdfSourcePath();
+        Integer pageNum = question.getPdfPageNumber();
+        if (pdfPath == null || pageNum == null) return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+
+        File tempFile = null;
+        try {
+            ResolvedPdf resolved = resolvePdfFile(pdfPath);
+            if (resolved == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            tempFile = resolved.tempFile;
+
+            try (PDDocument document = PDDocument.load(resolved.pdfFile)) {
+                if (pageNum < 1 || pageNum > document.getNumberOfPages())
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+
+                PDFRenderer renderer = new PDFRenderer(document);
+                BufferedImage img = renderer.renderImageWithDPI(pageNum - 1, 150);
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(img, "PNG", baos);
+
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.setContentType(org.springframework.http.MediaType.IMAGE_PNG);
+                return new ResponseEntity<>(baos.toByteArray(), headers, HttpStatus.OK);
+            }
+        } catch (Exception e) {
+            log.error("Failed to render PDF page image for question {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            if (tempFile != null && tempFile.exists()) tempFile.delete();
+        }
+    }
+
+    @GetMapping("/{id}/page-text")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<String> getQuestionPageText(@PathVariable("id") Long id) {
+        Optional<Question> questionOpt = questionService.getQuestionById(id);
+        if (questionOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+
+        Question question = questionOpt.get();
+        String pdfPath = question.getPdfSourcePath();
+        Integer pageNum = question.getPdfPageNumber();
+        if (pdfPath == null || pageNum == null) return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+
+        File tempFile = null;
+        try {
+            ResolvedPdf resolved = resolvePdfFile(pdfPath);
+            if (resolved == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            tempFile = resolved.tempFile;
+
+            try (PDDocument document = PDDocument.load(resolved.pdfFile)) {
+                if (pageNum < 1 || pageNum > document.getNumberOfPages())
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(pageNum);
+                stripper.setEndPage(pageNum);
+                return ResponseEntity.ok(stripper.getText(document));
+            }
+        } catch (Exception e) {
+            log.error("Failed to extract PDF page text for question {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            if (tempFile != null && tempFile.exists()) tempFile.delete();
+        }
+    }
+
+    // ── Internal helper ────────────────────────────────────────────────────────
+
+    /** Holds a resolved PDF file handle plus an optional temp file to delete after use. */
+    private record ResolvedPdf(File pdfFile, File tempFile) {}
+
+    /**
+     * Resolves a PDF path (URL or local filesystem) into a concrete {@link File}.
+     * Returns {@code null} if the file cannot be found anywhere.
+     */
+    private ResolvedPdf resolvePdfFile(String pdfPath) throws IOException {
+        if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) {
+            File tempFile = File.createTempFile("pdf_temp_", ".pdf");
+            tempFile.deleteOnExit();
+            try (InputStream in = new URL(pdfPath).openStream()) {
+                Files.copy(in, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            return new ResolvedPdf(tempFile, tempFile);
+        }
+
+        // Try multiple local paths in priority order
+        String filename = new File(pdfPath).getName();
+        File[] candidates = {
+            new File(pdfPath),
+            new File("backend/" + pdfPath),
+            new File("uploads/pdfs/" + filename),
+            new File("backend/uploads/pdfs/" + filename)
+        };
+        for (File candidate : candidates) {
+            if (candidate.exists()) return new ResolvedPdf(candidate, null);
+        }
+        return null;
+    }
+
+    @PostMapping("/{id}/image")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> uploadQuestionImage(
+            @PathVariable("id") Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+
+        Optional<Question> questionOpt = questionService.getQuestionById(id);
+        if (questionOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found with ID: " + id));
+        }
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: File is empty!"));
+        }
+
+        try {
+            String imagePath;
+            if (cloudinaryService.isConfigured()) {
+                imagePath = cloudinaryService.uploadMultipartFile(file, "images");
+                if (imagePath == null) {
+                    throw new java.io.IOException("Failed to upload image to Cloudinary");
+                }
+            } else {
+                // Save file in uploads/images/
+                String originalName = file.getOriginalFilename();
+                String uniqueName = UUID.randomUUID().toString().substring(0, 8) + "_" + originalName;
+                java.io.File destFile = new java.io.File("uploads/images/" + uniqueName).getAbsoluteFile();
+                destFile.getParentFile().mkdirs();
+                file.transferTo(destFile);
+                imagePath = "/uploads/images/" + uniqueName;
+            }
+
+            Question question = questionOpt.get();
+            question.setImagePath(imagePath);
+            questionService.saveQuestion(question);
+
+            return ResponseEntity.ok(new MessageResponse(imagePath));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Error uploading image: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/upload-image")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> uploadGeneralImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: File is empty!"));
+        }
+
+        try {
+            String imagePath;
+            if (cloudinaryService.isConfigured()) {
+                imagePath = cloudinaryService.uploadMultipartFile(file, "images");
+                if (imagePath == null) {
+                    throw new java.io.IOException("Failed to upload image to Cloudinary");
+                }
+            } else {
+                String originalName = file.getOriginalFilename();
+                String uniqueName = java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + originalName;
+                java.io.File destFile = new java.io.File("uploads/images/" + uniqueName).getAbsoluteFile();
+                destFile.getParentFile().mkdirs();
+                file.transferTo(destFile);
+                imagePath = "/uploads/images/" + uniqueName;
+            }
+            return ResponseEntity.ok(new MessageResponse(imagePath));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Error uploading image: " + e.getMessage()));
+        }
+    }
+
+    private QuestionDTO convertToDTO(Question question) {
+        return questionMapper.convertToDTO(question);
+    }
+
+    // Get simulated exam with 65 questions matching standard GATE weightage
+    @GetMapping("/simulator")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getSimulatorExam() {
+
+        // GATE 2024 blueprint: [subjectKeyword, 1-mark count, 2-mark count]
+        // Each entry fetches directly from DB using ORDER BY RAND() — no full table load.
+        record BlueprintEntry(String keyword, int req1Mark, int req2Mark) {}
+
+        List<BlueprintEntry> blueprint = List.of(
+            new BlueprintEntry("aptitude",     5, 5),
+            new BlueprintEntry("math",         4, 5),
+            new BlueprintEntry("discrete",     0, 0), // covered by "math" keyword umbrella
+            new BlueprintEntry("digital",      2, 1),
+            new BlueprintEntry("organization", 2, 2),
+            new BlueprintEntry("programming",  3, 3),
+            new BlueprintEntry("algorithm",    3, 3),
+            new BlueprintEntry("computation",  3, 3),
+            new BlueprintEntry("compiler",     2, 1),
+            new BlueprintEntry("operating",    3, 3),
+            new BlueprintEntry("database",     2, 2),
+            new BlueprintEntry("network",      1, 4)
+        );
+
+        List<QuestionDTO> selected = new ArrayList<>();
+        Set<Long> selectedIds = new HashSet<>();
+
+        // Load all subjects once for keyword matching
+        List<com.pyq.platform.entity.Subject> allSubjects = subjectRepository.findAll();
+
+        for (BlueprintEntry entry : blueprint) {
+            if (entry.req1Mark() == 0 && entry.req2Mark() == 0) continue;
+
+            // Find matching subjects by keyword
+            List<Long> matchingSubjectIds = allSubjects.stream()
+                .filter(s -> s.getName().toLowerCase().contains(entry.keyword()))
+                .map(com.pyq.platform.entity.Subject::getId)
+                .collect(Collectors.toList());
+
+            if (matchingSubjectIds.isEmpty()) continue;
+
+            int totalNeeded = entry.req1Mark() + entry.req2Mark();
+            // Fetch slightly more than needed to account for mark-split filtering, then trim
+            int fetchLimit = totalNeeded * 3 + 10;
+
+            List<Question> pool = new ArrayList<>();
+            for (Long subjectId : matchingSubjectIds) {
+                pool.addAll(questionRepository.findRandomApprovedBySubject(subjectId, fetchLimit));
+            }
+
+            // Split by marks
+            List<Question> pool1 = pool.stream()
+                .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 1)
+                .distinct().collect(Collectors.toList());
+            List<Question> pool2 = pool.stream()
+                .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 2)
+                .distinct().collect(Collectors.toList());
+
+            // Pick up to required amounts
+            int drawn1 = 0;
+            for (Question q : pool1) {
+                if (drawn1 >= entry.req1Mark()) break;
+                selected.add(questionMapper.convertToDTO(q));
+                selectedIds.add(q.getId());
+                drawn1++;
+            }
+
+            int drawn2 = 0;
+            for (Question q : pool2) {
+                if (drawn2 >= entry.req2Mark()) break;
+                selected.add(questionMapper.convertToDTO(q));
+                selectedIds.add(q.getId());
+                drawn2++;
+            }
+        }
+
+        // Fill any remaining slots up to 65 from general pool
+        if (selected.size() < 65) {
+            int remaining = 65 - selected.size();
+            List<Question> extras = questionRepository.findRandomApproved(remaining * 2);
+            for (Question q : extras) {
+                if (selected.size() >= 65) break;
+                if (!selectedIds.contains(q.getId())) {
+                    selected.add(questionMapper.convertToDTO(q));
+                    selectedIds.add(q.getId());
+                }
+            }
+        }
+
+        // Hard cap at 65
+        if (selected.size() > 65) {
+            selected = selected.subList(0, 65);
+        }
+
+        return ResponseEntity.ok(selected);
+    }
+}
+

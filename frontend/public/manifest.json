@@ -1,0 +1,17 @@
+{
+  "short_name": "AIRGATE",
+  "name": "AIRGATE – GATE PYQs & AI Tutor Platform",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "description": "AIRGATE is India's premier AI-powered GATE preparation platform featuring 20+ years of solved papers, AI tutoring, and rank analytics."
+}

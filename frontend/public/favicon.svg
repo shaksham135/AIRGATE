@@ -1,0 +1,39 @@
+<svg width="64" height="64" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="favGradFinal" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00d2ff" />
+      <stop offset="50%" stop-color="#3a7bd5" />
+      <stop offset="100%" stop-color="#928dab" />
+    </linearGradient>
+    <linearGradient id="favABody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00c6ff" />
+      <stop offset="50%" stop-color="#0072ff" />
+      <stop offset="100%" stop-color="#7a22ff" />
+    </linearGradient>
+    <linearGradient id="favGBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="100%" stop-color="#4facfe" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Glow Circle for crisp browser tab visibility -->
+  <circle cx="60" cy="60" r="58" fill="#090d16" stroke="url(#favGradFinal)" stroke-width="3" />
+
+  <!-- Outer Orbital Arc Ring -->
+  <path d="M 22,74 A 42,42 0 1,1 98,74" stroke="url(#favGradFinal)" stroke-width="3" fill="none" opacity="0.9" />
+  <circle cx="60" cy="18" r="4.5" fill="#00f2fe" />
+
+  <!-- Main Outer Triangular 'A' Gateway -->
+  <path d="M 60,22 L 96,92 L 82,92 L 60,48 L 38,92 L 24,92 Z" fill="url(#favABody)" />
+
+  <!-- Central Stylized 'G' Lettermark -->
+  <path d="M 70,56 C 70,44 50,42 50,57 C 50,70 70,68 70,61 L 58,61" stroke="url(#favGBody)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+  <!-- Base Portal Bars -->
+  <rect x="46" y="74" width="3" height="18" fill="#00f2fe" rx="1" />
+  <rect x="71" y="74" width="3" height="18" fill="#00f2fe" rx="1" />
+
+  <!-- Center Bright Portal Light Door -->
+  <rect x="54" y="78" width="12" height="14" fill="#00f2fe" rx="2" />
+  <rect x="57" y="81" width="6" height="11" fill="#ffffff" rx="1" />
+</svg>

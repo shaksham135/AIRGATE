@@ -1,0 +1,21 @@
+# AIRGATE Search Engine Crawling Instructions for Googlebot & Bingbot
+User-agent: *
+Allow: /
+Allow: /explore
+Allow: /practice
+Allow: /simulator
+Allow: /privacy
+Allow: /terms
+Allow: /contact
+Allow: /login
+Allow: /register
+Allow: /premium
+
+# Disallow indexing private admin dashboard routes
+Disallow: /admin
+Disallow: /uploads
+Disallow: /review
+Disallow: /users
+Disallow: /profile
+
+Sitemap: /sitemap.xml

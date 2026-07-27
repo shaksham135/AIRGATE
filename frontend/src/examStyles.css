@@ -1,0 +1,21 @@
+/* Exam Simulator specific styles */
+.timer-warning {
+  color: orange;
+}
+
+.timer-danger {
+  color: red;
+}
+
+.light-paper {
+  background: #fafafa; /* light background */
+  color: #222; /* dark text */
+}
+
+.calc-light {
+  background: #f9f9f9;
+  color: #000;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+}

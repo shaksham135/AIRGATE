@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # MySQL 8.0 Database Container
+  mysql-db:
+    image: mysql:8.0
+    container_name: airgate-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: pyq_db
+      MYSQL_ROOT_PASSWORD: airgate_production_password_2026
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # Spring Boot Backend Container
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: airgate-backend
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/pyq_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: airgate_production_password_2026
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET:-airgate_production_super_secure_jwt_secret_key_32bytes_minimum_length_2026}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql_data:

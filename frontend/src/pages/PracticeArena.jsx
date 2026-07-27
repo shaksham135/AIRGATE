@@ -1,0 +1,667 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import AuthService from '../services/AuthService';
+import API_CONFIG from '../config/api';
+import { getAssetUrl, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis } from '../utils/mathRenderer';
+import { 
+  FiSearch, FiBookOpen, FiLayers, FiAlertTriangle, FiCheckCircle, 
+  FiBookmark, FiMessageSquare, FiFilter, FiLoader, FiLock, FiClock, FiCheckSquare, FiRotateCcw, FiZap
+} from 'react-icons/fi';
+import PremiumGateModal from '../components/PremiumGateModal';
+import LoginGate from '../components/LoginGate';
+
+export default function PracticeArena() {
+  const [subjects, setSubjects] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearchQuery, setActiveSearchQuery] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+  const [selectedTopicId, setSelectedTopicId] = useState(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState('ALL');
+  const [selectedType, setSelectedType] = useState('ALL');
+
+  // Pagination
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+
+  // Daily Quota State
+  const [quota, setQuota] = useState({ usedToday: 0, limitToday: 30, isPremium: false, remainingToday: 30 });
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showLoginGateModal, setShowLoginGateModal] = useState(false);
+
+  // Interactive Question States
+  const [selectedOptions, setSelectedOptions] = useState({});
+  const [tempMsqSelections, setTempMsqSelections] = useState({});
+  const [natInputs, setNatInputs] = useState({});
+  const [revealedAnswers, setRevealedAnswers] = useState({});
+  const [resetCounts, setResetCounts] = useState({});
+
+  const currentUser = AuthService.getCurrentUser();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    AuthService.checkAndRefreshUserStatus(true).then(() => {
+      fetchDailyQuota();
+    });
+    fetchSubjects();
+  }, []);
+
+  useEffect(() => {
+    if (selectedSubjectId) {
+      fetchTopics(selectedSubjectId);
+    } else {
+      setTopics([]);
+    }
+  }, [selectedSubjectId]);
+
+  useEffect(() => {
+    fetchPracticeQuestions(page);
+  }, [page, pageSize, selectedSubjectId, selectedTopicId, selectedDifficulty, selectedType, activeSearchQuery]);
+
+  const fetchDailyQuota = async () => {
+    if (!currentUser) return;
+    try {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/practice/quota`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setQuota(response.data);
+    } catch (err) {
+      console.error("Failed to load practice quota", err);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/subjects`);
+      setSubjects(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Failed to load subjects', err);
+    }
+  };
+
+  const fetchTopics = async (subjectId) => {
+    try {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/subjects/${subjectId}/topics`);
+      setTopics(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Failed to load topics', err);
+    }
+  };
+
+  const fetchPracticeQuestions = async (pageNumber = 0) => {
+    setLoading(true);
+    try {
+      const params = {
+        page: pageNumber,
+        size: pageSize
+      };
+      if (selectedSubjectId) params.subjectId = selectedSubjectId;
+      if (selectedTopicId) params.topicId = selectedTopicId;
+      if (selectedDifficulty && selectedDifficulty !== 'ALL') params.difficulty = selectedDifficulty;
+      if (selectedType && selectedType !== 'ALL') params.type = selectedType;
+      if (activeSearchQuery && activeSearchQuery.trim()) params.query = activeSearchQuery.trim();
+
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/practice/questions`, {
+        params,
+        headers: AuthService.getAuthHeader()
+      });
+
+      if (response.data && response.data.content) {
+        setQuestions(response.data.content);
+        setTotalPages(response.data.totalPages || 0);
+        setTotalElements(response.data.totalElements || 0);
+      } else {
+        setQuestions([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch practice questions', err);
+      setQuestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setPage(0);
+    setActiveSearchQuery(searchQuery);
+  };
+
+  const handleSelectOption = (questionId, label, isMsq = false) => {
+    if (isMsq) {
+      setTempMsqSelections(prev => {
+        const current = prev[questionId] || [];
+        const exists = current.includes(label);
+        return {
+          ...prev,
+          [questionId]: exists ? current.filter(l => l !== label) : [...current, label].sort()
+        };
+      });
+    } else {
+      setSelectedOptions(prev => ({ ...prev, [questionId]: label }));
+    }
+  };
+
+  const handleNatInputChange = (questionId, value) => {
+    setNatInputs(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const handleLockAndVerifyAnswer = async (question) => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+
+    // Quota Check
+    if (!quota.isPremium && quota.usedToday >= quota.limitToday) {
+      setShowQuotaModal(true);
+      return;
+    }
+
+    let finalSelection = '';
+    if (question.questionType === 'MSQ') {
+      const selections = tempMsqSelections[question.id] || [];
+      if (selections.length === 0) {
+        alert('Please select at least one option for MSQ!');
+        return;
+      }
+      finalSelection = selections.join(',');
+    } else if (question.questionType === 'NAT') {
+      const input = natInputs[question.id];
+      if (!input || !input.trim()) {
+        alert('Please enter your numerical answer!');
+        return;
+      }
+      finalSelection = input.trim();
+    } else {
+      finalSelection = selectedOptions[question.id];
+      if (!finalSelection) {
+        alert('Please select an option first!');
+        return;
+      }
+    }
+
+    if (!currentUser) {
+      setShowLoginGateModal(true);
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${question.id}/solve`, {
+        selectedOption: finalSelection,
+        timeTaken: "30"
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+
+      if (response.data) {
+        setRevealedAnswers(prev => ({ ...prev, [question.id]: true }));
+        fetchDailyQuota(); // Update remaining count live
+      }
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setShowLoginGateModal(true);
+      } else if (err.response?.status === 429 || err.response?.data?.error === 'QUOTA_EXCEEDED') {
+        setShowQuotaModal(true);
+      } else {
+        alert(err.response?.data?.message || 'Failed to submit answer.');
+      }
+    }
+  };
+
+  const handleResetAnswer = (questionId) => {
+    const currentCount = resetCounts[questionId] || 0;
+    if (currentCount >= 3) return;
+    setResetCounts(prev => ({ ...prev, [questionId]: currentCount + 1 }));
+    setRevealedAnswers(prev => ({ ...prev, [questionId]: false }));
+  };
+
+  return (
+    <div className="practice-arena-container" style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', color: 'var(--text-primary)' }}>
+      
+      {/* ── TOP BANNER: CONCEPTUAL PRACTICE & DAILY QUOTA PROGRESS ────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(6, 182, 212, 0.08) 100%)',
+        border: '1px solid rgba(99, 102, 241, 0.25)',
+        borderRadius: '24px',
+        padding: '32px',
+        marginBottom: '28px',
+        boxShadow: '0 12px 35px rgba(0, 0, 0, 0.25)',
+        backdropFilter: 'blur(10px)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)',
+                width: '40px', height: '40px', borderRadius: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
+              }}>
+                <FiZap size={22} style={{ color: '#fff' }} />
+              </div>
+              <h1 style={{ fontSize: '1.85rem', fontWeight: 900, margin: 0, color: '#fff', letterSpacing: '-0.02em' }}>
+                Conceptual Practice Arena
+              </h1>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              High-Yield Topic-Wise Practice Questions Engineered to Maximize Your GATE Score
+            </p>
+          </div>
+
+          {/* Daily Quota Counter Badge */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            minWidth: '260px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', fontWeight: 700, marginBottom: '10px', gap: '16px' }}>
+              <span style={{ color: 'var(--text-muted)', letterSpacing: '0.05em' }}>DAILY SOLVE QUOTA</span>
+              <span style={{ color: quota.isPremium ? '#10b981' : quota.usedToday >= quota.limitToday ? '#ef4444' : '#818cf8', whiteSpace: 'nowrap', fontWeight: 800 }}>
+                {quota.isPremium ? 'UNLIMITED 👑' : `${quota.usedToday} / ${quota.limitToday} Solved`}
+              </span>
+            </div>
+            {!quota.isPremium && (
+              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(100, (quota.usedToday / quota.limitToday) * 100)}%`,
+                  background: quota.usedToday >= quota.limitToday ? '#ef4444' : 'linear-gradient(90deg, #6366f1, #a855f7)',
+                  borderRadius: '4px',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            )}
+            {!quota.isPremium && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'right' }}>
+                {Math.max(0, quota.limitToday - quota.usedToday)} questions remaining today
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── FILTERS BAR (No Year Filter for Practice Questions) ───────────── */}
+      <div style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '16px',
+        padding: '20px',
+        marginBottom: '28px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+            <FiSearch style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search conceptual practice questions..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 14px 12px 42px',
+                backgroundColor: 'var(--bg-main)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                color: '#fff',
+                fontSize: '0.9rem'
+              }}
+            />
+          </div>
+          <button type="submit" className="btn btn-primary" style={{ padding: '0 24px', borderRadius: '10px', fontWeight: 700 }}>
+            Search
+          </button>
+        </form>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+          {/* Subject Dropdown */}
+          <select
+            value={selectedSubjectId || ''}
+            onChange={e => {
+              setSelectedSubjectId(e.target.value ? Number(e.target.value) : null);
+              setSelectedTopicId(null);
+              setPage(0);
+            }}
+            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+          >
+            <option value="">All Subjects</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+
+          {/* Topic Dropdown */}
+          <select
+            value={selectedTopicId || ''}
+            onChange={e => { setSelectedTopicId(e.target.value ? Number(e.target.value) : null); setPage(0); }}
+            disabled={!selectedSubjectId}
+            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', opacity: !selectedSubjectId ? 0.5 : 1 }}
+          >
+            <option value="">All Topics</option>
+            {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+
+          {/* Difficulty Dropdown */}
+          <select
+            value={selectedDifficulty}
+            onChange={e => { setSelectedDifficulty(e.target.value); setPage(0); }}
+            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+          >
+            <option value="ALL">All Difficulties</option>
+            <option value="EASY">🟢 Easy</option>
+            <option value="MEDIUM">🟡 Medium</option>
+            <option value="HARD">🔴 Hard</option>
+          </select>
+
+          {/* Question Type Dropdown */}
+          <select
+            value={selectedType}
+            onChange={e => { setSelectedType(e.target.value); setPage(0); }}
+            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+          >
+            <option value="ALL">All Question Types</option>
+            <option value="MCQ">MCQ (Single Choice)</option>
+            <option value="MSQ">MSQ (Multiple Select)</option>
+            <option value="NAT">NAT (Numerical)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ── QUESTION FEED ─────────────────────────────────────────────────── */}
+      <div id="practice-questions-start"></div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+          <FiLoader size={36} className="spin-animation" />
+          <p style={{ marginTop: '12px' }}>Loading Conceptual Practice Questions...</p>
+        </div>
+      ) : questions.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+          <h3>No Conceptual Questions Found</h3>
+          <p style={{ color: 'var(--text-muted)' }}>Try resetting your subject/topic or difficulty filters.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {questions.map((q, index) => {
+            const isRevealed = revealedAnswers[q.id];
+            const retryCount = resetCounts[q.id] || 0;
+
+            return (
+              <div key={q.id} style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                padding: '24px',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                {/* Header Badge */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ padding: '4px 10px', background: 'rgba(99, 102, 241, 0.2)', color: '#c4b5fd', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 800 }}>
+                      PRACTICE Q{page * pageSize + index + 1}
+                    </span>
+                    <span style={{ padding: '4px 10px', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', borderRadius: '6px', fontSize: '0.78rem' }}>
+                      {q.subjectName} • {q.topicName}
+                    </span>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      background: q.difficulty === 'HARD' ? 'rgba(239, 68, 68, 0.2)' : q.difficulty === 'EASY' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                      color: q.difficulty === 'HARD' ? '#ef4444' : q.difficulty === 'EASY' ? '#10b981' : '#f59e0b'
+                    }}>
+                      {q.difficulty || 'MEDIUM'}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{q.questionType}</span>
+                </div>
+
+                {/* Question Stem */}
+                <div style={{ fontSize: '1rem', lineHeight: '1.6', marginBottom: '20px', color: '#fff' }}>
+                  {renderQuestionText(q.text)}
+                </div>
+
+                {/* Options List */}
+                {q.options && q.options.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', marginBottom: '20px' }}>
+                    {q.options.map(opt => {
+                      const isMsq = q.questionType === 'MSQ';
+                      const isSelected = isMsq 
+                        ? (tempMsqSelections[q.id] || []).includes(opt.optionLabel)
+                        : selectedOptions[q.id] === opt.optionLabel;
+
+                      return (
+                        <div
+                          key={opt.id}
+                          onClick={() => !isRevealed && handleSelectOption(q.id, opt.optionLabel, isMsq)}
+                          style={{
+                            padding: '14px 18px',
+                            borderRadius: '10px',
+                            background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-main)',
+                            border: `1px solid ${isSelected ? '#6366f1' : 'var(--border-color)'}`,
+                            cursor: isRevealed ? 'default' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '6px',
+                            background: isSelected ? '#6366f1' : 'rgba(255,255,255,0.06)',
+                            color: isSelected ? '#fff' : 'var(--text-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: '0.82rem'
+                          }}>
+                            {opt.optionLabel}
+                          </span>
+                          <div style={{ fontSize: '0.92rem', color: '#e2e8f0' }}>
+                            {renderQuestionText(opt.optionText)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* NAT Input */
+                  <div style={{ marginBottom: '20px' }}>
+                    <input
+                      type="number"
+                      placeholder="Enter numerical answer..."
+                      value={natInputs[q.id] || ''}
+                      onChange={e => handleNatInputChange(q.id, e.target.value)}
+                      disabled={isRevealed}
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-main)',
+                        color: '#fff',
+                        fontSize: '0.95rem',
+                        width: '260px'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Actions Footer */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  {!isRevealed ? (
+                    <button
+                      onClick={() => handleLockAndVerifyAnswer(q)}
+                      className="btn btn-primary"
+                      style={{ padding: '10px 20px', borderRadius: '8px', fontWeight: 700 }}
+                    >
+                      Lock & Check Answer
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 700 }}>✓ Answer Saved</span>
+                      {retryCount < 3 ? (
+                        <button
+                          onClick={() => handleResetAnswer(q.id)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            background: 'rgba(99, 102, 241, 0.15)',
+                            border: '1px solid rgba(99, 102, 241, 0.35)',
+                            color: '#c4b5fd',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <FiRotateCcw size={14} /> Mark Unsolved ({3 - retryCount} retry left)
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>🔒 Max 3 resets used</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Revealed Answer & Explanation Block */}
+                {isRevealed && (
+                  <div style={{ marginTop: '20px', padding: '16px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <div style={{ fontWeight: 800, color: '#10b981', marginBottom: '6px', fontSize: '0.9rem' }}>
+                      Correct Answer: {q.aiSuggestedAnswer || 'See Explanation'}
+                    </div>
+                    {q.aiSuggestedExplanation && (
+                      <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                        {renderMentorAnalysis(q.aiSuggestedExplanation)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── PAGINATION CONTROLS ────────────────────────────────────────────── */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justify: 'center',
+          alignItems: 'center',
+          gap: '12px',
+          marginTop: '32px',
+          marginBottom: '32px'
+        }}>
+          <button
+            onClick={() => {
+              setPage(p => Math.max(0, p - 1));
+              const feedEl = document.getElementById('practice-questions-start');
+              if (feedEl) feedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            disabled={page === 0}
+            className="btn btn-outline"
+            style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', opacity: page === 0 ? 0.5 : 1 }}
+          >
+            ← Previous
+          </button>
+          <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+            Page {page + 1} of {totalPages} ({totalElements} Total Questions)
+          </span>
+          <button
+            onClick={() => {
+              setPage(p => Math.min(totalPages - 1, p + 1));
+              const feedEl = document.getElementById('practice-questions-start');
+              if (feedEl) feedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            disabled={page >= totalPages - 1}
+            className="btn btn-outline"
+            style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', opacity: page >= totalPages - 1 ? 0.5 : 1 }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      {/* ── DAILY 30-LIMIT EXCEEDED MODAL ──────────────────────────────────── */}
+      {showQuotaModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid rgba(99, 102, 241, 0.4)',
+            borderRadius: '24px',
+            padding: '36px',
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🛑</div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginBottom: '12px' }}>
+              Daily Practice Limit Reached!
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '24px' }}>
+              You have completed your free quota of <strong>30 conceptual practice questions</strong> for today. Take rest to process what you learned, or upgrade to <strong>Aspirant Pro</strong> for unlimited daily practice!
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                onClick={() => { setShowQuotaModal(false); navigate('/premium'); }}
+                className="btn btn-primary"
+                style={{ padding: '14px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem' }}
+              >
+                👑 Upgrade to Aspirant Pro (Unlimited Solves)
+              </button>
+              <button
+                onClick={() => setShowQuotaModal(false)}
+                style={{
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: 'transparent',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Continue Browsing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <LoginGate
+        isOpen={showLoginGateModal}
+        onClose={() => setShowLoginGateModal(false)}
+        title="Sign in to Submit & Track Progress"
+        message="Practice questions are completely free to view! Sign in or create a free account to lock your answers and track your Prep Analyst statistics."
+      />
+    </div>
+  );
+}

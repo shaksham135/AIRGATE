@@ -1,0 +1,31 @@
+# Target & Build Directories
+**/target/
+**/dist/
+**/build/
+.mvn/
+*.jar
+*.war
+
+# Node Dependencies
+**/node_modules/
+package-lock.json
+
+# Environment & Credentials
+.env
+.env.local
+*.pem
+*.key
+
+# Temp Uploads
+uploads/
+**/uploads/images/*
+**/uploads/pdfs/*
+!**/uploads/images/.gitkeep
+!**/uploads/pdfs/.gitkeep
+
+# IDE & OS Metadata
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

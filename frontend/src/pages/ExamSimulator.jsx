@@ -1,0 +1,1439 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import AuthService from '../services/AuthService';
+import { useNavigate } from 'react-router-dom';
+import { FiClock, FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiGrid, FiList, FiCpu, FiPlus } from 'react-icons/fi';
+import { formatMathText, renderQuestionText, renderOptionContent, getAssetUrl } from '../utils/mathRenderer';
+import API_CONFIG from '../config/api';
+import LoginGate from '../components/LoginGate';
+import PremiumGateModal from '../components/PremiumGateModal';
+
+export default function ExamSimulator() {
+  return (
+    <LoginGate featureName="Mock Test Arena" featureIcon="🏆">
+      <MockTestArena />
+    </LoginGate>
+  );
+}
+
+function MockTestArena() {
+  const navigate = useNavigate();
+  
+  // State variables
+  const [questions, setQuestions] = useState([]);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('standard');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [customQuestionCount, setCustomQuestionCount] = useState(10);
+  const [customTime, setCustomTime] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [examStarted, setExamStarted] = useState(false);
+  const [examSubmitted, setExamSubmitted] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Exam progress state
+  const [answers, setAnswers] = useState({}); // { questionId: answerText }
+  const [visited, setVisited] = useState(new Set([0]));
+  const [flagged, setFlagged] = useState(new Set());
+  const [timeLeft, setTimeLeft] = useState(180 * 60); // 3 hours in seconds
+  
+  // Scientific Calculator popover state
+  const [showCalc, setShowCalc] = useState(false);
+  const [calcInput, setCalcInput] = useState('');
+  
+  // Results details
+  const [results, setResults] = useState({
+    score: 0.0,
+    correctCount: 0,
+    incorrectCount: 0,
+    skippedCount: 0,
+    negativeWastage: 0.0,
+    subjectBreakdown: {}
+  });
+
+  const timerRef = useRef(null);
+  const timeLeftRef = useRef(180 * 60); // track time taken for history
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+  const isUnloadingRef = useRef(false);
+
+  // Refs to access latest state inside event handlers (avoids stale closure)
+  const questionsRef = useRef([]);
+  const answersRef = useRef({});
+  const examStartedRef = useRef(false);
+  const examSubmittedRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { examStartedRef.current = examStarted; }, [examStarted]);
+  useEffect(() => { examSubmittedRef.current = examSubmitted; }, [examSubmitted]);
+
+  // Load questions when exam starts
+  const startExam = async () => {
+    // Enforce DB-backed limits for free users (Bypass-proof against LocalStorage clearing)
+    if (!AuthService.isPremium()) {
+      try {
+        let history = [];
+        try {
+          const res = await axios.get(`${API_CONFIG.BASE_URL}/api/simulator/history`, {
+            headers: AuthService.getAuthHeader()
+          });
+          if (Array.isArray(res.data)) {
+            history = res.data;
+          }
+        } catch (dbErr) {
+          history = JSON.parse(localStorage.getItem('gate_mock_history') || '[]');
+        }
+
+        if (activeTab === 'standard') {
+          const standardAttempts = history.filter(h => h.mode === 'standard' || (!h.mode && (h.totalQuestions > 20 || h.totalQuestions === 0))).length;
+          if (standardAttempts >= 3) {
+            alert(`You have used your 3 Free Full-Syllabus PYQ Mock attempts! Upgrade to Aspirant Pro for unlimited mock sessions.`);
+            setShowPremiumModal(true);
+            return;
+          }
+        } else if (activeTab === 'hybrid') {
+          const hybridAttempts = history.filter(h => h.mode === 'hybrid').length;
+          if (hybridAttempts >= 2) {
+            alert(`You have used your 2 Free Smart Hybrid Mock attempts! Upgrade to Aspirant Pro for unlimited access.`);
+            setShowPremiumModal(true);
+            return;
+          }
+        } else if (activeTab === 'custom') {
+          const customAttempts = history.filter(h => h.mode === 'custom').length;
+          if (customAttempts >= 2) {
+            alert(`You have used your 2 Free Subject Practice Mocks! Upgrade to Aspirant Pro at ₹99/mo to unlock unlimited Subject-wise practice mocks.`);
+            setShowPremiumModal(true);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to check free mock limits", e);
+      }
+    }
+
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/simulator`);
+      if (res.data.length === 0) {
+        alert("The database is currently empty. Please ask the administrator to upload exam papers before starting mock tests.");
+        setLoading(false);
+        return;
+      }
+
+      let finalQuestions = res.data;
+      if (activeTab === 'standard') {
+        // Mode 1: 100% Official PYQs
+        const pyqOnly = finalQuestions.filter(q => q.pdfSourceName !== 'AI_NIGHTLY_GENERATOR');
+        if (pyqOnly.length > 0) finalQuestions = pyqOnly;
+      } else if (activeTab === 'hybrid') {
+        // Mode 2: Smart Hybrid Mock (70% Double-Verified + 30% PYQ)
+        const doubleVerified = finalQuestions.filter(q => q.pdfSourceName === 'AI_NIGHTLY_GENERATOR');
+        const officialPyqs = finalQuestions.filter(q => q.pdfSourceName !== 'AI_NIGHTLY_GENERATOR');
+        
+        if (doubleVerified.length > 0) {
+          // Shuffle function
+          const shuffle = arr => arr.sort(() => Math.random() - 0.5);
+          const targetVerified = Math.min(doubleVerified.length, Math.floor(finalQuestions.length * 0.7));
+          const targetPyq = finalQuestions.length - targetVerified;
+
+          const pickedVerified = shuffle(doubleVerified).slice(0, targetVerified);
+          const pickedPyq = shuffle(officialPyqs).slice(0, targetPyq);
+          finalQuestions = shuffle([...pickedVerified, ...pickedPyq]);
+        }
+      } else if (activeTab === 'custom' && selectedSubject) {
+        // Mode 3: Subject Practice Mock
+        finalQuestions = finalQuestions.filter(q => q.subjectName === selectedSubject);
+        if (finalQuestions.length === 0) {
+          alert(`No approved questions found for subject "${selectedSubject}" in database. Starting standard full syllabus mock instead.`);
+          finalQuestions = res.data;
+        } else {
+          finalQuestions = finalQuestions.slice(0, customQuestionCount);
+        }
+      }
+
+      setQuestions(finalQuestions);
+      setAnswers({});
+      setVisited(new Set([0]));
+      setFlagged(new Set());
+      setTimeLeft((activeTab === 'custom' ? customTime : 180) * 60);
+      setExamStarted(true);
+      setExamSubmitted(false);
+      setCurrentIndex(0);
+      
+      // Force Fullscreen mode automatically when exam starts
+      enterFullscreen();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to compile simulator exam. Make sure database contains approved questions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Keep timeLeftRef in sync
+  useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+
+  // Timer effect
+  useEffect(() => {
+    if (examStarted && !examSubmitted) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            submitExam(true); // Auto submit
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [examStarted, examSubmitted]);
+
+  // Auto-submit when user navigates AWAY from exam page (in-app nav or tab close)
+  useEffect(() => {
+    // Helper: save attempt to localStorage history
+    const saveAttemptHistory = (res, qs, ans, timeTaken, autoSubmitted) => {
+      try {
+        const history = JSON.parse(localStorage.getItem('gate_mock_history') || '[]');
+        const cleanQs = qs.map(q => ({
+          id: q.id,
+          text: q.text,
+          questionType: q.questionType,
+          marks: q.marks,
+          subjectName: q.subjectName,
+          imagePath: q.imagePath,
+          options: q.options?.map(o => ({
+            id: o.id,
+            optionLabel: o.optionLabel,
+            optionText: o.optionText
+          })) || [],
+          aiSuggestedAnswer: q.aiSuggestedAnswer,
+          aiSuggestedExplanation: q.aiSuggestedExplanation
+        }));
+        history.unshift({
+          id: Date.now(),
+          mode: activeTab,
+          date: new Date().toISOString(),
+          score: res.score,
+          totalQuestions: qs.length,
+          correctCount: res.correctCount,
+          incorrectCount: res.incorrectCount,
+          skippedCount: res.skippedCount,
+          negativeWastage: res.negativeWastage,
+          subjectBreakdown: res.subjectBreakdown,
+          timeTakenSeconds: timeTaken,
+          autoSubmitted,
+          questions: cleanQs,
+          answers: ans,
+        });
+        // Keep only last 30 attempts
+        if (history.length > 30) history.splice(30);
+        localStorage.setItem('gate_mock_history', JSON.stringify(history));
+      } catch (e) { console.error('Failed to save history', e); }
+    };
+
+    // Shared submit logic using refs (no stale closure)
+    const autoSubmitViaRef = () => {
+      if (!examStartedRef.current || examSubmittedRef.current) return;
+      if (timerRef.current) clearInterval(timerRef.current);
+
+      const qs = questionsRef.current;
+      const ans = answersRef.current;
+      let totalScore = 0.0, correct = 0, incorrect = 0, skipped = 0, negativeWasted = 0.0;
+      const subjBreak = {};
+
+      qs.forEach((q) => {
+        const userAns = ans[q.id];
+        const subject = q.subjectName || 'Uncategorized';
+        if (!subjBreak[subject]) subjBreak[subject] = { total: 0, correct: 0, score: 0.0 };
+        subjBreak[subject].total++;
+
+        if (!userAns) {
+          skipped++;
+        } else {
+          const isCorrect = evaluateAnswer(q, userAns);
+          if (isCorrect) {
+            correct++;
+            totalScore += q.marks;
+            subjBreak[subject].correct++;
+            subjBreak[subject].score += q.marks;
+          } else {
+            incorrect++;
+            if (q.questionType === 'MCQ') {
+              const penalty = q.marks === 1 ? 1/3 : 2/3;
+              totalScore -= penalty;
+              negativeWasted += penalty;
+              subjBreak[subject].score -= penalty;
+            }
+          }
+        }
+      });
+
+      const finalResults = {
+        score: Math.max(0.0, parseFloat(totalScore.toFixed(2))),
+        correctCount: correct,
+        incorrectCount: incorrect,
+        skippedCount: skipped,
+        negativeWastage: parseFloat(negativeWasted.toFixed(2)),
+        subjectBreakdown: subjBreak,
+      };
+      const timeTaken = (180 * 60) - timeLeftRef.current;
+      saveAttemptHistory(finalResults, qs, ans, timeTaken, true);
+      setResults(finalResults);
+      setExamSubmitted(true);
+      examSubmittedRef.current = true;
+    };
+
+    // 1. Tab close/refresh → ONLY warn, do NOT auto-submit here
+    //    (user might click Cancel — we must not submit if they stay)
+    const onBeforeUnload = (e) => {
+      if (!examStartedRef.current || examSubmittedRef.current) return;
+      e.preventDefault();
+      e.returnValue = 'Your mock exam is still in progress. Leaving will auto-submit your answers.';
+      return e.returnValue;
+    };
+
+    // 2. Actual page unload (confirmed refresh or tab close)
+    const onUnload = () => {
+      isUnloadingRef.current = true;
+      autoSubmitViaRef();
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('unload', onUnload);
+
+    // 3. Cleanup = component unmount = in-app navigation → auto-submit
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('unload', onUnload);
+      
+      // Only auto-submit on component unmount if the page itself is NOT unloading
+      if (!isUnloadingRef.current) {
+        autoSubmitViaRef(); // only fires if exam was running and not yet submitted
+      }
+    };
+  }, []); // runs once — uses refs for latest state
+
+  // Navigate index helpers
+  const handleNav = (index) => {
+    if (index >= 0 && index < questions.length) {
+      setCurrentIndex(index);
+      setVisited((prev) => {
+        const next = new Set(prev);
+        next.add(index);
+        return next;
+      });
+    }
+  };
+
+  // Calculator button evaluator
+  const handleCalcBtn = (val) => {
+    if (val === 'C') {
+      setCalcInput('');
+    } else if (val === '=') {
+      try {
+        // Safe evaluation replacements
+        let expr = calcInput
+          .replace(/sin\(/g, 'Math.sin(')
+          .replace(/cos\(/g, 'Math.cos(')
+          .replace(/tan\(/g, 'Math.tan(')
+          .replace(/log\(/g, 'Math.log10(')
+          .replace(/ln\(/g, 'Math.log(')
+          .replace(/pi/g, 'Math.PI')
+          .replace(/sqrt\(/g, 'Math.sqrt(')
+          .replace(/\^/g, '**');
+        
+        const result = eval(expr);
+        setCalcInput(Number(result).toFixed(4).toString());
+      } catch (e) {
+        setCalcInput('Error');
+      }
+    } else {
+      setCalcInput(prev => prev + val);
+    }
+  };
+  // Fullscreen Exit & Navigation Warning States
+  const [showExitWarningModal, setShowExitWarningModal] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState(null);
+
+  // Track fullscreen state changes & issue warning if user minimizes during exam
+  React.useEffect(() => {
+    const onFsChange = () => {
+      const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFullscreen(inFs);
+      
+      // Hide/show the main app sidebar
+      const appSidebar = document.querySelector('aside.sidebar');
+      if (appSidebar) {
+        appSidebar.style.display = inFs ? 'none' : '';
+      }
+      const mainContent = document.querySelector('main.main-content');
+      if (mainContent) {
+        mainContent.style.marginLeft = inFs ? '0' : '';
+        mainContent.style.width = inFs ? '100%' : '';
+      }
+
+      // If exam is running and user exits fullscreen, trigger warning modal
+      if (!inFs && examStartedRef.current && !examSubmittedRef.current) {
+        setShowExitWarningModal(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
+  }, []);
+
+  // Request fullscreen mode for the exam page
+  const enterFullscreen = () => {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch((err) => console.error('Fullscreen error:', err));
+    } else if (elem.webkitRequestFullscreen) {
+      elem.webkitRequestFullscreen();
+    }
+  };
+
+  const exitFullscreen = () => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  };
+
+  // Check answer accuracy matching SolveController range and decimal checks
+  const evaluateAnswer = (q, selected) => {
+    if (!selected) return false;
+    const correct = q.aiSuggestedAnswer;
+    if (!correct) return false;
+
+    let c = correct.trim().toLowerCase().replace(/^(option\s+)/i, '');
+    let s = selected.trim().toLowerCase().replace(/^(option\s+)/i, '');
+    
+    if (c === s) return true;
+
+    // Robust check for MSQ answers
+    if (q.questionType === 'MSQ') {
+      const cLetters = c.toUpperCase().replace(/[^A-D]/g, '').split('').sort().join('');
+      const sLetters = s.toUpperCase().replace(/[^A-D]/g, '').split('').sort().join('');
+      return cLetters === sLetters && cLetters.length > 0;
+    }
+
+    // Check numerical range checks
+    try {
+      const sVal = parseFloat(s);
+      if (!isNaN(sVal)) {
+        const rangePattern = /[-:to]+/;
+        const parts = c.split(rangePattern);
+        if (parts.length === 2) {
+          const min = parseFloat(parts[0].trim());
+          const max = parseFloat(parts[1].trim());
+          return sVal >= min && sVal <= max;
+        } else if (parts.length === 1) {
+          const cVal = parseFloat(c);
+          return Math.abs(cVal - sVal) < 1e-4;
+        }
+      }
+    } catch (e) {}
+    return false;
+  };
+
+  // Helper: save attempt to localStorage and backend
+  const saveAttemptHistory = async (res, timeTaken, autoSubmitted) => {
+    // 1. Build answers payload for backend
+    const payloadAnswers = questions.map(q => {
+      const userAns = answers[q.id];
+      const isCorrect = userAns ? evaluateAnswer(q, userAns) : false;
+      
+      let marksAwarded = 0.0;
+      if (userAns) {
+        if (isCorrect) {
+          marksAwarded = q.marks;
+        } else if (q.questionType === 'MCQ') {
+          marksAwarded = q.marks === 1 ? -(1.0 / 3.0) : -(2.0 / 3.0);
+        }
+      }
+
+      return {
+        questionId: q.id,
+        selectedAnswer: userAns || null,
+        isCorrect,
+        marksAwarded
+      };
+    });
+
+    const nowStr = new Date().toISOString();
+
+    // 2. Submit to Backend
+    try {
+      await axios.post(`${API_CONFIG.BASE_URL}/api/simulator/submit`, {
+        startedAt: new Date(Date.now() - (timeTaken * 1000)).toISOString(),
+        submittedAt: nowStr,
+        timeTakenSeconds: timeTaken,
+        totalQuestions: questions.length,
+        correctCount: res.correctCount,
+        incorrectCount: res.incorrectCount,
+        skippedCount: res.skippedCount,
+        score: res.score,
+        negativeWastage: res.negativeWastage,
+        autoSubmitted,
+        mode: activeTab,
+        answers: payloadAnswers
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+    } catch (e) {
+      console.error('Failed to save mock attempt to database:', e);
+    }
+
+    // 3. Fallback Local Storage
+    try {
+      const history = JSON.parse(localStorage.getItem('gate_mock_history') || '[]');
+      const cleanQs = questions.map(q => ({
+        id: q.id,
+        text: q.text,
+        questionType: q.questionType,
+        marks: q.marks,
+        subjectName: q.subjectName,
+        imagePath: q.imagePath,
+        options: q.options?.map(o => ({
+          id: o.id,
+          optionLabel: o.optionLabel,
+          optionText: o.optionText
+        })) || [],
+        aiSuggestedAnswer: q.aiSuggestedAnswer,
+        aiSuggestedExplanation: q.aiSuggestedExplanation
+      }));
+      history.unshift({
+        id: Date.now(),
+        date: nowStr,
+        score: res.score,
+        totalQuestions: questions.length,
+        correctCount: res.correctCount,
+        incorrectCount: res.incorrectCount,
+        skippedCount: res.skippedCount,
+        negativeWastage: res.negativeWastage,
+        subjectBreakdown: res.subjectBreakdown,
+        timeTakenSeconds: timeTaken,
+        autoSubmitted,
+        questions: cleanQs,
+        answers: answers,
+      });
+      if (history.length > 30) history.splice(30);
+      localStorage.setItem('gate_mock_history', JSON.stringify(history));
+    } catch (e) { console.error('Failed to save history locally', e); }
+  };
+
+  // Calculate results on submission
+  const submitExam = (auto = false, skipConfirm = false) => {
+    if (!auto && !skipConfirm) {
+      const confirmSubmit = window.confirm('Are you sure you want to submit your mock exam? You cannot modify your answers after submission!');
+      if (!confirmSubmit) return;
+    }
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    
+    let totalScore = 0.0;
+    let correct = 0;
+    let incorrect = 0;
+    let skipped = 0;
+    let negativeWasted = 0.0;
+    let subjBreak = {};
+
+    questions.forEach((q) => {
+      const userAns = answers[q.id];
+      const subject = q.subjectName || 'Uncategorized';
+
+      if (!subjBreak[subject]) {
+        subjBreak[subject] = { total: 0, correct: 0, score: 0.0 };
+      }
+      subjBreak[subject].total++;
+
+      if (!userAns) {
+        skipped++;
+      } else {
+        const isCorrect = evaluateAnswer(q, userAns);
+        if (isCorrect) {
+          correct++;
+          totalScore += q.marks;
+          subjBreak[subject].correct++;
+          subjBreak[subject].score += q.marks;
+        } else {
+          incorrect++;
+          if (q.questionType === 'MCQ') {
+            const penalty = q.marks === 1 ? (1.0 / 3.0) : (2.0 / 3.0);
+            totalScore -= penalty;
+            negativeWasted += penalty;
+            subjBreak[subject].score -= penalty;
+          }
+        }
+      }
+    });
+
+    const finalResults = {
+      score: Math.max(0.0, parseFloat(totalScore.toFixed(2))),
+      correctCount: correct,
+      incorrectCount: incorrect,
+      skippedCount: skipped,
+      negativeWastage: parseFloat(negativeWasted.toFixed(2)),
+      subjectBreakdown: subjBreak,
+    };
+
+    const timeTaken = (180 * 60) - timeLeftRef.current;
+    saveAttemptHistory(finalResults, timeTaken, auto);
+    examSubmittedRef.current = true;
+    setResults(finalResults);
+    setExamSubmitted(true);
+  };
+
+  // Timer formatter
+  const formatTime = (secs) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Render initial instruction screen
+  if (!examStarted && !examSubmitted) {
+    return (
+      <div style={{ padding: '40px', maxWidth: '800px', margin: '40px auto', width: '100%' }}>
+        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+          <FiClock size={48} style={{ color: 'var(--color-primary)', marginBottom: '16px' }} />
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>Mock Test Arena — GATE</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.6 }}>
+            Test your preparation levels under actual exam conditions.
+          </p>
+
+          {/* 3 Modes Tab selector */}
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '28px', paddingBottom: '2px', justifyContent: 'center' }}>
+            <button 
+              type="button"
+              className="tab-btn" 
+              onClick={() => setActiveTab('standard')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: activeTab === 'standard' ? 'var(--color-primary)' : 'var(--text-muted)',
+                borderBottom: activeTab === 'standard' ? '2px solid var(--color-primary)' : 'none',
+                padding: '10px 18px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              📜 Official PYQ Exam
+            </button>
+            <button 
+              type="button"
+              className="tab-btn" 
+              onClick={() => setActiveTab('hybrid')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: activeTab === 'hybrid' ? '#a855f7' : 'var(--text-muted)',
+                borderBottom: activeTab === 'hybrid' ? '2px solid #a855f7' : 'none',
+                padding: '10px 18px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              ✨ Smart Hybrid Mock (70% Fresh + 30% PYQ)
+            </button>
+            <button 
+              type="button"
+              className="tab-btn" 
+              onClick={() => setActiveTab('custom')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: activeTab === 'custom' ? 'var(--color-secondary)' : 'var(--text-muted)',
+                borderBottom: activeTab === 'custom' ? '2px solid var(--color-secondary)' : 'none',
+                padding: '10px 18px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              🎯 Subject Practice Mock (2 Free)
+            </button>
+          </div>
+
+          {activeTab === 'standard' && (
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', lineHeight: 1.6 }}>
+              This simulator dynamically assembles a standard 100-mark mock paper based on 100% authentic Previous Years' GATE Question papers.
+            </p>
+          )}
+
+          {activeTab === 'hybrid' && (
+            <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', marginBottom: '32px', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#c084fc', display: 'block', marginBottom: '6px' }}>
+                🚀 Real Exam Readiness Mode
+              </span>
+              <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.88rem', lineHeight: 1.5 }}>
+                Combines 70% <b>Double-Verified Conceptual Questions</b> with 30% High-Yield Official GATE PYQs to give you a true unseen exam experience!
+              </p>
+            </div>
+          )}
+
+          {activeTab !== 'custom' ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '36px', textAlign: 'left' }}>
+                <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>DURATION</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>180 Minutes</div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>QUESTIONS</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>65 Items</div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>MAX SCORE</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-secondary)', marginTop: '4px' }}>100 Marks</div>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '16px', borderRadius: '12px', textAlign: 'left', marginBottom: '40px' }}>
+                <h4 style={{ color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
+                  <FiAlertTriangle /> Important Instructions:
+                </h4>
+                <ul style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
+                  <li>Multiple Choice Questions (MCQ) carry 1/3 negative marking for 1-mark, and 2/3 negative marking for 2-mark questions.</li>
+                  <li>Numerical Answer Type (NAT) questions carry ZERO negative marking.</li>
+                  <li>Leaving or refreshing the tab will not pause the timer.</li>
+                  <li>You can use the floating scientific calculator provided inside the test sheet.</li>
+                </ul>
+              </div>
+
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '220px', padding: '14px', fontSize: '1.05rem' }} 
+                onClick={startExam} 
+                disabled={loading}
+              >
+                {loading ? 'Initializing Exam...' : 'Start Simulator Exam'}
+              </button>
+            </>
+          ) : (
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', textAlign: 'center', fontSize: '0.92rem' }}>
+                Generate customized mini mock tests dynamically on specific subjects to target your preparation weaknesses.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '480px', margin: '0 auto 36px auto' }}>
+                <div>
+                  <label className="form-label" style={{ marginBottom: '8px', display: 'block', fontWeight: 700 }}>Select Practice Subject:</label>
+                  <select 
+                    className="form-select" 
+                    value={selectedSubject} 
+                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '8px' }}
+                  >
+                    <option value="">-- Choose Subject --</option>
+                    <option value="Operating Systems">Operating Systems</option>
+                    <option value="Databases">Databases</option>
+                    <option value="Computer Networks">Computer Networks</option>
+                    <option value="Theory of Computation">Theory of Computation</option>
+                    <option value="Digital Logic">Digital Logic</option>
+                    <option value="Algorithms">Algorithms</option>
+                    <option value="Data Structures">Data Structures</option>
+                    <option value="Computer Organization">Computer Organization</option>
+                    <option value="Engineering Mathematics">Engineering Mathematics</option>
+                    <option value="General Aptitude">General Aptitude</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label className="form-label" style={{ marginBottom: '8px', display: 'block', fontWeight: 700 }}>Questions Limit:</label>
+                    <select 
+                      className="form-select" 
+                      value={customQuestionCount} 
+                      onChange={(e) => setCustomQuestionCount(parseInt(e.target.value))}
+                      style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '8px' }}
+                    >
+                      <option value="5">5 Questions</option>
+                      <option value="10">10 Questions</option>
+                      <option value="15">15 Questions</option>
+                      <option value="20">20 Questions</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ marginBottom: '8px', display: 'block', fontWeight: 700 }}>Practice Timer:</label>
+                    <select 
+                      className="form-select" 
+                      value={customTime} 
+                      onChange={(e) => setCustomTime(parseInt(e.target.value))}
+                      style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '8px' }}
+                    >
+                      <option value="15">15 Minutes</option>
+                      <option value="30">30 Minutes</option>
+                      <option value="45">45 Minutes</option>
+                      <option value="60">60 Minutes</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '240px', padding: '14px', fontSize: '1.05rem', backgroundColor: 'var(--color-secondary)', borderColor: 'var(--color-secondary)' }} 
+                  onClick={startExam} 
+                  disabled={!selectedSubject || loading}
+                >
+                  {loading ? 'Generating Custom Mock...' : 'Generate Practice Mock'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <PremiumGateModal 
+          isOpen={showPremiumModal} 
+          onClose={() => setShowPremiumModal(false)} 
+          onUpgradeSuccess={() => {
+            setTimeout(() => {
+              startExam();
+            }, 100);
+          }} 
+        />
+      </div>
+    );
+  }
+
+  // Render Result Sheet
+  if (examSubmitted) {
+    const totalMaxMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const mockTitle = activeTab === 'custom' 
+      ? `🎯 Subject Practice Assessment: ${selectedSubject || 'Custom Test'}`
+      : activeTab === 'hybrid'
+      ? `✨ Smart Hybrid Mock Performance Report`
+      : `📜 Official PYQ Full Mock Assessment Report`;
+
+    return (
+      <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '8px' }}>{mockTitle}</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
+          {activeTab === 'custom' 
+            ? `Deep topic-wise accuracy, time efficiency, and marks wastage analysis for ${selectedSubject || 'Selected Subject'}.`
+            : `Comprehensive subject strengths, accuracy ratios, and negative marking analysis below.`}
+        </p>
+
+        {/* Highlight Score metrics */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Your Score</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary)', marginTop: '8px' }}>{results.score} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ {totalMaxMarks}</span></div>
+          </div>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Accuracy Rate</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-secondary)', marginTop: '8px' }}>
+              {questions.length - results.skippedCount > 0 ? ((results.correctCount / (questions.length - results.skippedCount)) * 100).toFixed(1) : '0'}%
+            </div>
+          </div>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Negative Penalties</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-error)', marginTop: '8px' }}>-{results.negativeWastage}</div>
+          </div>
+        </div>
+
+        {/* Detailed Stats Cards */}
+        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '20px' }}>Question Breakdowns</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', textAlign: 'center' }}>
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Questions</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{questions.length}</div>
+            </div>
+            <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Correct</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>{results.correctCount}</div>
+            </div>
+            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incorrect</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-error)', marginTop: '4px' }}>{results.incorrectCount}</div>
+            </div>
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Skipped</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{results.skippedCount}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Subject wise Performance Breakdown */}
+        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '20px' }}>Subject Wise Marks Distribution</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {Object.keys(results.subjectBreakdown).map((subject) => {
+              const data = results.subjectBreakdown[subject];
+              const percentage = ((data.correct / data.total) * 100).toFixed(0);
+              return (
+                <div key={subject} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'rgba(255,255,255,0.01)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ flexGrow: 1 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{subject}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Accuracy: {percentage}% | Questions: {data.total}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-secondary)' }}>{data.score.toFixed(2)} Marks</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Top-Notch AI Preparation Advisor & Weakness Insights */}
+        <div style={{
+          backgroundColor: 'rgba(99, 102, 241, 0.04)',
+          border: '1px solid rgba(99, 102, 241, 0.2)',
+          borderRadius: '16px',
+          padding: '24px',
+          marginBottom: '40px'
+        }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#c084fc', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0 }}>
+            🧠 AIRGATE Smart Preparation Advisor & Recommendations
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+            {results.negativeWastage > 2.0 && (
+              <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '10px', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#fca5a5' }}>
+                ⚠️ <b>High Negative Marking Warning:</b> You lost <b>-{results.negativeWastage} marks</b> due to incorrect MCQs. Avoid guessing MCQs with low confidence to protect your rank cutoff.
+              </div>
+            )}
+
+            {Object.keys(results.subjectBreakdown).length > 0 && (() => {
+              const subjectsArr = Object.keys(results.subjectBreakdown).map(s => ({
+                subject: s,
+                acc: (results.subjectBreakdown[s].correct / results.subjectBreakdown[s].total) * 100
+              })).sort((a, b) => a.acc - b.acc);
+
+              const weakest = subjectsArr[0];
+              const strongest = subjectsArr[subjectsArr.length - 1];
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {weakest && (
+                    <div>
+                      🔴 <b>Priority Focus Required:</b> Your accuracy in <b>{weakest.subject}</b> is <b>{weakest.acc.toFixed(0)}%</b>. Solve at least 15 NAT questions in this subject via Practice Arena.
+                    </div>
+                  )}
+                  {strongest && strongest.subject !== weakest?.subject && (
+                    <div>
+                      🟢 <b>Stronghold Subject:</b> <b>{strongest.subject}</b> is your highest-scoring subject with <b>{strongest.acc.toFixed(0)}%</b> accuracy. Maintain this advantage!
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div style={{ marginTop: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              💡 <b>Pro Tip:</b> Use AI Tutor Chat on incorrect questions to view detailed step-by-step mathematical proofs and logic explanations.
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <button className="btn btn-primary" onClick={startExam} style={{ padding: '12px 24px' }}>
+            Retake Simulator Mock Test
+          </button>
+          <button className="btn btn-outline" onClick={() => navigate('/explore')} style={{ padding: '12px 24px' }}>
+            Go to Practice Explorer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Active exam session sheet
+  const activeQuestion = questions[currentIndex];
+
+  return (
+    <div className="exam-simulator-layout" style={{ display: 'flex', width: '100%', flexGrow: 1, height: '100%', overflow: 'hidden' }}>
+      
+      {/* Question sheet (Left side) */}
+      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', padding: '24px', overflowY: 'auto' }}>
+        
+        {/* Exam Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '24px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>🏆 Mock Test Arena — GATE</h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Question {currentIndex + 1} of {questions.length}</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div className={
+              timeLeft <= 300
+                ? 'timer-danger'
+                : timeLeft <= 600
+                ? 'timer-warning'
+                : ''
+            } style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border-color)', padding: '8px 16px', borderRadius: '10px', color: 'var(--color-secondary)', fontWeight: 700 }}>
+              <FiClock /> {formatTime(timeLeft)}
+            </div>
+
+            <button className="btn" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)', color: 'var(--color-secondary)', border: '1px solid rgba(6, 182, 212, 0.2)', padding: '8px 16px', fontWeight: 600 }} onClick={() => setShowCalc(!showCalc)}>
+              Calculator
+            </button>
+
+            <button className="btn btn-primary" style={{ padding: '8px 18px', fontWeight: 600 }} onClick={() => submitExam(false)}>
+              Submit Test
+            </button>
+            <button 
+              className="btn btn-outline" 
+              style={{ padding: '8px 12px', fontWeight: 600 }} 
+              onClick={isFullscreen ? exitFullscreen : enterFullscreen}
+            >
+              {isFullscreen ? '⛶ Exit Fullscreen' : '⛶ Full‑Screen'}
+            </button>
+          </div>
+        </div>
+
+        {/* Scientific Calculator Floating Modal */}
+        {showCalc && (
+          <div className="calc-light" style={{ position: 'fixed', top: '100px', right: '350px', width: '280px', zIndex: 1000 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>SCIENTIFIC CALCULATOR</span>
+              <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setShowCalc(false)}>✕</button>
+            </div>
+            
+            <input 
+              type="text" 
+              className="form-input" 
+              value={calcInput} 
+              readOnly 
+              style={{ textAlign: 'right', fontSize: '1.25rem', fontWeight: 700, marginBottom: '12px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.9)', color: '#000' }}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+              {['sin(', 'cos(', 'tan(', 'log(', 'ln('].map(op => (
+                <button key={op} className="btn" style={{ padding: '8px 2px', fontSize: '0.75rem', backgroundColor: '#fff', border: '1px solid var(--border-color)' }} onClick={() => handleCalcBtn(op)}>{op.replace('(', '')}</button>
+              ))}
+              {['sqrt(', 'pi', '^', '(', ')'].map(op => (
+                <button key={op} className="btn" style={{ padding: '8px 2px', fontSize: '0.75rem', backgroundColor: '#fff', border: '1px solid var(--border-color)' }} onClick={() => handleCalcBtn(op)}>{op.replace('(', '')}</button>
+              ))}
+              {['7', '8', '9', '/', 'C'].map(op => (
+                <button key={op} className="btn" style={{ padding: '8px', fontSize: '0.85rem', backgroundColor: op === 'C' ? '#ffebeb' : '#fff', color: op === 'C' ? 'var(--color-error)' : '#000', border: '1px solid var(--border-color)' }} onClick={() => handleCalcBtn(op)}>{op}</button>
+              ))}
+              {['4', '5', '6', '*', '+'].map(op => (
+                <button key={op} className="btn" style={{ padding: '8px', fontSize: '0.85rem', backgroundColor: '#fff', border: '1px solid var(--border-color)' }} onClick={() => handleCalcBtn(op)}>{op}</button>
+              ))}
+              {['1', '2', '3', '-', '='].map(op => (
+                <button key={op} className="btn" style={{ padding: '8px', fontSize: '0.85rem', gridRow: op === '=' ? 'span 2' : 'auto', backgroundColor: op === '=' ? 'var(--color-primary)' : '#fff', border: '1px solid var(--border-color)' }} onClick={() => handleCalcBtn(op)}>{op}</button>
+              ))}
+              {['0', '.', ''].map((op, idx) => (
+                op ? (
+                  <button key={op} className="btn" style={{ padding: '8px', fontSize: '0.85rem', backgroundColor: '#fff', border: '1px solid var(--border-color)' }} onClick={() => handleCalcBtn(op)}>{op}</button>
+                ) : (
+                  <div key={idx}></div>
+                )
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Question display Sheet */}
+        {activeQuestion && (
+          <div className="light-paper" style={{ border: '1px solid var(--border-color)', borderRadius: '16px', padding: '32px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            
+            <div>
+              {/* Question metadata */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '0.8rem', backgroundColor: 'rgba(99, 102, 241, 0.1)', color: 'var(--color-primary)', padding: '4px 12px', borderRadius: '50px', fontWeight: 600 }}>
+                    {activeQuestion.subjectName}
+                  </span>
+
+                  {/* Question Source Badge (Double Verified vs Official PYQ) */}
+                  {activeQuestion.pdfSourceName === 'AI_NIGHTLY_GENERATOR' ? (
+                    <span style={{ fontSize: '0.75rem', background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(236,72,153,0.15) 100%)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.3)', padding: '3px 10px', borderRadius: '50px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ⚡ Double-Verified Conceptual Q
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(56,189,248,0.1)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: '50px', fontWeight: 700 }}>
+                      📜 Official GATE {activeQuestion.year || 'PYQ'}
+                    </span>
+                  )}
+                </div>
+
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Marks: {activeQuestion.marks} | {activeQuestion.questionType}
+                </span>
+              </div>
+
+              {/* Question text */}
+              <div style={{ fontSize: '1.05rem', lineHeight: 1.7, color: 'var(--text-primary)', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>
+                {renderQuestionText(activeQuestion.text)}
+              </div>
+
+              {/* Question diagram/image (from imagePath field) */}
+              {activeQuestion.imagePath && (
+                <div style={{ marginBottom: '24px', backgroundColor: '#fff', borderRadius: '10px', padding: '12px', border: '1px solid #e5e7eb', display: 'inline-block', maxWidth: '100%' }}>
+                  <img
+                    src={getAssetUrl(activeQuestion.imagePath)}
+                    alt="Question Diagram"
+                    style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', display: 'block', borderRadius: '6px' }}
+                    onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }}
+                  />
+                </div>
+              )}
+
+              {/* Answering fields */}
+              {activeQuestion.questionType === 'MCQ' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {activeQuestion.options.map((opt) => {
+                    const isSelected = answers[activeQuestion.id] === opt.optionLabel;
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={() => setAnswers(prev => ({ ...prev, [activeQuestion.id]: opt.optionLabel }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '12px',
+                          padding: '16px',
+                          backgroundColor: isSelected ? 'rgba(6, 182, 212, 0.08)' : 'rgba(255,255,255,0.01)',
+                          border: isSelected ? '2px solid var(--color-secondary)' : '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {/* Custom radio circle */}
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          minWidth: '20px',
+                          borderRadius: '50%',
+                          border: isSelected ? '2px solid var(--color-secondary)' : '2px solid var(--border-color)',
+                          backgroundColor: isSelected ? 'var(--color-secondary)' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: '2px',
+                          transition: 'all 0.15s ease',
+                        }}>
+                          {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fff' }} />}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                          <span style={{ fontWeight: 700, color: isSelected ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.85rem' }}>Option {opt.optionLabel}</span>
+                          <span style={{ color: 'var(--text-primary)' }}>{renderOptionContent(opt.optionText)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : activeQuestion.questionType === 'MSQ' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {activeQuestion.options.map((opt) => {
+                    const currentSelected = answers[activeQuestion.id]
+                      ? answers[activeQuestion.id].toUpperCase().replace(/[^A-D]/g, '').split('')
+                      : [];
+                    const isChecked = currentSelected.includes(opt.optionLabel);
+
+                    const handleMsqToggle = () => {
+                      let nextSelected;
+                      if (isChecked) {
+                        nextSelected = currentSelected.filter(x => x !== opt.optionLabel);
+                      } else {
+                        nextSelected = [...currentSelected, opt.optionLabel].sort();
+                      }
+                      const joined = nextSelected.join(', ');
+                      setAnswers(prev => {
+                        const copy = { ...prev };
+                        if (joined) {
+                          copy[activeQuestion.id] = joined;
+                        } else {
+                          delete copy[activeQuestion.id];
+                        }
+                        return copy;
+                      });
+                    };
+
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={handleMsqToggle}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '12px',
+                          padding: '16px',
+                          backgroundColor: isChecked ? 'rgba(6, 182, 212, 0.08)' : 'rgba(255,255,255,0.01)',
+                          border: isChecked ? '2px solid var(--color-secondary)' : '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {/* Custom checkbox square */}
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          minWidth: '20px',
+                          borderRadius: '4px',
+                          border: isChecked ? '2px solid var(--color-secondary)' : '2px solid var(--border-color)',
+                          backgroundColor: isChecked ? 'var(--color-secondary)' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: '2px',
+                          transition: 'all 0.15s ease',
+                        }}>
+                          {isChecked && <span style={{ color: '#fff', fontSize: '12px', fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                          <span style={{ fontWeight: 700, color: isChecked ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.85rem' }}>Option {opt.optionLabel}</span>
+                          <span style={{ color: 'var(--text-primary)' }}>{renderOptionContent(opt.optionText)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+
+                /* NAT Integer type questions text input */
+                <div style={{ maxWidth: '400px' }}>
+                  <label className="form-label" style={{ marginBottom: '8px', display: 'block' }}>Enter Numerical Value Answer:</label>
+                  <input 
+                    type="text" 
+                    className="form-input"
+                    value={answers[activeQuestion.id] || ''}
+                    onChange={(e) => setAnswers(prev => ({ ...prev, [activeQuestion.id]: e.target.value }))}
+                    placeholder="Enter decimal value or range (e.g. 10.5 or 10-12)"
+                    style={{ fontSize: '1.1rem', padding: '12px', fontWeight: 600 }}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px', display: 'block' }}>Numerical answers are range-tolerant and evaluated at 4 decimal places.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Nav controls */}
+            <div className="exam-nav-bar" style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '24px', marginTop: '40px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  disabled={currentIndex === 0} 
+                  onClick={() => handleNav(currentIndex - 1)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <FiChevronLeft /> Previous
+                </button>
+                
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setAnswers(prev => {
+                    const next = { ...prev };
+                    delete next[activeQuestion.id];
+                    return next;
+                  })}
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Clear Answer
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  className="btn" 
+                  style={{ backgroundColor: 'rgba(139, 92, 246, 0.08)', color: 'var(--color-primary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}
+                  onClick={() => {
+                    setFlagged(prev => {
+                      const next = new Set(prev);
+                      if (next.has(currentIndex)) next.delete(currentIndex);
+                      else next.add(currentIndex);
+                      return next;
+                    });
+                    handleNav(currentIndex + 1);
+                  }}
+                >
+                  {flagged.has(currentIndex) ? 'Unmark Review' : 'Mark for Review & Next'}
+                </button>
+
+                <button 
+                  className="btn btn-success" 
+                  onClick={() => { alert('Answers saved locally.'); }}
+                >
+                  Save
+                </button>
+
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => handleNav(currentIndex + 1)}
+                  disabled={currentIndex === questions.length - 1}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  Next <FiChevronRight />
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* Question Palette — GATE style, always visible */}
+      <div style={{
+        width: isFullscreen ? '260px' : '300px',
+        borderLeft: '1px solid #d1d5db',
+        backgroundColor: '#f8f9fa',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflowY: 'auto',
+        flexShrink: 0,
+      }}>
+        {/* Palette Header */}
+        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px', paddingBottom: '10px', borderBottom: '2px solid #e5e7eb' }}>
+          Question Palette
+        </div>
+
+        {/* GATE-style Legend */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.7rem', color: '#6b7280', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block', flexShrink: 0 }} />
+            Answered
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#dc2626', display: 'inline-block', flexShrink: 0 }} />
+            Not Answered
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#9333ea', display: 'inline-block', flexShrink: 0 }} />
+            Marked Review
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: '#d1d5db', border: '1px solid #9ca3af', display: 'inline-block', flexShrink: 0 }} />
+            Not Visited
+          </div>
+        </div>
+
+        {/* Subject sections with question grid */}
+        {(() => {
+          // Group questions by subject
+          const sections = {};
+          questions.forEach((q, idx) => {
+            const subj = q.subjectName || 'General';
+            if (!sections[subj]) sections[subj] = [];
+            sections[subj].push({ q, idx });
+          });
+          return Object.entries(sections).map(([subj, items]) => (
+            <div key={subj} style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid #e5e7eb' }}>
+                {subj}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                {items.map(({ q, idx }) => {
+                  const hasAns = !!answers[q.id];
+                  const isFlag = flagged.has(idx);
+                  const isVis = visited.has(idx);
+                  const isCurrent = idx === currentIndex;
+
+                  let bg = '#d1d5db'; // not visited — grey
+                  let textCol = '#374151';
+                  if (isFlag) { bg = '#9333ea'; textCol = '#fff'; }
+                  else if (hasAns) { bg = '#16a34a'; textCol = '#fff'; }
+                  else if (isVis) { bg = '#dc2626'; textCol = '#fff'; }
+
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => handleNav(idx)}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        borderRadius: '50%',
+                        backgroundColor: bg,
+                        color: textCol,
+                        border: isCurrent ? '3px solid #1d4ed8' : '2px solid transparent',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: isCurrent ? '0 0 0 2px #bfdbfe' : 'none',
+                        transition: 'all 0.1s ease',
+                        fontFamily: 'var(--font-body)',
+                        padding: 0,
+                      }}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ));
+        })()}
+
+        {/* Submit button in palette */}
+        <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '10px', fontWeight: 700, fontSize: '0.9rem', borderRadius: '8px' }}
+            onClick={() => submitExam(false)}
+          >
+            Submit Test
+          </button>
+        </div>
+      </div>
+
+      {/* FULLSCREEN EXIT WARNING MODAL */}
+      {showExitWarningModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ backgroundColor: '#1e293b', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '20px', padding: '32px', maxWidth: '480px', width: '100%', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 16px auto' }}>
+              ⚠️
+            </div>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+              Exam Security Warning!
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '24px' }}>
+              You minimized or exited full-screen mode. To maintain test integrity, please return to full-screen or submit your exam.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => { setShowExitWarningModal(false); enterFullscreen(); }}
+                style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#3b82f6', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Return to Full-Screen
+              </button>
+              <button 
+                onClick={() => { setShowExitWarningModal(false); submitExam(false, true); }}
+                style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Submit Exam Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

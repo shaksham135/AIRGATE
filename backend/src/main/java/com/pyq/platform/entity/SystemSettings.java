@@ -1,0 +1,89 @@
+package com.pyq.platform.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "system_settings")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class SystemSettings {
+
+    @Id
+    private Integer id; // Always 1 for singleton configuration
+
+    @Column(name = "premium_price_inr", nullable = false)
+    private Double premiumPriceInr;
+
+    @Column(name = "premium_duration_months", nullable = false)
+    private Integer premiumDurationMonths;
+
+    @Column(name = "ai_daily_limit_premium", nullable = false)
+    private Integer aiDailyLimitPremium;
+
+    @Column(name = "is_maintenance_mode", nullable = false)
+    private Boolean isMaintenanceMode;
+
+    // Dynamic Multi-Tier Pricing Packages
+    @Column(name = "tier1_price_inr", nullable = false)
+    private Double tier1PriceInr;
+
+    @Column(name = "tier1_duration_months", nullable = false)
+    private Integer tier1DurationMonths;
+
+    @Column(name = "tier1_special_offer")
+    private String tier1SpecialOffer;
+
+    @Column(name = "tier2_price_inr", nullable = false)
+    private Double tier2PriceInr;
+
+    @Column(name = "tier2_duration_months", nullable = false)
+    private Integer tier2DurationMonths;
+
+    @Column(name = "tier2_special_offer")
+    private String tier2SpecialOffer;
+
+    @Column(name = "tier3_price_inr", nullable = false)
+    private Double tier3PriceInr;
+
+    @Column(name = "tier3_duration_months", nullable = false)
+    private Integer tier3DurationMonths;
+
+    @Column(name = "tier3_special_offer")
+    private String tier3SpecialOffer;
+
+    // Dynamic SEO & Search Engine Optimization Fields
+    @Column(name = "seo_site_title")
+    private String seoSiteTitle;
+
+    @Column(name = "seo_meta_description", length = 1000)
+    private String seoMetaDescription;
+
+    @Column(name = "seo_keywords", columnDefinition = "TEXT")
+    private String seoKeywords;
+
+    @Column(name = "google_site_verification")
+    private String googleSiteVerification;
+
+    @Column(name = "umami_website_id")
+    private String umamiWebsiteId;
+
+    // Automated AI Practice Generator Control Settings
+    @Column(name = "ai_generator_enabled", nullable = false)
+    private Boolean aiGeneratorEnabled = true;
+
+    @Column(name = "ai_generator_start_hour", nullable = false)
+    private Integer aiGeneratorStartHour = 0; // 00:00 AM IST
+
+    @Column(name = "ai_generator_end_hour", nullable = false)
+    private Integer aiGeneratorEndHour = 4; // 04:00 AM IST
+
+    // Dynamic Contact & Customer Support Settings
+    @Column(name = "support_email")
+    private String supportEmail = "support@airgate.in";
+
+    @Column(name = "support_phone")
+    private String supportPhone = "+91 (800) AIR-GATE";
+}
