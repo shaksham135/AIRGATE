@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS question_ai_analysis (
     answer_confidence DOUBLE,
     raw_ai_json TEXT,
     prompt_version VARCHAR(20),
+    temperature DOUBLE,
+    top_p DOUBLE,
     model_name VARCHAR(50),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
