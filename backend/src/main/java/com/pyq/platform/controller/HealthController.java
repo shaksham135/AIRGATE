@@ -41,7 +41,7 @@ public class HealthController {
         }
     }
 
-    @GetMapping({"/health", "/api/public/health"})
+    @GetMapping({"/", "/health", "/api/public/health"})
     public ResponseEntity<Map<String, Object>> getHealthStatus(HttpServletRequest request) {
         String clientIp = getClientIp(request);
         long now = System.currentTimeMillis();
