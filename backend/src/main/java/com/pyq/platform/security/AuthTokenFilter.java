@@ -49,6 +49,23 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         this.systemSettingsRepository = systemSettingsRepository;
     }
 
+    private static final java.util.Map<String, UserDetailsCacheEntry> userDetailsRamCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static class UserDetailsCacheEntry {
+        final UserDetails userDetails;
+        final long timestamp;
+        UserDetailsCacheEntry(UserDetails userDetails, long timestamp) {
+            this.userDetails = userDetails;
+            this.timestamp = timestamp;
+        }
+    }
+
+    public static void evictUserFromRamCache(String username) {
+        if (username != null) {
+            userDetailsRamCache.remove(username);
+        }
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -56,7 +73,16 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             String jwt = parseJwt(request);
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
                 String username = jwtUtils.getUsernameFromJwtToken(jwt);
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                
+                long nowMs = System.currentTimeMillis();
+                UserDetailsCacheEntry cacheEntry = userDetailsRamCache.get(username);
+                UserDetails userDetails;
+                if (cacheEntry != null && (nowMs - cacheEntry.timestamp < 300_000)) { // 5 mins RAM TTL
+                    userDetails = cacheEntry.userDetails;
+                } else {
+                    userDetails = userDetailsService.loadUserByUsername(username);
+                    userDetailsRamCache.put(username, new UserDetailsCacheEntry(userDetails, nowMs));
+                }
                 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
