@@ -49,6 +49,7 @@ public class PaymentController {
     }
 
     @GetMapping("/pricing")
+    @org.springframework.cache.annotation.Cacheable(value = "publicMeta")
     public ResponseEntity<?> getPricingTiers() {
         try {
             com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
