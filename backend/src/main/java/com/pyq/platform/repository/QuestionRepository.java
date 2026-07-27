@@ -3,12 +3,28 @@ package com.pyq.platform.repository;
 import com.pyq.platform.entity.Question;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSpecificationExecutor<Question> {
+
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @NonNull
+    org.springframework.data.domain.Page<Question> findAll(
+        @Nullable org.springframework.data.jpa.domain.Specification<Question> spec,
+        @NonNull org.springframework.data.domain.Pageable pageable
+    );
+
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @NonNull
+    Optional<Question> findById(@NonNull Long id);
+
     Optional<Question> findByChecksumHash(String checksumHash);
     boolean existsByChecksumHash(String checksumHash);
     boolean existsByChecksumHashAndTopicId(String checksumHash, Long topicId);

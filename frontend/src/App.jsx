@@ -135,8 +135,31 @@ function DashboardLayout({ children }) {
         <button className="hamburger-btn" onClick={() => setIsMobileOpen(!isMobileOpen)}>
           <FiMenu />
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FiGrid size={20} style={{ color: isAdminRoute ? 'var(--color-success)' : 'var(--color-secondary)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <svg width="28" height="28" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, filter: 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.75))' }}>
+            <defs>
+              <linearGradient id="mobTopGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#00d2ff" />
+                <stop offset="50%" stopColor="#3a7bd5" />
+                <stop offset="100%" stopColor="#928dab" />
+              </linearGradient>
+              <linearGradient id="mobTopABody" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00c6ff" />
+                <stop offset="50%" stopColor="#0072ff" />
+                <stop offset="100%" stopColor="#7a22ff" />
+              </linearGradient>
+              <linearGradient id="mobTopGBody" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00f2fe" />
+                <stop offset="100%" stopColor="#4facfe" />
+              </linearGradient>
+            </defs>
+            <path d="M 16,74 A 48,48 0 1,1 104,74" stroke="url(#mobTopGrad)" strokeWidth="2.8" fill="none" opacity="0.9" />
+            <circle cx="60" cy="12" r="4" fill="#00f2fe" />
+            <path d="M 60,16 L 102,94 L 86,94 L 60,45 L 34,94 L 18,94 Z" fill="url(#mobTopABody)" />
+            <path d="M 72,55 C 72,42 48,40 48,56 C 48,70 72,68 72,60 L 58,60" stroke="url(#mobTopGBody)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <rect x="54" y="80" width="12" height="14" fill="#00f2fe" rx="2" />
+            <rect x="57" y="83" width="6" height="11" fill="#ffffff" rx="1" />
+          </svg>
           <span style={{ fontFamily: 'var(--font-title)', fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>
             {isAdminRoute ? (
               <span style={{ color: 'var(--color-success)' }}>AIRGATE <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>ADMIN</span></span>

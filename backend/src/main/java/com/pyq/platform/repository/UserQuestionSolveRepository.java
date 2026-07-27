@@ -8,7 +8,10 @@ import java.util.Optional;
 
 @Repository
 public interface UserQuestionSolveRepository extends JpaRepository<UserQuestionSolve, Long> {
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "question.options", "question.subject", "question.topic"})
     List<UserQuestionSolve> findByUserId(Long userId);
+
     Optional<UserQuestionSolve> findByUserIdAndQuestionId(Long userId, Long questionId);
     long countByUserId(Long userId);
     long countByUserIdAndIsCorrect(Long userId, Boolean isCorrect);

@@ -604,7 +604,7 @@ public class AiQuestionGeneratorService {
                 if (q.getOptions() != null) {
                     q.getOptions().forEach(o -> auditPrompt.append(o.getOptionLabel()).append(") ").append(o.getOptionText()).append("\n"));
                 }
-                auditPrompt.append("\nReturn STRICT JSON:\n{\"questionText\":\"...\",\"options\":[{\"label\":\"A\",\"text\":\"...\"},{\"label\":\"B\",\"text\":\"...\"},{\"label\":\"C\",\"text\":\"...\"},{\"label\":\"D\",\"text\":\"...\"}],\"correctAnswer\":\"A\"}");
+                auditPrompt.append("\nINSTRUCTIONS FOR AUDIT:\n1. Preserve all mathematical LaTeX expressions, matrices, and variables wrapped in $...$ or $$...$$.\n2. Escape backslashes in JSON (\\\\frac, \\\\lambda, \\\\begin{bmatrix}).\nReturn STRICT JSON:\n{\"questionText\":\"...\",\"options\":[{\"label\":\"A\",\"text\":\"...\"},{\"label\":\"B\",\"text\":\"...\"},{\"label\":\"C\",\"text\":\"...\"},{\"label\":\"D\",\"text\":\"...\"}],\"correctAnswer\":\"A\"}");
 
                 JsonNode auditedNode = executeGroqCall(auditPrompt.toString(), true, 450);
                 if (auditedNode == null || !auditedNode.has("questionText") || !auditedNode.has("correctAnswer")) {

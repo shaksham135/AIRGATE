@@ -67,26 +67,64 @@ export const getAssetUrl = (path) => {
 export const sanitizeLatexString = (str) => {
   if (!str) return '';
 
-  let s = str;
+  let s = String(str);
 
-  // 1. Normalize double-escaped backslashes from JSON parsing
-  s = s.replace(/\\\\/g, '\\');
+  // 1. Repair matrix environments where backslashes were stripped by JSON parsing
+  // e.g. \begin{bmatrix}2&0&0\0&3&0\0&0&4\end{bmatrix} -> $$ \begin{bmatrix}2&0&0 \\ 0&3&0 \\ 0&0&4 \end{bmatrix} $$
+  s = s.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, (match, env, content) => {
+    let clean = content;
+    clean = clean.replace(/([0-9a-zA-Z\)\}])\s*\\(?=[0-9a-zA-Z\-\+\(\{])/g, '$1 \\\\ ');
+    clean = clean.replace(/&\s*\\(?=[0-9a-zA-Z])/g, '& ');
+    return ` $$ \\begin{${env}}${clean}\\end{${env}} $$ `;
+  });
 
-  // 2. Fix un-escaped JSON control characters (\t, \r)
-  s = s.replace(/\t(imes|ext|heta|au|sum|prod)/g, '\\t$1');
-  s = s.replace(/\r(ightarrow|ight|ho|eal|ange)/g, '\\r$1');
+  // 2. Convert \[ ... \] to $$ ... $$ and \( ... \) to $ ... $
+  s = s.replace(/\\\[([\s\S]*?)\\\]/g, ' $$ $1 $$ ');
+  s = s.replace(/\\\(([\s\S]*?)\\\)/g, ' $ $1 $ ');
 
-  // 3. Convert \( ... \) to $ ... $ and \[ ... \] to $$ ... $$
-  s = s.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
-  s = s.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+  // 3. Auto-wrap unwrapped \frac{...}{...} if not enclosed in $
+  s = s.replace(/(?<!\$)\\frac\{([^{}]+|\{[^{}]*\})\}\{([^{}]+|\{[^{}]*\})\}(?!\$)/gi, ' $\\frac{$1}{$2}$ ');
 
-  // 4. Auto-wrap unwrapped matrices \begin{bmatrix} ... \end{bmatrix} if not enclosed in $
-  s = s.replace(/(?<!\$)\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}[\s\S]*?\\end\{\1\}(?!\$)/gi, (m) => ` $${m}$ `);
+  // 4. Fix stashed words & commands (e.g. cdot(-1) -> \cdot (-1), det(A) -> \det(A))
+  s = s.replace(/\bcdot([^\s])/g, ' \\cdot $1');
+  s = s.replace(/andtheminor/gi, ' and the minor ');
 
-  // 5. Auto-wrap unwrapped \frac{...}{...} if not enclosed in $
-  s = s.replace(/(?<!\$)\\frac\{([^{}]+|\{[^{}]*\})\}\{([^{}]+|\{[^{}]*\})\}(?!\$)/gi, (m) => ` $${m}$ `);
+  // 5. Split string into already-wrapped math vs plain text segments
+  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,300}?\$)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
 
-  // 6. Balance odd number of $ signs to prevent runaway formatting
+  while ((match = dollarRegex.exec(s)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: s.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'math', value: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < s.length) {
+    parts.push({ type: 'text', value: s.slice(lastIndex) });
+  }
+
+  // 6. Auto-wrap unwrapped LaTeX math tokens in plain text parts
+  s = parts.map(part => {
+    if (part.type === 'math') return part.value;
+    let t = part.value;
+
+    // Match LaTeX expressions like \lambda_1^2 = 4, \sum_{i=1}^{3} \lambda_i, v_1 = [1 0 0]
+    t = t.replace(/(?<!\$)(\\?(?:lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|det|tr|a_|b_|M_|v_|\b[a-zA-Z]\b_\d+)(?:[^\$\n,;]+)?)(?!\$)/gi, (token) => {
+      let trimmed = token.trim();
+      if ((trimmed.startsWith('\\') || /[_\^]=?/.test(trimmed)) && 
+          !/^(and|the|where|if|is|are|with|matrix|eigenvalues|vectors|trace|minor|determinant)$/i.test(trimmed)) {
+        return ` $${trimmed}$ `;
+      }
+      return token;
+    });
+
+    return t;
+  }).join('');
+
+  // 7. Balance odd number of $ signs to prevent runaway formatting
   const dollarIndices = [];
   for (let i = 0; i < s.length; i++) {
     if (s[i] === '$' && (i === 0 || s[i - 1] !== '\\')) {
@@ -101,13 +139,45 @@ export const sanitizeLatexString = (str) => {
   return s;
 };
 
+const KATEX_OPTIONS_DISPLAY = {
+  displayMode: true,
+  throwOnError: false,
+  errorColor: '#38bdf8',
+  trust: true,
+  strict: false,
+  output: 'html',
+  macros: {
+    "\\tr": "\\operatorname{tr}",
+    "\\det": "\\operatorname{det}",
+    "\\gcd": "\\operatorname{gcd}",
+    "\\lcm": "\\operatorname{lcm}",
+    "\\rank": "\\operatorname{rank}"
+  }
+};
+
+const KATEX_OPTIONS_INLINE = {
+  displayMode: false,
+  throwOnError: false,
+  errorColor: '#38bdf8',
+  trust: true,
+  strict: false,
+  output: 'html',
+  macros: {
+    "\\tr": "\\operatorname{tr}",
+    "\\det": "\\operatorname{det}",
+    "\\gcd": "\\operatorname{gcd}",
+    "\\lcm": "\\operatorname{lcm}",
+    "\\rank": "\\operatorname{rank}"
+  }
+};
+
 export const formatMathText = (text) => {
   if (!text) return '';
   
   const normalized = sanitizeLatexString(text);
 
   // Match $$...$$ (display math) and $...$ (inline math)
-  const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,300}?\$)/g;
+  const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,400}?\$)/g;
 
   const parts = [];
   let lastIndex = 0;
@@ -129,28 +199,16 @@ export const formatMathText = (text) => {
     if (raw.startsWith('$$') && raw.endsWith('$$')) {
       let latex = raw.slice(2, -2).trim();
       try {
-        parts.push(katex.renderToString(latex, {
-          displayMode: true,
-          throwOnError: false,
-          trust: true,
-          strict: false,
-          output: 'html'
-        }));
+        parts.push(katex.renderToString(latex, KATEX_OPTIONS_DISPLAY));
       } catch {
-        parts.push(`<code style="color:#f59e0b">${latex}</code>`);
+        parts.push(`<code style="color:#38bdf8">${latex}</code>`);
       }
     } else {
       let latex = raw.slice(1, -1).trim();
       try {
-        parts.push(katex.renderToString(latex, {
-          displayMode: false,
-          throwOnError: false,
-          trust: true,
-          strict: false,
-          output: 'html'
-        }));
+        parts.push(katex.renderToString(latex, KATEX_OPTIONS_INLINE));
       } catch {
-        parts.push(`<code style="color:#f59e0b">${latex}</code>`);
+        parts.push(`<code style="color:#38bdf8">${latex}</code>`);
       }
     }
 

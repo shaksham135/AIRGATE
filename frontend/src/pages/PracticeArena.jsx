@@ -228,31 +228,32 @@ export default function PracticeArena() {
     <div className="practice-arena-container" style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', color: 'var(--text-primary)' }}>
       
       {/* ── TOP BANNER: CONCEPTUAL PRACTICE & DAILY QUOTA PROGRESS ────────── */}
-      <div style={{
+      <div className="practice-top-banner" style={{
         background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(6, 182, 212, 0.08) 100%)',
         border: '1px solid rgba(99, 102, 241, 0.25)',
         borderRadius: '24px',
-        padding: '32px',
-        marginBottom: '28px',
+        padding: '24px 32px',
+        marginBottom: '20px',
         boxShadow: '0 12px 35px rgba(0, 0, 0, 0.25)',
         backdropFilter: 'blur(10px)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
               <div style={{
                 background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)',
-                width: '40px', height: '40px', borderRadius: '12px',
+                width: '36px', height: '36px', borderRadius: '10px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)'
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                flexShrink: 0
               }}>
-                <FiZap size={22} style={{ color: '#fff' }} />
+                <FiZap size={18} style={{ color: '#fff' }} />
               </div>
-              <h1 style={{ fontSize: '1.85rem', fontWeight: 900, margin: 0, color: '#fff', letterSpacing: '-0.02em' }}>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, color: '#fff', letterSpacing: '-0.02em' }}>
                 Conceptual Practice Arena
               </h1>
             </div>
-            <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            <p className="practice-banner-subtitle" style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
               High-Yield Topic-Wise Practice Questions Engineered to Maximize Your GATE Score
             </p>
           </div>
@@ -261,18 +262,18 @@ export default function PracticeArena() {
           <div style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            padding: '16px 24px',
-            minWidth: '260px'
+            borderRadius: '14px',
+            padding: '10px 16px',
+            minWidth: '220px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', fontWeight: 700, marginBottom: '10px', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 700, marginBottom: '6px', gap: '12px' }}>
               <span style={{ color: 'var(--text-muted)', letterSpacing: '0.05em' }}>DAILY SOLVE QUOTA</span>
               <span style={{ color: quota.isPremium ? '#10b981' : quota.usedToday >= quota.limitToday ? '#ef4444' : '#818cf8', whiteSpace: 'nowrap', fontWeight: 800 }}>
                 {quota.isPremium ? 'UNLIMITED 👑' : `${quota.usedToday} / ${quota.limitToday} Solved`}
               </span>
             </div>
             {!quota.isPremium && (
-              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
                   width: `${Math.min(100, (quota.usedToday / quota.limitToday) * 100)}%`,
@@ -283,7 +284,7 @@ export default function PracticeArena() {
               </div>
             )}
             {!quota.isPremium && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px', textAlign: 'right' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'right' }}>
                 {Math.max(0, quota.limitToday - quota.usedToday)} questions remaining today
               </div>
             )}
@@ -292,41 +293,41 @@ export default function PracticeArena() {
       </div>
 
       {/* ── FILTERS BAR (No Year Filter for Practice Questions) ───────────── */}
-      <div style={{
+      <div className="practice-filters-box" style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
         borderRadius: '16px',
-        padding: '20px',
-        marginBottom: '28px',
+        padding: '16px 20px',
+        marginBottom: '20px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '12px'
       }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
-            <FiSearch style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexWrap: 'nowrap' }}>
+          <div style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
+            <FiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder="Search conceptual practice questions..."
+              placeholder="Search practice questions..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
                 width: '100%',
-                padding: '12px 14px 12px 42px',
+                padding: '9px 12px 9px 36px',
                 backgroundColor: 'var(--bg-main)',
                 border: '1px solid var(--border-color)',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 color: '#fff',
-                fontSize: '0.9rem'
+                fontSize: '0.85rem'
               }}
             />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ padding: '0 24px', borderRadius: '10px', fontWeight: 700 }}>
+          <button type="submit" className="btn btn-primary" style={{ padding: '0 18px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem' }}>
             Search
           </button>
         </form>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+        <div className="practice-select-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
           {/* Subject Dropdown */}
           <select
             value={selectedSubjectId || ''}

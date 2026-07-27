@@ -12,6 +12,13 @@ import {
 export default function LandingPage() {
   const navigate = useNavigate();
   const currentUser = AuthService.getCurrentUser();
+
+  // Auto-redirect logged-in users directly to Explorer Dashboard
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/explore', { replace: true });
+    }
+  }, [currentUser, navigate]);
   
   const [stats, setStats] = useState({
     totalApproved: 124,

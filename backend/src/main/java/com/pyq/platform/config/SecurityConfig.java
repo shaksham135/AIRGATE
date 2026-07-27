@@ -116,15 +116,17 @@ public class SecurityConfig {
         }
 
         http.authorizeHttpRequests(auth -> auth
-                // Allow all CORS preflight OPTIONS requests
+                // Allow all CORS preflight OPTIONS & Uptime HEAD requests
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Public Auth & Info Endpoints
-                .requestMatchers("/api/auth/**", "/api/public/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/**").permitAll()
+                // Public Health Check Endpoints (UptimeRobot, Pingdom, Render health checks)
+                .requestMatchers("/health", "/api/public/health", "/api/public/**", "/actuator/health").permitAll()
+                // Public Auth Endpoints
+                .requestMatchers("/api/auth/**").permitAll()
                 // Public static files & SEO sitemaps
                 .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/sitemap.xml", "/robots.txt", "/health").permitAll()
-                // Actuator endpoints (secured)
-                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/sitemap.xml", "/robots.txt").permitAll()
+                // Actuator admin endpoints
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 // Anonymous Read-Only Access (allowing both base path and sub-paths)
                 .requestMatchers(HttpMethod.GET, "/api/subjects", "/api/subjects/**").permitAll()

@@ -18,9 +18,9 @@ public interface AiGenerationLedgerRepository extends JpaRepository<AiGeneration
     @Query("SELECT l FROM AiGenerationLedger l LEFT JOIN FETCH l.subject LEFT JOIN FETCH l.topic ORDER BY l.totalAccepted ASC, l.lastGeneratedAt ASC")
     List<AiGenerationLedger> findAllBalancedPriority();
 
-    @Query("SELECT SUM(l.totalAccepted) FROM AiGenerationLedger l")
+    @Query("SELECT COALESCE(SUM(l.totalAccepted), 0) FROM AiGenerationLedger l")
     Long countTotalAcceptedQuestions();
 
-    @Query("SELECT SUM(l.totalRejected) FROM AiGenerationLedger l")
+    @Query("SELECT COALESCE(SUM(l.totalRejected), 0) FROM AiGenerationLedger l")
     Long countTotalRejectedQuestions();
 }

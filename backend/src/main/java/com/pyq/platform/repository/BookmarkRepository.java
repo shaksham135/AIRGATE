@@ -8,7 +8,10 @@ import java.util.Optional;
 
 @Repository
 public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "question.options", "question.subject", "question.topic"})
     List<Bookmark> findByUserId(Long userId);
+
     Optional<Bookmark> findByUserIdAndQuestionId(Long userId, Long questionId);
     boolean existsByUserIdAndQuestionId(Long userId, Long questionId);
     void deleteByUserIdAndQuestionId(Long userId, Long questionId);

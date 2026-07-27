@@ -8,8 +8,13 @@ import java.util.Optional;
 
 @Repository
 public interface TopicRepository extends JpaRepository<Topic, Long> {
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"subject", "parentTopic"})
     List<Topic> findBySubjectId(Long subjectId);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"subject", "parentTopic"})
     List<Topic> findBySubjectIdAndParentTopicIsNull(Long subjectId);
+
     List<Topic> findByParentTopicId(Long parentTopicId);
     Optional<Topic> findByNameAndSubjectIdAndParentTopicId(String name, Long subjectId, Long parentTopicId);
     Optional<Topic> findByNameAndSubjectIdAndParentTopicIsNull(String name, Long subjectId);
