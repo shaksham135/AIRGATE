@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS question_ai_analysis (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     question_id BIGINT NOT NULL,
     suggested_answer VARCHAR(10),
-    suggested explanation TEXT,
+    suggested_explanation TEXT,
     mentor_insights TEXT,
     confidence DOUBLE,
     question_confidence DOUBLE,
