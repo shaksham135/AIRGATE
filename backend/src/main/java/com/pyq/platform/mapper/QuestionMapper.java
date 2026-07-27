@@ -24,21 +24,50 @@ public class QuestionMapper {
     }
 
     public QuestionDTO convertToDTO(Question question) {
+        return convertToDTO(question, true);
+    }
+
+    public QuestionDTO convertToDTOFast(Question question) {
+        return convertToDTO(question, false);
+    }
+
+    public QuestionDTO convertToDTO(Question question, boolean fetchSubQueries) {
         if (question == null) return null;
 
-        List<OptionDTO> options = question.getOptions().stream()
+        List<OptionDTO> options = question.getOptions() != null ? question.getOptions().stream()
                 .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()) : List.of();
 
-        Set<String> tags = question.getTags().stream()
+        Set<String> tags = question.getTags() != null ? question.getTags().stream()
                 .map(Tag::getName)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toSet()) : Set.of();
 
-        Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
-                .findFirstByQuestionIdOrderByCreatedAtDesc(question.getId());
+        String aiSuggestedAnswer = null;
+        String aiSuggestedExplanation = null;
+        String aiMentorInsights = null;
+        Double questionConfidence = null;
+        Double optionsConfidence = null;
+        Double answerConfidence = null;
+        String rawAiJson = null;
+        long helpful = 0;
+        long notHelpful = 0;
 
-        long helpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.UPVOTE);
-        long notHelpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.DOWNVOTE);
+        if (fetchSubQueries) {
+            Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
+                    .findFirstByQuestionIdOrderByCreatedAtDesc(question.getId());
+            if (aiOpt.isPresent()) {
+                QuestionAIAnalysis ai = aiOpt.get();
+                aiSuggestedAnswer = ai.getSuggestedAnswer();
+                aiSuggestedExplanation = ai.getSuggestedExplanation();
+                aiMentorInsights = ai.getMentorInsights();
+                questionConfidence = ai.getQuestionConfidence();
+                optionsConfidence = ai.getOptionsConfidence();
+                answerConfidence = ai.getAnswerConfidence();
+                rawAiJson = ai.getRawAiJson();
+            }
+            helpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.UPVOTE);
+            notHelpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.DOWNVOTE);
+        }
 
         return QuestionDTO.builder()
                 .id(question.getId())
@@ -48,10 +77,10 @@ public class QuestionMapper {
                 .marks(question.getMarks())
                 .negativeMarks(question.getNegativeMarks())
                 .year(question.getYear())
-                .subjectId(question.getSubject().getId())
-                .subjectName(question.getSubject().getName())
-                .topicId(question.getTopic().getId())
-                .topicName(question.getTopic().getName())
+                .subjectId(question.getSubject() != null ? question.getSubject().getId() : null)
+                .subjectName(question.getSubject() != null ? question.getSubject().getName() : null)
+                .topicId(question.getTopic() != null ? question.getTopic().getId() : null)
+                .topicName(question.getTopic() != null ? question.getTopic().getName() : null)
                 .isCommunityVerified(question.getIsCommunityVerified())
                 .pdfSourceName(question.getPdfSourceName())
                 .pdfSourcePath(question.getPdfSourcePath())
@@ -60,22 +89,19 @@ public class QuestionMapper {
                 .status(question.getStatus())
                 .options(options)
                 .tags(tags)
-                // AI related properties
-                .aiSuggestedAnswer(aiOpt.map(QuestionAIAnalysis::getSuggestedAnswer).orElse(null))
-                .aiSuggestedExplanation(aiOpt.map(QuestionAIAnalysis::getSuggestedExplanation).orElse(null))
-                .aiMentorInsights(aiOpt.map(QuestionAIAnalysis::getMentorInsights).orElse(null))
-                .questionConfidence(aiOpt.map(QuestionAIAnalysis::getQuestionConfidence).orElse(null))
-                .optionsConfidence(aiOpt.map(QuestionAIAnalysis::getOptionsConfidence).orElse(null))
-                .answerConfidence(aiOpt.map(QuestionAIAnalysis::getAnswerConfidence).orElse(null))
-                .rawAiJson(aiOpt.map(QuestionAIAnalysis::getRawAiJson).orElse(null))
-                // Audit / metadata properties
+                .aiSuggestedAnswer(aiSuggestedAnswer)
+                .aiSuggestedExplanation(aiSuggestedExplanation)
+                .aiMentorInsights(aiMentorInsights)
+                .questionConfidence(questionConfidence)
+                .optionsConfidence(optionsConfidence)
+                .answerConfidence(answerConfidence)
+                .rawAiJson(rawAiJson)
                 .publishAt(question.getPublishAt())
                 .rawOcrText(question.getRawOcrText())
                 .reviewNotes(question.getReviewNotes())
                 .verifiedBy(question.getVerifiedBy() != null ? question.getVerifiedBy().getUsername() : null)
                 .verifiedAt(question.getVerifiedAt())
                 .assignedTo(question.getAssignedTo() != null ? question.getAssignedTo().getUsername() : null)
-                // Votes
                 .helpfulVotes(helpful)
                 .notHelpfulVotes(notHelpful)
                 .build();

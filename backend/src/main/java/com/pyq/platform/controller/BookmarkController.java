@@ -95,6 +95,6 @@ public class BookmarkController {
     }
 
     private QuestionDTO convertToDTO(Question question) {
-        return questionMapper.convertToDTO(question);
+        return questionMapper.convertToDTOFast(question);
     }
 }

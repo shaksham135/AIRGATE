@@ -764,59 +764,61 @@ export default function Explorer() {
         <div style={{
           backgroundColor: 'var(--bg-sidebar)',
           borderBottom: '1px solid var(--border-color)',
-          padding: '24px 40px',
+          padding: '12px 20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
+          gap: '10px',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           transition: 'all 0.3s ease'
         }}>
           {/* Row 0: Title Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '-4px' }}>
-            <span style={{ fontSize: '1.4rem' }}>📜</span>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '-2px' }}>
+            <span style={{ fontSize: '1.1rem' }}>📜</span>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
               Official GATE PYQs Archive
             </h2>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '6px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '6px' }}>
               Authentic 20+ Years Past Exam Papers
             </span>
           </div>
 
           {/* Row 1: Search and actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '12px', flexGrow: 1, maxWidth: '600px' }}>
-              <div className="header-search-bar" style={{ width: '100%', height: '42px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flexGrow: 1, maxWidth: '500px' }}>
+              <div className="header-search-bar" style={{ width: '100%', height: '36px' }}>
                 <FiSearch style={{ color: 'var(--text-muted)' }} />
                 <input 
                   type="text" 
                   placeholder="Search matrix inverse, binary search trees..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ height: '36px', fontSize: '0.82rem' }}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" style={{ padding: '0 24px' }}>Search</button>
+              <button type="submit" className="btn btn-primary" style={{ height: '36px', padding: '0 16px', fontSize: '0.82rem' }}>Search</button>
             </form>
 
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button 
                 type="button" 
                 className="btn btn-outline mobile-filter-toggle" 
                 onClick={() => setShowMobileFilters(!showMobileFilters)}
+                style={{ height: '36px', fontSize: '0.8rem' }}
               >
                 <FiFilter /> {showMobileFilters ? 'Hide Filters' : 'Filters'}
               </button>
 
-              <button className="btn btn-outline" onClick={clearFilters} style={{ height: '42px' }}>
-                Reset Filters
+              <button className="btn btn-outline" onClick={clearFilters} style={{ height: '36px', fontSize: '0.8rem' }}>
+                Reset
               </button>
 
               <button 
                 type="button" 
                 className="btn btn-outline" 
                 onClick={() => setIsFiltersCollapsed(true)} 
-                style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                style={{ height: '36px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}
               >
-                <FiX /> Collapse Search
+                <FiX /> Collapse
               </button>
 
               {AuthService.isAdminOrEditor() && (

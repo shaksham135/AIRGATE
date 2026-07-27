@@ -89,7 +89,7 @@ public class QuestionController {
                 tagName, status, userId, solvedStatus, bookmarked, pageable);
 
         List<QuestionDTO> dtos = questionsPage.getContent().stream()
-                .map(this::convertToDTO)
+                .map(this::convertToDTOFast)
                 .collect(Collectors.toList());
 
         PageDTO<QuestionDTO> pageDTO = PageDTO.<QuestionDTO>builder()
@@ -485,6 +485,10 @@ public class QuestionController {
 
     private QuestionDTO convertToDTO(Question question) {
         return questionMapper.convertToDTO(question);
+    }
+
+    private QuestionDTO convertToDTOFast(Question question) {
+        return questionMapper.convertToDTOFast(question);
     }
 
     // Get simulated exam with 65 questions matching standard GATE weightage

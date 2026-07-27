@@ -6,7 +6,8 @@ import API_CONFIG from '../config/api';
 import { getAssetUrl, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis } from '../utils/mathRenderer';
 import { 
   FiSearch, FiBookOpen, FiLayers, FiAlertTriangle, FiCheckCircle, 
-  FiBookmark, FiMessageSquare, FiFilter, FiLoader, FiLock, FiClock, FiCheckSquare, FiRotateCcw, FiZap
+  FiBookmark, FiMessageSquare, FiFilter, FiLoader, FiLock, FiClock, FiCheckSquare, FiRotateCcw, FiZap,
+  FiExternalLink, FiX
 } from 'react-icons/fi';
 import PremiumGateModal from '../components/PremiumGateModal';
 import LoginGate from '../components/LoginGate';
@@ -24,6 +25,7 @@ export default function PracticeArena() {
   const [selectedTopicId, setSelectedTopicId] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState('ALL');
   const [selectedType, setSelectedType] = useState('ALL');
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(0);
@@ -36,6 +38,35 @@ export default function PracticeArena() {
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showLoginGateModal, setShowLoginGateModal] = useState(false);
+
+  // Report Question Modal State
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportQuestionId, setReportQuestionId] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDesc, setReportDesc] = useState('');
+
+  const handleSendReport = async () => {
+    if (!currentUser) {
+      setShowLoginGateModal(true);
+      return;
+    }
+    if (!reportQuestionId || !reportReason) return;
+    try {
+      await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${reportQuestionId}/report`, {
+        reason: reportReason,
+        description: reportDesc
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+      alert("Thank you! Your report has been submitted to the administrator for review.");
+      setShowReportModal(false);
+      setReportQuestionId(null);
+      setReportReason('');
+      setReportDesc('');
+    } catch (err) {
+      alert("Failed to submit report. Please try again.");
+    }
+  };
 
   // Interactive Question States
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -227,152 +258,161 @@ export default function PracticeArena() {
   return (
     <div className="practice-arena-container" style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', color: 'var(--text-primary)' }}>
       
-      {/* ── TOP BANNER: CONCEPTUAL PRACTICE & DAILY QUOTA PROGRESS ────────── */}
+      {/* ── TOP BANNER: SLEEK & COMPACT CONCEPTUAL PRACTICE & DAILY QUOTA ────────── */}
       <div className="practice-top-banner" style={{
         background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(6, 182, 212, 0.08) 100%)',
         border: '1px solid rgba(99, 102, 241, 0.25)',
-        borderRadius: '24px',
-        padding: '24px 32px',
-        marginBottom: '20px',
-        boxShadow: '0 12px 35px rgba(0, 0, 0, 0.25)',
+        borderRadius: '16px',
+        padding: '10px 16px',
+        marginBottom: '12px',
+        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.15)',
         backdropFilter: 'blur(10px)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)',
-                width: '36px', height: '36px', borderRadius: '10px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                flexShrink: 0
-              }}>
-                <FiZap size={18} style={{ color: '#fff' }} />
-              </div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, color: '#fff', letterSpacing: '-0.02em' }}>
-                Conceptual Practice Arena
-              </h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)',
+              width: '28px', height: '28px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(99, 102, 241, 0.4)',
+              flexShrink: 0
+            }}>
+              <FiZap size={14} style={{ color: '#fff' }} />
             </div>
-            <p className="practice-banner-subtitle" style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              High-Yield Topic-Wise Practice Questions Engineered to Maximize Your GATE Score
-            </p>
+            <h1 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#fff', letterSpacing: '-0.01em' }}>
+              Conceptual Practice Arena
+            </h1>
           </div>
 
-          {/* Daily Quota Counter Badge */}
+          {/* Daily Quota Counter Badge - Ultra Sleek Mini Progress */}
           <div style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
-            borderRadius: '14px',
-            padding: '10px 16px',
-            minWidth: '220px'
+            borderRadius: '10px',
+            padding: '4px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 700, marginBottom: '6px', gap: '12px' }}>
-              <span style={{ color: 'var(--text-muted)', letterSpacing: '0.05em' }}>DAILY SOLVE QUOTA</span>
-              <span style={{ color: quota.isPremium ? '#10b981' : quota.usedToday >= quota.limitToday ? '#ef4444' : '#818cf8', whiteSpace: 'nowrap', fontWeight: 800 }}>
-                {quota.isPremium ? 'UNLIMITED 👑' : `${quota.usedToday} / ${quota.limitToday} Solved`}
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+              QUOTA: <span style={{ color: quota.isPremium ? '#10b981' : quota.usedToday >= quota.limitToday ? '#ef4444' : '#818cf8', fontWeight: 800 }}>
+                {quota.isPremium ? 'UNLIMITED 👑' : `${quota.usedToday}/${quota.limitToday}`}
               </span>
             </div>
             {!quota.isPremium && (
-              <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '60px', height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
                   width: `${Math.min(100, (quota.usedToday / quota.limitToday) * 100)}%`,
                   background: quota.usedToday >= quota.limitToday ? '#ef4444' : 'linear-gradient(90deg, #6366f1, #a855f7)',
-                  borderRadius: '4px',
+                  borderRadius: '3px',
                   transition: 'width 0.3s ease'
                 }} />
-              </div>
-            )}
-            {!quota.isPremium && (
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'right' }}>
-                {Math.max(0, quota.limitToday - quota.usedToday)} questions remaining today
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── FILTERS BAR (No Year Filter for Practice Questions) ───────────── */}
+      {/* ── COMPACT FILTERS BAR WITH COLLAPSE TOGGLE ───────────── */}
       <div className="practice-filters-box" style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
-        borderRadius: '16px',
-        padding: '16px 20px',
-        marginBottom: '20px',
+        borderRadius: '14px',
+        padding: isFiltersCollapsed ? '8px 14px' : '12px 16px',
+        marginBottom: '14px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px'
+        gap: '10px',
+        transition: 'all 0.2s ease'
       }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexWrap: 'nowrap' }}>
-          <div style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
-            <FiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search practice questions..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '9px 12px 9px 36px',
-                backgroundColor: 'var(--bg-main)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.85rem'
-              }}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" style={{ padding: '0 18px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem' }}>
-            Search
+        {/* Top Controls: Search + Collapse Toggle */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flex: '1 1 180px', minWidth: 0 }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <FiSearch style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.85rem' }} />
+              <input
+                type="text"
+                placeholder="Search practice questions..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '36px',
+                  padding: '6px 10px 6px 32px',
+                  backgroundColor: 'var(--bg-main)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '0.82rem'
+                }}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ height: '36px', padding: '0 14px', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem' }}>
+              Search
+            </button>
+          </form>
+
+          <button 
+            type="button" 
+            className="btn btn-outline" 
+            onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)} 
+            style={{ height: '36px', padding: '0 12px', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+          >
+            <FiFilter /> {isFiltersCollapsed ? 'Show Filters' : 'Collapse'}
           </button>
-        </form>
+        </div>
 
-        <div className="practice-select-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
-          {/* Subject Dropdown */}
-          <select
-            value={selectedSubjectId || ''}
-            onChange={e => {
-              setSelectedSubjectId(e.target.value ? Number(e.target.value) : null);
-              setSelectedTopicId(null);
-              setPage(0);
-            }}
-            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-          >
-            <option value="">All Subjects</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+        {/* Dropdown Filters Grid - Collapsible */}
+        {!isFiltersCollapsed && (
+          <div className="practice-select-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+            <select
+              value={selectedSubjectId || ''}
+              onChange={e => {
+                setSelectedSubjectId(e.target.value ? Number(e.target.value) : null);
+                setSelectedTopicId(null);
+                setPage(0);
+              }}
+              style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
+            >
+              <option value="">All Subjects</option>
+              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
 
-          {/* Topic Dropdown */}
-          <select
-            value={selectedTopicId || ''}
-            onChange={e => { setSelectedTopicId(e.target.value ? Number(e.target.value) : null); setPage(0); }}
-            disabled={!selectedSubjectId}
-            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', opacity: !selectedSubjectId ? 0.5 : 1 }}
-          >
-            <option value="">All Topics</option>
-            {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+            <select
+              value={selectedTopicId || ''}
+              onChange={e => { setSelectedTopicId(e.target.value ? Number(e.target.value) : null); setPage(0); }}
+              disabled={!selectedSubjectId}
+              style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem', opacity: !selectedSubjectId ? 0.5 : 1 }}
+            >
+              <option value="">All Topics</option>
+              {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
 
-          {/* Difficulty Dropdown */}
-          <select
-            value={selectedDifficulty}
-            onChange={e => { setSelectedDifficulty(e.target.value); setPage(0); }}
-            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-          >
-            <option value="ALL">All Difficulties</option>
-            <option value="EASY">🟢 Easy</option>
-            <option value="MEDIUM">🟡 Medium</option>
-            <option value="HARD">🔴 Hard</option>
-          </select>
+            <select
+              value={selectedDifficulty}
+              onChange={e => { setSelectedDifficulty(e.target.value); setPage(0); }}
+              style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
+            >
+              <option value="ALL">All Difficulties</option>
+              <option value="EASY">🟢 Easy</option>
+              <option value="MEDIUM">🟡 Medium</option>
+              <option value="HARD">🔴 Hard</option>
+            </select>
 
-          {/* Question Type Dropdown */}
-          <select
-            value={selectedType}
-            onChange={e => { setSelectedType(e.target.value); setPage(0); }}
-            style={{ padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-          >
-            <option value="ALL">All Question Types</option>
-            <option value="MCQ">MCQ (Single Choice)</option>
+            <select
+              value={selectedType}
+              onChange={e => { setSelectedType(e.target.value); setPage(0); }}
+              style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
+            >
+              <option value="ALL">All Question Types</option>
+              <option value="MCQ">MCQ (Single Choice)</option>
+              <option value="MSQ">MSQ (Multiple Select)</option>
+              <option value="NAT">NAT (Numerical)</option>
+            </select>
+          </div>
+        )}
+      </div>
             <option value="MSQ">MSQ (Multiple Select)</option>
             <option value="NAT">NAT (Numerical)</option>
           </select>
@@ -425,11 +465,64 @@ export default function PracticeArena() {
                       {q.difficulty || 'MEDIUM'}
                     </span>
                   </div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{q.questionType}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{q.questionType}</span>
+
+                    {/* View Details Page Link */}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/questions/${q.id}`)}
+                      title="View Detailed Question Page"
+                      style={{
+                        padding: '4px 8px',
+                        background: 'rgba(99, 102, 241, 0.12)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '6px',
+                        color: '#818cf8',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <FiExternalLink size={12} /> Details
+                    </button>
+
+                    {/* Report Question Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReportQuestionId(q.id);
+                        setShowReportModal(true);
+                      }}
+                      title="Report an error in this question"
+                      style={{
+                        padding: '4px 8px',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: '6px',
+                        color: '#ef4444',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <FiAlertTriangle size={12} /> Report
+                    </button>
+                  </div>
                 </div>
 
-                {/* Question Stem */}
-                <div style={{ fontSize: '1rem', lineHeight: '1.6', marginBottom: '20px', color: '#fff' }}>
+                {/* Question Stem (Clickable to view detailed page) */}
+                <div 
+                  onClick={() => navigate(`/questions/${q.id}`)}
+                  style={{ fontSize: '1rem', lineHeight: '1.6', marginBottom: '20px', color: '#fff', cursor: 'pointer' }}
+                  title="Click to view detailed question page with explanation"
+                >
                   {renderQuestionText(q.text)}
                 </div>
 
@@ -651,6 +744,78 @@ export default function PracticeArena() {
                 }}
               >
                 Continue Browsing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Question Modal */}
+      {showReportModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10000, padding: '20px'
+        }}>
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderRadius: '20px', padding: '28px', maxWidth: '480px', width: '100%',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiAlertTriangle style={{ color: '#ef4444' }} /> Report Question Error
+              </h3>
+              <button onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Reason for Report:</label>
+              <select
+                value={reportReason}
+                onChange={e => setReportReason(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+              >
+                <option value="">Select a reason...</option>
+                <option value="Incorrect Answer Key">Wrong Correct Answer</option>
+                <option value="Typo / Formatting Error">Typo or LaTeX Formatting Error</option>
+                <option value="Missing Image / Text">Missing Image or Incomplete Text</option>
+                <option value="Duplicate Question">Duplicate Question</option>
+                <option value="Other">Other Reason</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Additional Details (Optional):</label>
+              <textarea
+                value={reportDesc}
+                onChange={e => setReportDesc(e.target.value)}
+                placeholder="Explain the error briefly..."
+                rows={3}
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', resize: 'vertical' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowReportModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '8px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSendReport}
+                disabled={!reportReason}
+                style={{ padding: '8px 18px', borderRadius: '8px', opacity: !reportReason ? 0.5 : 1 }}
+              >
+                Submit Report
               </button>
             </div>
           </div>

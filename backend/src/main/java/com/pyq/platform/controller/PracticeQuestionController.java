@@ -115,7 +115,7 @@ public class PracticeQuestionController {
         }, pageable);
 
         List<QuestionDTO> dtos = questionsPage.getContent().stream()
-                .map(questionMapper::convertToDTO)
+                .map(questionMapper::convertToDTOFast)
                 .collect(Collectors.toList());
 
         PageDTO<QuestionDTO> pageDTO = PageDTO.<QuestionDTO>builder()

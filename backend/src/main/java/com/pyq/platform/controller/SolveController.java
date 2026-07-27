@@ -29,17 +29,20 @@ public class SolveController {
     private final UserRepository userRepository;
     private final BookmarkRepository bookmarkRepository;
     private final QuestionAIAnalysisRepository aiAnalysisRepository;
+    private final com.pyq.platform.mapper.QuestionMapper questionMapper;
 
     public SolveController(UserQuestionSolveRepository userQuestionSolveRepository,
                            QuestionRepository questionRepository,
                            UserRepository userRepository,
                            BookmarkRepository bookmarkRepository,
-                           QuestionAIAnalysisRepository aiAnalysisRepository) {
+                           QuestionAIAnalysisRepository aiAnalysisRepository,
+                           com.pyq.platform.mapper.QuestionMapper questionMapper) {
         this.userQuestionSolveRepository = userQuestionSolveRepository;
         this.questionRepository = questionRepository;
         this.userRepository = userRepository;
         this.bookmarkRepository = bookmarkRepository;
         this.aiAnalysisRepository = aiAnalysisRepository;
+        this.questionMapper = questionMapper;
     }
 
     // Solve question and record result
@@ -192,38 +195,7 @@ public class SolveController {
     }
 
     private QuestionDTO convertToDTO(Question question) {
-        List<OptionDTO> options = question.getOptions().stream()
-                .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
-                .collect(Collectors.toList());
-
-        Set<String> tags = question.getTags().stream()
-                .map(Tag::getName)
-                .collect(Collectors.toSet());
-
-        Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository.findFirstByQuestionIdOrderByCreatedAtDesc(question.getId());
-
-        return QuestionDTO.builder()
-                .id(question.getId())
-                .text(question.getText())
-                .questionType(question.getQuestionType())
-                .marks(question.getMarks())
-                .negativeMarks(question.getNegativeMarks())
-                .year(question.getYear())
-                .subjectId(question.getSubject().getId())
-                .subjectName(question.getSubject().getName())
-                .topicId(question.getTopic().getId())
-                .topicName(question.getTopic().getName())
-                .isCommunityVerified(question.getIsCommunityVerified())
-                .pdfSourceName(question.getPdfSourceName())
-                .pdfSourcePath(question.getPdfSourcePath())
-                .pdfPageNumber(question.getPdfPageNumber())
-                .imagePath(question.getImagePath())
-                .status(question.getStatus())
-                .options(options)
-                .tags(tags)
-                .aiSuggestedAnswer(aiOpt.map(QuestionAIAnalysis::getSuggestedAnswer).orElse(null))
-                .aiSuggestedExplanation(aiOpt.map(QuestionAIAnalysis::getSuggestedExplanation).orElse(null))
-                .build();
+        return questionMapper.convertToDTOFast(question);
     }
 
     private static String normalizeMsq(String val) {
