@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
+import CacheService from '../services/CacheService';
 import { useNavigate } from 'react-router-dom';
 import { FiClock, FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiGrid, FiList, FiCpu, FiPlus } from 'react-icons/fi';
 import { formatMathText, renderQuestionText, renderOptionContent, getAssetUrl } from '../utils/mathRenderer';
@@ -490,6 +491,7 @@ function MockTestArena() {
       }, {
         headers: AuthService.getAuthHeader()
       });
+      CacheService.invalidate('mock_history');
     } catch (e) {
       console.error('Failed to save mock attempt to database:', e);
     }

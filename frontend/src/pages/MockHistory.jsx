@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
 import AuthService from '../services/AuthService';
+import CacheService from '../services/CacheService';
 import LoginGate from '../components/LoginGate';
 import { FiClock, FiCheckCircle, FiXCircle, FiMinus, FiTrash2, FiBarChart2, FiCpu, FiAlertCircle, FiLoader } from 'react-icons/fi';
 import { renderQuestionText, renderOptionContent, getAssetUrl } from '../utils/mathRenderer';
@@ -41,7 +42,14 @@ function MockHistoryContent() {
 
   useEffect(() => {
     const fetchHistory = async () => {
-      setLoading(true);
+      const cached = CacheService.get('mock_history');
+      if (cached) {
+        setHistory(cached);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
       try {
         const res = await axios.get(`${API_CONFIG.BASE_URL}/api/simulator/history`, {
           headers: AuthService.getAuthHeader()
@@ -56,7 +64,6 @@ function MockHistoryContent() {
             item.answers.forEach(ans => {
               const q = ans.question;
               if (q) {
-                // Ensure subjectName is populated for breakdown
                 if (!q.subjectName && q.subject) {
                   q.subjectName = q.subject.name;
                 }
@@ -93,12 +100,13 @@ function MockHistoryContent() {
         });
 
         setHistory(mapped);
+        CacheService.set('mock_history', mapped, 300000); // 5 mins TTL
       } catch (err) {
         console.error("Failed to load history from backend, falling back to localStorage", err);
         try {
           const raw = localStorage.getItem('gate_mock_history');
           setHistory(raw ? JSON.parse(raw) : []);
-        } catch { setHistory([]); }
+        } catch { if (!cached) setHistory([]); }
       } finally {
         setLoading(false);
       }

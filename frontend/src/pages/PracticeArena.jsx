@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
+import CacheService from '../services/CacheService';
 import API_CONFIG from '../config/api';
 import { getAssetUrl, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis } from '../utils/mathRenderer';
 import { 
   FiSearch, FiBookOpen, FiLayers, FiAlertTriangle, FiCheckCircle, 
   FiBookmark, FiMessageSquare, FiFilter, FiLoader, FiLock, FiClock, FiCheckSquare, FiRotateCcw, FiZap,
-  FiExternalLink, FiX
+  FiExternalLink, FiX, FiShare2, FiCheck
 } from 'react-icons/fi';
 import PremiumGateModal from '../components/PremiumGateModal';
 import LoginGate from '../components/LoginGate';
@@ -38,6 +39,43 @@ export default function PracticeArena() {
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showLoginGateModal, setShowLoginGateModal] = useState(false);
+
+  // Share State
+  const [copiedShareId, setCopiedShareId] = useState(null);
+
+  const handleShareQuestion = async (e, q) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/questions/${q.id}`;
+    const shareTitle = `GATE CSE ${q.year || ''} - ${q.topicName || 'Question'} | AIRGATE`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: `Check out this GATE question on AIRGATE:`,
+          url: shareUrl,
+        });
+        return;
+      } catch (err) {
+        // Fallback to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedShareId(q.id);
+      setTimeout(() => setCopiedShareId(null), 2500);
+    } catch (err) {
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedShareId(q.id);
+      setTimeout(() => setCopiedShareId(null), 2500);
+    }
+  };
 
   // Report Question Modal State
   const [showReportModal, setShowReportModal] = useState(false);
@@ -110,36 +148,55 @@ export default function PracticeArena() {
   };
 
   const fetchSubjects = async () => {
+    const cached = CacheService.get('subjects');
+    if (cached) setSubjects(cached);
     try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/subjects`);
-      setSubjects(Array.isArray(response.data) ? response.data : []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      setSubjects(data);
+      CacheService.set('subjects', data, 600000); // 10 mins TTL
     } catch (err) {
       console.error('Failed to load subjects', err);
     }
   };
 
   const fetchTopics = async (subjectId) => {
+    const cached = CacheService.get(`topics_${subjectId}`);
+    if (cached) setTopics(cached);
     try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/subjects/${subjectId}/topics`);
-      setTopics(Array.isArray(response.data) ? response.data : []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      setTopics(data);
+      CacheService.set(`topics_${subjectId}`, data, 600000);
     } catch (err) {
       console.error('Failed to load topics', err);
     }
   };
 
   const fetchPracticeQuestions = async (pageNumber = 0) => {
-    setLoading(true);
-    try {
-      const params = {
-        page: pageNumber,
-        size: pageSize
-      };
-      if (selectedSubjectId) params.subjectId = selectedSubjectId;
-      if (selectedTopicId) params.topicId = selectedTopicId;
-      if (selectedDifficulty && selectedDifficulty !== 'ALL') params.difficulty = selectedDifficulty;
-      if (selectedType && selectedType !== 'ALL') params.type = selectedType;
-      if (activeSearchQuery && activeSearchQuery.trim()) params.query = activeSearchQuery.trim();
+    const params = {
+      page: pageNumber,
+      size: pageSize
+    };
+    if (selectedSubjectId) params.subjectId = selectedSubjectId;
+    if (selectedTopicId) params.topicId = selectedTopicId;
+    if (selectedDifficulty && selectedDifficulty !== 'ALL') params.difficulty = selectedDifficulty;
+    if (selectedType && selectedType !== 'ALL') params.type = selectedType;
+    if (activeSearchQuery && activeSearchQuery.trim()) params.query = activeSearchQuery.trim();
 
+    const cacheKey = `practice_feed_${JSON.stringify(params)}`;
+    const cached = CacheService.get(cacheKey);
+
+    if (cached) {
+      setQuestions(cached.content || []);
+      setTotalPages(cached.totalPages || 0);
+      setTotalElements(cached.totalElements || 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/practice/questions`, {
         params,
         headers: AuthService.getAuthHeader()
@@ -149,12 +206,13 @@ export default function PracticeArena() {
         setQuestions(response.data.content);
         setTotalPages(response.data.totalPages || 0);
         setTotalElements(response.data.totalElements || 0);
+        CacheService.set(cacheKey, response.data, 180000); // 3 mins TTL
       } else {
         setQuestions([]);
       }
     } catch (err) {
       console.error('Failed to fetch practice questions', err);
-      setQuestions([]);
+      if (!cached) setQuestions([]);
     } finally {
       setLoading(false);
     }
@@ -483,6 +541,30 @@ export default function PracticeArena() {
                       }}
                     >
                       <FiExternalLink size={12} /> Details
+                    </button>
+
+                    {/* Share Question Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleShareQuestion(e, q)}
+                      title="Share Direct Question Link"
+                      style={{
+                        padding: '4px 10px',
+                        background: copiedShareId === q.id ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                        border: `1px solid ${copiedShareId === q.id ? '#22c55e' : 'var(--border-color)'}`,
+                        borderRadius: '6px',
+                        color: copiedShareId === q.id ? '#22c55e' : 'var(--text-secondary)',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {copiedShareId === q.id ? <FiCheck size={12} /> : <FiShare2 size={12} />}
+                      {copiedShareId === q.id ? 'Copied!' : 'Share'}
                     </button>
 
                     {/* Report Question Button */}

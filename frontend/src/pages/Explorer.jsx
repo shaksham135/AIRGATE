@@ -8,7 +8,7 @@ import {
   FiSearch, FiBookOpen, FiLayers, FiTag, FiCalendar, FiPlus, 
   FiEdit, FiTrash, FiAlertTriangle, FiCheckCircle, FiChevronRight,
   FiBookmark, FiMessageSquare, FiTrendingUp, FiThumbsUp, FiThumbsDown, FiCornerDownRight,
-  FiX, FiFilter, FiLoader, FiMaximize2, FiMinimize2
+  FiX, FiFilter, FiLoader, FiMaximize2, FiMinimize2, FiShare2, FiCheck
 } from 'react-icons/fi';
 
 import { getAssetUrl, formatMathText, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis, renderAiChatText } from '../utils/mathRenderer';
@@ -63,6 +63,43 @@ export default function Explorer() {
   const [reportQuestionId, setReportQuestionId] = useState(null);
   const [reportReason, setReportReason] = useState('');
   const [reportDesc, setReportDesc] = useState('');
+
+  // Share State
+  const [copiedShareId, setCopiedShareId] = useState(null);
+
+  const handleShareQuestion = async (e, q) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/questions/${q.id}`;
+    const shareTitle = `GATE CSE ${q.year || ''} - ${q.topicName || 'Question'} | AIRGATE`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: `Check out this GATE question on AIRGATE:`,
+          url: shareUrl,
+        });
+        return;
+      } catch (err) {
+        // Fallback to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedShareId(q.id);
+      setTimeout(() => setCopiedShareId(null), 2500);
+    } catch (err) {
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedShareId(q.id);
+      setTimeout(() => setCopiedShareId(null), 2500);
+    }
+  };
 
 
   // Exposed answers map { questionId: boolean }
@@ -1018,6 +1055,30 @@ export default function Explorer() {
                     title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
                   >
                     <FiBookmark size={18} fill={isBookmarked ? 'var(--color-warning)' : 'none'} />
+                  </button>
+
+                  {/* Share button */}
+                  <button 
+                    style={{ 
+                      background: copiedShareId === q.id ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)', 
+                      border: `1px solid ${copiedShareId === q.id ? '#22c55e' : 'var(--border-color)'}`, 
+                      color: copiedShareId === q.id ? '#22c55e' : 'var(--text-secondary)', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      marginLeft: '10px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={(e) => handleShareQuestion(e, q)}
+                    title="Share Direct Question Link"
+                  >
+                    {copiedShareId === q.id ? <FiCheck size={14} /> : <FiShare2 size={14} />}
+                    <span>{copiedShareId === q.id ? 'Copied!' : 'Share'}</span>
                   </button>
 
                   {/* Report button */}

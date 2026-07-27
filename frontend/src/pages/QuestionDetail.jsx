@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
+import CacheService from '../services/CacheService';
 import { formatMathText, renderQuestionText, getAssetUrl, renderMentorAnalysis, checkAnswerCorrect, renderAiChatText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
 import PremiumGateModal from '../components/PremiumGateModal';
 import { 
   FiBookmark, FiCheckCircle, FiXCircle, FiMessageSquare, FiActivity, 
-  FiArrowLeft, FiThumbsUp, FiThumbsDown, FiClock, FiPlus, FiCornerDownRight, FiAlertTriangle, FiLoader, FiX, FiMaximize2, FiMinimize2 
+  FiArrowLeft, FiThumbsUp, FiThumbsDown, FiClock, FiPlus, FiCornerDownRight, FiAlertTriangle, FiLoader, FiX, FiMaximize2, FiMinimize2,
+  FiShare2, FiCheck
 } from 'react-icons/fi';
 
 
@@ -24,6 +26,40 @@ export default function QuestionDetail() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDesc, setReportDesc] = useState('');
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  const handleShareQuestion = async () => {
+    const shareUrl = `${window.location.origin}/questions/${id}`;
+    const shareTitle = question ? `GATE CSE ${question.year || ''} - ${question.topicName || 'Question'} | AIRGATE` : 'AIRGATE Question';
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: `Check out this GATE question on AIRGATE:`,
+          url: shareUrl,
+        });
+        return;
+      } catch (err) {
+        // Fallback to clipboard if share dismissed
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2500);
+    } catch (err) {
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2500);
+    }
+  };
 
   const [startTime] = useState(Date.now());
   const [loading, setLoading] = useState(true);
@@ -58,17 +94,31 @@ export default function QuestionDetail() {
   }, [id]);
 
   const loadQuestionData = async () => {
-    setLoading(true);
+    // 1. Instant RAM Cache Check (0ms response on back/forth navigation)
+    const cachedQ = CacheService.get(`qd_${id}`);
+    const cachedSimilar = CacheService.get(`similar_${id}`);
+
+    if (cachedQ) {
+      setQuestion(cachedQ);
+      document.title = `GATE CSE ${cachedQ.year || ''} - ${cachedQ.topicName || ''} | AIRGATE`;
+      if (cachedSimilar) setSuggestedNextQuestion(cachedSimilar);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError('');
     try {
       const qRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}`);
       setQuestion(qRes.data);
-      document.title = `GATE CSE ${qRes.data.year} - ${qRes.data.topicName} | Exam Prep Platform`;
+      CacheService.set(`qd_${id}`, qRes.data, 300000); // 5 minutes TTL
+      document.title = `GATE CSE ${qRes.data.year || ''} - ${qRes.data.topicName || ''} | AIRGATE`;
 
       try {
         const similarRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/similar`);
         if (similarRes.data && similarRes.data.length > 0) {
           setSuggestedNextQuestion(similarRes.data[0]);
+          CacheService.set(`similar_${id}`, similarRes.data[0], 300000);
         } else {
           setSuggestedNextQuestion(null);
         }
@@ -551,6 +601,30 @@ export default function QuestionDetail() {
             <FiBookmark size={20} fill={isBookmarked ? 'var(--color-warning)' : 'none'} />
           </button>
 
+          {/* Share Button */}
+          <button 
+            style={{ 
+              background: copiedShare ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)', 
+              border: `1px solid ${copiedShare ? '#22c55e' : 'var(--border-color)'}`, 
+              color: copiedShare ? '#22c55e' : 'var(--text-secondary)', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              marginLeft: '12px',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={handleShareQuestion}
+            title="Share Direct Question Link"
+          >
+            {copiedShare ? <FiCheck size={16} /> : <FiShare2 size={16} />}
+            <span>{copiedShare ? 'Link Copied!' : 'Share'}</span>
+          </button>
+
           {/* Report Button */}
           <button 
             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '12px' }}
@@ -624,15 +698,7 @@ export default function QuestionDetail() {
                       ...(isSelected && !selectedOption ? { borderColor: 'var(--color-secondary)', backgroundColor: 'rgba(6, 182, 212, 0.05)' } : {})
                     }}
                   >
-                    <span className="option-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {question.questionType === 'MSQ' && (
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected}
-                          readOnly
-                          style={{ accentColor: 'var(--color-secondary)', width: '16px', height: '16px', marginRight: '6px', pointerEvents: 'none' }}
-                        />
-                      )}
+                    <span className="option-label" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                       {opt.optionLabel}
                     </span>
                     {isImageOption ? (
@@ -896,8 +962,8 @@ export default function QuestionDetail() {
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', marginTop: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
           <div style={{ flex: 1 }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '4px' }}>🚀 Next Recommended Question</span>
-            <h4 style={{ fontSize: '0.95rem', margin: 0, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
-              {suggestedNextQuestion.text.replace(/<[^>]*>/g, '').substring(0, 150)}...
+            <h4 style={{ fontSize: '0.95rem', margin: 0, fontWeight: 500, color: 'var(--text-primary)', lineHeight: '1.5' }}>
+              {renderQuestionText(suggestedNextQuestion.text.length > 200 ? suggestedNextQuestion.text.substring(0, 200) + '...' : suggestedNextQuestion.text)}
             </h4>
           </div>
           <button 
