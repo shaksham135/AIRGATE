@@ -42,7 +42,7 @@ public class QuestionService {
 
     @Cacheable(
         value = "questions",
-        key = "(#query != null ? #query : '') + ':' + #subjectId + ':' + #topicId + ':' + #year + ':' + #questionType + ':' + #tagName + ':' + #status + ':' + #userId + ':' + #solvedStatus + ':' + #bookmarked + ':' + #pageable.pageNumber + ':' + #pageable.pageSize"
+        key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #status, #userId, #solvedStatus, #bookmarked, #pageable.pageNumber, #pageable.pageSize)"
     )
     public Page<Question> searchQuestions(String query, Long subjectId, Long topicId, Integer year, String questionType,
             String tagName, String status, Long userId, String solvedStatus, Boolean bookmarked, Pageable pageable) {

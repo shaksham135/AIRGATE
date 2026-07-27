@@ -64,18 +64,20 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                // Throttled update of lastActiveAt field (once per 30 minutes to reduce DB load)
+                // Non-blocking throttled update of lastActiveAt field (once per 30 minutes)
                 if (userDetails instanceof UserDetailsImpl) {
                     Long userId = ((UserDetailsImpl) userDetails).getId();
                     java.time.LocalDateTime now = java.time.LocalDateTime.now();
                     java.time.LocalDateTime lastTracked = activeUsersCache.get(userId);
                     if (lastTracked == null || lastTracked.isBefore(now.minusMinutes(30))) {
                         activeUsersCache.put(userId, now);
-                        try {
-                            userRepository.updateLastActiveAt(userId, now);
-                        } catch (Exception ex) {
-                            log.error("Failed to update last active timestamp: {}", ex.getMessage());
-                        }
+                        java.util.concurrent.CompletableFuture.runAsync(() -> {
+                            try {
+                                userRepository.updateLastActiveAt(userId, now);
+                            } catch (Exception ex) {
+                                log.error("Failed to update last active timestamp: {}", ex.getMessage());
+                            }
+                        });
                     }
                 }
             }

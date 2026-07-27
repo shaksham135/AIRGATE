@@ -20,17 +20,20 @@ public class SubjectController {
     }
 
     @GetMapping
+    @org.springframework.cache.annotation.Cacheable(value = "subjects")
     public ResponseEntity<List<Subject>> getAllSubjects() {
         return ResponseEntity.ok(topicService.getAllSubjects());
     }
 
     @GetMapping("/{id}/topics")
+    @org.springframework.cache.annotation.Cacheable(value = "topics", key = "#id")
     public ResponseEntity<List<TopicNode>> getSubjectTopics(@PathVariable("id") Long id) {
         return ResponseEntity.ok(topicService.getTopicTree(id));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics"}, allEntries = true)
     public ResponseEntity<?> createSubject(@RequestBody java.util.Map<String, String> payload) {
         String name = payload.get("name");
         if (name == null || name.trim().isEmpty()) {
@@ -46,6 +49,7 @@ public class SubjectController {
 
     @PostMapping("/{id}/topics")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics"}, allEntries = true)
     public ResponseEntity<?> createTopic(
             @PathVariable("id") Long subjectId,
             @RequestBody java.util.Map<String, Object> payload) {

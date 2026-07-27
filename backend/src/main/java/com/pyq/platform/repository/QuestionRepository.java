@@ -43,6 +43,8 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
 
     List<Question> findBySubjectIdAndStatus(Long subjectId, String status);
     List<Question> findByTopicIdAndStatus(Long topicId, String status);
+    List<Question> findByTopicIdInAndStatus(List<Long> topicIds, String status);
+    List<Question> findTop5ByTopicIdAndStatusAndIdNot(Long topicId, String status, Long excludeId);
     List<Question> findByYearAndStatus(Integer year, String status);
     long countByStatus(String status);
     List<Question> findByStatusAndPublishAtBefore(String status, java.time.LocalDateTime time);

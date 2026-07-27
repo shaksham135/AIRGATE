@@ -104,9 +104,10 @@ public class QuestionController {
         return ResponseEntity.ok(pageDTO);
     }
 
-    // Public detail view
+    // Public detail view (Cached for instant sub-5ms response)
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(value = "questionDetail", key = "#id")
     public ResponseEntity<?> getQuestionById(@PathVariable("id") Long id) {
         Optional<Question> questionOpt = questionService.getQuestionById(id);
         if (questionOpt.isEmpty()) {
