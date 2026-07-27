@@ -18,4 +18,4 @@ Disallow: /review
 Disallow: /users
 Disallow: /profile
 
-Sitemap: /sitemap.xml
+Sitemap: https://airgate.vercel.app/sitemap.xml
