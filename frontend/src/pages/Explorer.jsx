@@ -146,8 +146,11 @@ export default function Explorer() {
     fetchSubjects();
     fetchAvailableYears();
     if (currentUser) {
-      fetchBookmarks();
-      fetchSolvedHistory();
+      // Stagger background user state calls so main question feed gets 100% DB pool bandwidth
+      setTimeout(() => {
+        fetchBookmarks();
+        fetchSolvedHistory();
+      }, 60);
     }
   }, []);
 
@@ -193,6 +196,13 @@ export default function Explorer() {
 
   const fetchSolvedHistory = async () => {
     if (!currentUser) return;
+    const cacheKey = `user_solved_${currentUser.id || currentUser.username}`;
+    const cached = CacheService.get(cacheKey);
+    if (cached) {
+      setSelectedOptions(cached.solvedMap || {});
+      setTempMsqSelections(cached.msqMap || {});
+    }
+
     try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved`, {
         headers: AuthService.getAuthHeader()
@@ -211,6 +221,7 @@ export default function Explorer() {
       }
       setSelectedOptions(solvedMap);
       setTempMsqSelections(msqMap);
+      CacheService.set(cacheKey, { solvedMap, msqMap }, 120000); // 2 mins TTL
     } catch (e) {
       console.error('Failed to load solved history', e);
     }
@@ -304,11 +315,19 @@ export default function Explorer() {
   };
 
   const fetchBookmarks = async () => {
+    if (!currentUser) return;
+    const cacheKey = `user_bookmarks_${currentUser.id || currentUser.username}`;
+    const cached = CacheService.get(cacheKey);
+    if (cached) {
+      setBookmarks(cached);
+    }
     try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/bookmarks`, {
         headers: AuthService.getAuthHeader()
       });
-      setBookmarks(Array.isArray(response.data) ? response.data.map(q => q.id) : []);
+      const bookmarkedIds = Array.isArray(response.data) ? response.data.map(q => q.id) : [];
+      setBookmarks(bookmarkedIds);
+      CacheService.set(cacheKey, bookmarkedIds, 120000); // 2 mins TTL
     } catch (e) {
       console.error('Failed to load bookmarks', e);
     }

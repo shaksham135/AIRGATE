@@ -15,7 +15,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +31,7 @@ public class CommentController {
     private final UserRepository userRepository;
 
     public CommentController(DiscussionCommentRepository commentRepository, DiscussionVoteRepository voteRepository,
-                             QuestionRepository questionRepository, UserRepository userRepository) {
+            QuestionRepository questionRepository, UserRepository userRepository) {
         this.commentRepository = commentRepository;
         this.voteRepository = voteRepository;
         this.questionRepository = questionRepository;
@@ -46,7 +45,7 @@ public class CommentController {
             @PathVariable("id") Long id,
             @RequestBody CommentDTO requestDto,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Optional<Question> questionOpt = questionRepository.findById(id);
         if (questionOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -54,7 +53,7 @@ public class CommentController {
         }
 
         User user = userRepository.findById(userDetails.getId()).orElseThrow();
-        
+
         DiscussionComment parent = null;
         if (requestDto.getParentCommentId() != null) {
             parent = commentRepository.findById(requestDto.getParentCommentId()).orElse(null);
@@ -76,9 +75,9 @@ public class CommentController {
     public ResponseEntity<List<CommentDTO>> getComments(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         Long currentUserId = userDetails != null ? userDetails.getId() : null;
-        
+
         // 1. Fetch all comments for this question in 1 single query
         List<DiscussionComment> allComments = commentRepository.findByQuestionIdOrderByCreatedAtAsc(id);
         if (allComments.isEmpty()) {
@@ -159,7 +158,7 @@ public class CommentController {
             @PathVariable("id") Long id,
             @RequestParam("type") String voteType,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        
+
         if (!voteType.equals("UPVOTE") && !voteType.equals("DOWNVOTE")) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Invalid vote type!"));
         }

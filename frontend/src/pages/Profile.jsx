@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
+import CacheService from '../services/CacheService';
 import API_CONFIG from '../config/api';
 import { FiUser, FiMail, FiShield, FiLock, FiTrash2, FiActivity, FiCheckCircle, FiAward, FiBookOpen } from 'react-icons/fi';
 
@@ -32,12 +33,22 @@ export default function Profile() {
   }, []);
 
   const fetchStats = async () => {
-    setLoadingStats(true);
+    if (!currentUser) return;
+    const cacheKey = `user_solve_stats_${currentUser.id || currentUser.username}`;
+    const cached = CacheService.get(cacheKey);
+    if (cached) {
+      setStats(cached);
+      setLoadingStats(false);
+    } else {
+      setLoadingStats(true);
+    }
+
     try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/solve/stats`, {
         headers: AuthService.getAuthHeader()
       });
       setStats(response.data);
+      CacheService.set(cacheKey, response.data, 120000); // 2 mins TTL
     } catch (err) {
       console.error('Failed to load stats', err);
     } finally {

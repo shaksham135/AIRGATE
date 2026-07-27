@@ -117,10 +117,12 @@ export default function PracticeArena() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    AuthService.checkAndRefreshUserStatus(true).then(() => {
-      fetchDailyQuota();
-    });
     fetchSubjects();
+    if (currentUser) {
+      setTimeout(() => {
+        fetchDailyQuota();
+      }, 50);
+    }
   }, []);
 
   useEffect(() => {

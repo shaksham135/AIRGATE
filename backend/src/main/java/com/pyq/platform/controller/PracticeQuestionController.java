@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,7 +31,6 @@ public class PracticeQuestionController {
     private final QuestionRepository questionRepository;
     private final TopicRepository topicRepository;
     private final UserQuestionSolveRepository solveRepository;
-    private final SystemSettingsRepository systemSettingsRepository;
     private final QuestionMapper questionMapper;
 
     /**
@@ -52,16 +50,17 @@ public class PracticeQuestionController {
                 "usedToday", usedToday,
                 "limitToday", dailyLimit,
                 "isPremium", isPremium,
-                "remainingToday", isPremium ? 999999 : Math.max(0, dailyLimit - usedToday)
-        ));
+                "remainingToday", isPremium ? 999999 : Math.max(0, dailyLimit - usedToday)));
     }
 
     /**
      * GET /api/practice/questions
-     * Returns ONLY AI-generated conceptual practice questions with Subject, Topic, Difficulty & Type filters.
+     * Returns ONLY AI-generated conceptual practice questions with Subject, Topic,
+     * Difficulty & Type filters.
      */
     @GetMapping("/questions")
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(value = "practiceQuestions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #difficulty, #questionType, #page, #size)")
     public ResponseEntity<PageDTO<QuestionDTO>> getPracticeQuestions(
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "subjectId", required = false) Long subjectId,
@@ -80,7 +79,8 @@ public class PracticeQuestionController {
                 List<Predicate> predicates = new ArrayList<>();
 
                 // Filter ONLY AI Generated Practice Questions
-                predicates.add(root.get("pdfSourceName").in("AI_NIGHTLY_GENERATOR", "AI_GENERATED", "AI_GENERATION", "AI_SYSTEM", "CONCEPTUAL_PRACTICE"));
+                predicates.add(root.get("pdfSourceName").in("AI_NIGHTLY_GENERATOR", "AI_GENERATED", "AI_GENERATION",
+                        "AI_SYSTEM", "CONCEPTUAL_PRACTICE"));
                 predicates.add(cb.equal(root.get("status"), "APPROVED"));
 
                 // Subject Filter
