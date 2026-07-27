@@ -413,11 +413,6 @@ export default function PracticeArena() {
           </div>
         )}
       </div>
-            <option value="MSQ">MSQ (Multiple Select)</option>
-            <option value="NAT">NAT (Numerical)</option>
-          </select>
-        </div>
-      </div>
 
       {/* ── QUESTION FEED ─────────────────────────────────────────────────── */}
       <div id="practice-questions-start"></div>

@@ -348,7 +348,7 @@ function MockTestArena() {
           .replace(/sqrt\(/g, 'Math.sqrt(')
           .replace(/\^/g, '**');
         
-        const result = eval(expr);
+        const result = Function('"use strict"; return (' + expr + ')')();
         setCalcInput(Number(result).toFixed(4).toString());
       } catch (e) {
         setCalcInput('Error');

@@ -2,7 +2,6 @@ package com.pyq.platform.controller;
 
 import com.pyq.platform.dto.MessageResponse;
 import com.pyq.platform.dto.QuestionDTO;
-import com.pyq.platform.dto.OptionDTO;
 import com.pyq.platform.entity.*;
 import com.pyq.platform.repository.*;
 import com.pyq.platform.security.UserDetailsImpl;
@@ -16,7 +15,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -32,11 +30,11 @@ public class SolveController {
     private final com.pyq.platform.mapper.QuestionMapper questionMapper;
 
     public SolveController(UserQuestionSolveRepository userQuestionSolveRepository,
-                           QuestionRepository questionRepository,
-                           UserRepository userRepository,
-                           BookmarkRepository bookmarkRepository,
-                           QuestionAIAnalysisRepository aiAnalysisRepository,
-                           com.pyq.platform.mapper.QuestionMapper questionMapper) {
+            QuestionRepository questionRepository,
+            UserRepository userRepository,
+            BookmarkRepository bookmarkRepository,
+            QuestionAIAnalysisRepository aiAnalysisRepository,
+            com.pyq.platform.mapper.QuestionMapper questionMapper) {
         this.userQuestionSolveRepository = userQuestionSolveRepository;
         this.questionRepository = questionRepository;
         this.userRepository = userRepository;
@@ -70,8 +68,8 @@ public class SolveController {
         Question question = questionOpt.get();
 
         // ── Daily Quota Check for AI Practice Questions ─────────────────────────────
-        boolean isAiPracticeQ = "AI_NIGHTLY_GENERATOR".equalsIgnoreCase(question.getPdfSourceName()) || 
-                                "AI_GENERATED".equalsIgnoreCase(question.getPdfSourceName());
+        boolean isAiPracticeQ = "AI_NIGHTLY_GENERATOR".equalsIgnoreCase(question.getPdfSourceName()) ||
+                "AI_GENERATED".equalsIgnoreCase(question.getPdfSourceName());
         boolean isPremium = Boolean.TRUE.equals(user.getIsPremium());
 
         if (isAiPracticeQ && !isPremium) {
@@ -80,7 +78,8 @@ public class SolveController {
             if (usedToday >= 30) {
                 log.warn("Daily practice limit (30 Qs) reached for user: {}", user.getUsername());
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(Map.of("error", "QUOTA_EXCEEDED", "message", "You have reached your daily quota of 30 practice questions! Upgrade to Aspirant Pro for unlimited daily conceptual practice."));
+                        .body(Map.of("error", "QUOTA_EXCEEDED", "message",
+                                "You have reached your daily quota of 30 practice questions! Upgrade to Aspirant Pro for unlimited daily conceptual practice."));
             }
         }
         // ────────────────────────────────────────────────────────────────────────────
@@ -91,8 +90,8 @@ public class SolveController {
 
         boolean isCorrect = checkAnswer(correctAnswer, selectedOption);
 
-
-        Optional<UserQuestionSolve> existingOpt = userQuestionSolveRepository.findByUserIdAndQuestionId(user.getId(), id);
+        Optional<UserQuestionSolve> existingOpt = userQuestionSolveRepository.findByUserIdAndQuestionId(user.getId(),
+                id);
         if (existingOpt.isPresent()) {
             return ResponseEntity.badRequest()
                     .body(new MessageResponse("Error: Question answer is already locked and cannot be changed!"));
@@ -199,7 +198,8 @@ public class SolveController {
     }
 
     private static String normalizeMsq(String val) {
-        if (val == null) return "";
+        if (val == null)
+            return "";
         String clean = val.trim().toLowerCase().replaceAll("(?i)^option\\s+", "");
         String[] tokens = clean.split("[,;\\s\\-\\+]+");
         List<String> list = new ArrayList<>();
@@ -214,8 +214,9 @@ public class SolveController {
     }
 
     private static boolean checkAnswer(String correct, String selected) {
-        if (correct == null || selected == null) return false;
-        
+        if (correct == null || selected == null)
+            return false;
+
         String normCorrect = normalizeMsq(correct);
         String normSelected = normalizeMsq(selected);
         if (!normCorrect.isEmpty() && normCorrect.equals(normSelected)) {
@@ -246,7 +247,6 @@ public class SolveController {
         return false;
     }
 
-
     // Reset solved history for a user
     @DeleteMapping("/questions/solve/reset")
     @PreAuthorize("isAuthenticated()")
@@ -256,5 +256,3 @@ public class SolveController {
         return ResponseEntity.ok(new MessageResponse("Solved history reset successfully!"));
     }
 }
-
-
