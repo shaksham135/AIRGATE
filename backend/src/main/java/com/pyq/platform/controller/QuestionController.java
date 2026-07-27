@@ -117,16 +117,11 @@ public class QuestionController {
     }
 
     @GetMapping("/stats")
+    @org.springframework.cache.annotation.Cacheable(value = "stats")
     public ResponseEntity<?> getStats() {
-        long approved = questionRepository.findAll().stream()
-                .filter(q -> "APPROVED".equalsIgnoreCase(q.getStatus()) && !"AI_NIGHTLY_GENERATOR".equalsIgnoreCase(q.getPdfSourceName()))
-                .count();
-        long pending = questionRepository.findAll().stream()
-                .filter(q -> "PENDING".equalsIgnoreCase(q.getStatus()) && !"AI_NIGHTLY_GENERATOR".equalsIgnoreCase(q.getPdfSourceName()))
-                .count();
-        long total = questionRepository.findAll().stream()
-                .filter(q -> !"AI_NIGHTLY_GENERATOR".equalsIgnoreCase(q.getPdfSourceName()))
-                .count();
+        long approved = questionRepository.countByStatus("APPROVED");
+        long pending = questionRepository.countByStatus("PENDING");
+        long total = questionRepository.count();
 
         java.util.Map<String, Long> stats = new java.util.HashMap<>();
         stats.put("totalApproved", approved);

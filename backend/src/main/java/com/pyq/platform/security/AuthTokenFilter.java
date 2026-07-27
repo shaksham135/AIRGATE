@@ -22,6 +22,23 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private final com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository;
     private final java.util.Map<Long, java.time.LocalDateTime> activeUsersCache = new java.util.concurrent.ConcurrentHashMap<>();
 
+    private static final long SETTINGS_CACHE_TTL_MS = 30_000;
+    private static volatile com.pyq.platform.entity.SystemSettings cachedSystemSettings = null;
+    private static volatile long lastSettingsFetchTime = 0;
+
+    private com.pyq.platform.entity.SystemSettings getCachedSettings() {
+        long now = System.currentTimeMillis();
+        if (cachedSystemSettings == null || (now - lastSettingsFetchTime) > SETTINGS_CACHE_TTL_MS) {
+            try {
+                cachedSystemSettings = systemSettingsRepository.findById(1).orElse(null);
+                lastSettingsFetchTime = now;
+            } catch (Exception ex) {
+                log.warn("Failed to refresh cached SystemSettings: {}", ex.getMessage());
+            }
+        }
+        return cachedSystemSettings;
+    }
+
     public AuthTokenFilter(JwtUtils jwtUtils, 
                            UserDetailsServiceImpl userDetailsService, 
                            com.pyq.platform.repository.UserRepository userRepository,
@@ -47,12 +64,12 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                // Throttled update of lastActiveAt field
+                // Throttled update of lastActiveAt field (once per 30 minutes to reduce DB load)
                 if (userDetails instanceof UserDetailsImpl) {
                     Long userId = ((UserDetailsImpl) userDetails).getId();
                     java.time.LocalDateTime now = java.time.LocalDateTime.now();
                     java.time.LocalDateTime lastTracked = activeUsersCache.get(userId);
-                    if (lastTracked == null || lastTracked.isBefore(now.minusMinutes(5))) {
+                    if (lastTracked == null || lastTracked.isBefore(now.minusMinutes(30))) {
                         activeUsersCache.put(userId, now);
                         try {
                             userRepository.updateLastActiveAt(userId, now);
@@ -66,13 +83,13 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             log.error("Cannot set user authentication: {}", e.getMessage());
         }
 
-        // Maintenance Mode Guard
+        // Maintenance Mode Guard with 30-second RAM Caching (zero DB latency)
         try {
             String path = request.getRequestURI();
             boolean isApi = path.startsWith("/api/");
             boolean isPublicAuth = path.startsWith("/api/auth/") || path.equals("/api/admin/settings");
             if (isApi && !isPublicAuth) {
-                com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+                com.pyq.platform.entity.SystemSettings settings = getCachedSettings();
                 if (settings != null && Boolean.TRUE.equals(settings.getIsMaintenanceMode())) {
                     // Check if authenticated user is admin or editor
                     boolean isAdminOrEditor = false;
