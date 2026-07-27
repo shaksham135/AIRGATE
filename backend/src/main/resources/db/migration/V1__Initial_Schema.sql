@@ -199,21 +199,7 @@ CREATE TABLE IF NOT EXISTS question_reports (
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Answer Votes table
-CREATE TABLE IF NOT EXISTS answer_votes (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_answer_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    vote_type VARCHAR(10) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_answer_id) REFERENCES user_answers(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY uk_user_answer (user_id, user_answer_id),
-    INDEX idx_user_answer (user_answer_id),
-    INDEX idx_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- User Answers table
+-- User Answers table (Must be declared before answer_votes)
 CREATE TABLE IF NOT EXISTS user_answers (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     question_id BIGINT NOT NULL,
@@ -227,6 +213,20 @@ CREATE TABLE IF NOT EXISTS user_answers (
     UNIQUE KEY uk_user_question (user_id, question_id),
     INDEX idx_user (user_id),
     INDEX idx_question (question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Answer Votes table (References user_answers)
+CREATE TABLE IF NOT EXISTS answer_votes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_answer_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    vote_type VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_answer_id) REFERENCES user_answers(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_user_answer (user_id, user_answer_id),
+    INDEX idx_user_answer (user_answer_id),
+    INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- User Question Solves table
