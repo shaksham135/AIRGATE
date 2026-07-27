@@ -38,37 +38,44 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
-        // 1. Seed Users
-        if (userRepository.count() == 0) {
-            log.info("Seeding default accounts...");
+        // 1. Always Ensure Admin User from Environment Variables
+        String adminUser  = resolvePassword("ADMIN_USERNAME",   "admin");
+        String adminEmail = resolvePassword("ADMIN_EMAIL",      "admin@airgate.in");
+        String adminPwd   = resolvePassword("ADMIN_PASSWORD",   "ChangeMe_Admin@2025!");
 
-            // Read admin credentials from environment variables dynamically
-            String adminUser  = resolvePassword("ADMIN_USERNAME",   "admin");
-            String adminEmail = resolvePassword("ADMIN_EMAIL",      "admin@airgate.in");
-            String adminPwd   = resolvePassword("ADMIN_PASSWORD",   "ChangeMe_Admin@2025!");
+        User admin = userRepository.findByUsername(adminUser)
+                .or(() -> userRepository.findByEmail(adminEmail))
+                .orElse(new User());
+
+        admin.setUsername(adminUser);
+        admin.setEmail(adminEmail);
+        admin.setPasswordHash(passwordEncoder.encode(adminPwd));
+        admin.setRole(User.UserRole.ADMIN);
+        userRepository.save(admin);
+        log.info("Admin user '{}' successfully synced with ENV credentials.", adminUser);
+
+        // Seed default secondary test accounts if table is empty
+        if (userRepository.count() <= 1) {
             String editorPwd  = resolvePassword("EDITOR_PASSWORD",  "ChangeMe_Editor@2025!");
             String studentPwd = resolvePassword("STUDENT_PASSWORD", "ChangeMe_Student@2025!");
 
-            userRepository.save(User.builder()
-                    .username(adminUser)
-                    .email(adminEmail)
-                    .passwordHash(passwordEncoder.encode(adminPwd))
-                    .role(User.UserRole.ADMIN)
-                    .build());
+            if (!userRepository.existsByUsername("editor")) {
+                userRepository.save(User.builder()
+                        .username("editor")
+                        .email("editor@pyqplatform.com")
+                        .passwordHash(passwordEncoder.encode(editorPwd))
+                        .role(User.UserRole.EDITOR)
+                        .build());
+            }
 
-            userRepository.save(User.builder()
-                    .username("editor")
-                    .email("editor@pyqplatform.com")
-                    .passwordHash(passwordEncoder.encode(editorPwd))
-                    .role(User.UserRole.EDITOR)
-                    .build());
-
-            userRepository.save(User.builder()
-                    .username("student")
-                    .email("student@pyqplatform.com")
-                    .passwordHash(passwordEncoder.encode(studentPwd))
-                    .role(User.UserRole.STUDENT)
-                    .build());
+            if (!userRepository.existsByUsername("student")) {
+                userRepository.save(User.builder()
+                        .username("student")
+                        .email("student@pyqplatform.com")
+                        .passwordHash(passwordEncoder.encode(studentPwd))
+                        .role(User.UserRole.STUDENT)
+                        .build());
+            }
         }
 
         // 2. Seed Subjects and Topics

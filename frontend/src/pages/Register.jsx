@@ -35,7 +35,41 @@ export default function Register() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2 style={{ marginBottom: '8px', fontSize: '1.75rem', fontWeight: 800, textAlign: 'center' }}>
+        {/* AIRGATE Brand Logo Header */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <svg width="42" height="42" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 0 12px rgba(56, 189, 248, 0.7))' }}>
+              <defs>
+                <linearGradient id="regGradFinal" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#00d2ff" />
+                  <stop offset="50%" stopColor="#3a7bd5" />
+                  <stop offset="100%" stopColor="#928dab" />
+                </linearGradient>
+                <linearGradient id="regABody" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#00c6ff" />
+                  <stop offset="50%" stopColor="#0072ff" />
+                  <stop offset="100%" stopColor="#7a22ff" />
+                </linearGradient>
+                <linearGradient id="regGBody" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#00f2fe" />
+                  <stop offset="100%" stopColor="#4facfe" />
+                </linearGradient>
+              </defs>
+              <path d="M 16,74 A 48,48 0 1,1 104,74" stroke="url(#regGradFinal)" strokeWidth="2.8" fill="none" opacity="0.9" />
+              <circle cx="60" cy="12" r="4" fill="#00f2fe" />
+              <path d="M 60,16 L 102,94 L 86,94 L 60,45 L 34,94 L 18,94 Z" fill="url(#regABody)" />
+              <path d="M 72,55 C 72,42 48,40 48,56 C 48,70 72,68 72,60 L 58,60" stroke="url(#regGBody)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <rect x="54" y="80" width="12" height="14" fill="#00f2fe" rx="2" />
+              <rect x="57" y="83" width="6" height="11" fill="#ffffff" rx="1" />
+            </svg>
+            <span style={{ fontFamily: 'var(--font-title)', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.03em' }}>
+              <span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AIR</span>
+              <span style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>GATE</span>
+            </span>
+          </div>
+        </div>
+
+        <h2 style={{ marginBottom: '8px', fontSize: '1.6rem', fontWeight: 800, textAlign: 'center' }}>
           Create Account
         </h2>
         <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '32px', fontSize: '0.9rem' }}>

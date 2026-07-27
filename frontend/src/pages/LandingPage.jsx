@@ -287,37 +287,44 @@ export default function LandingPage() {
 
       {/* Hero Section: Focused on Results */}
       <section style={{
-        padding: '100px 24px 80px 24px',
+        padding: '60px 16px 40px 16px',
         textAlign: 'center',
         maxWidth: '1100px',
         margin: '0 auto',
         position: 'relative',
-        zIndex: 5
+        zIndex: 5,
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}>
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
-          padding: '6px 16px',
+          padding: '6px 14px',
           borderRadius: '30px',
           background: 'rgba(99, 102, 241, 0.12)',
           border: '1px solid rgba(99, 102, 241, 0.3)',
           color: '#c4b5fd',
-          fontSize: '0.85rem',
+          fontSize: 'clamp(0.72rem, 2.8vw, 0.85rem)',
           fontWeight: 700,
-          marginBottom: '28px',
-          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.2)'
+          marginBottom: '24px',
+          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.2)',
+          maxWidth: '100%',
+          boxSizing: 'border-box'
         }}>
-          <FiAward style={{ color: '#38bdf8' }} /> Built for GATE Aspirants Aiming for Top AIR Ranks & PSU Cutoffs
+          <FiAward style={{ color: '#38bdf8', flexShrink: 0 }} />
+          <span>Built for GATE Aspirants Aiming for Top AIR Ranks & PSU Cutoffs</span>
         </div>
 
         <h1 style={{
-          fontSize: 'clamp(2.5rem, 5.5vw, 4.2rem)',
+          fontSize: 'clamp(1.65rem, 5.5vw, 3.8rem)',
           fontWeight: 900,
-          lineHeight: '1.15',
+          lineHeight: '1.2',
           letterSpacing: '-0.03em',
-          marginBottom: '24px',
-          color: '#ffffff'
+          marginBottom: '20px',
+          color: '#ffffff',
+          wordBreak: 'break-word',
+          maxWidth: '100%'
         }}>
           Stop Losing Marks to Silly Errors.{' '}
           <span style={{
@@ -330,21 +337,21 @@ export default function LandingPage() {
         </h1>
 
         <p style={{
-          fontSize: 'clamp(1.05rem, 2vw, 1.25rem)',
+          fontSize: 'clamp(0.92rem, 2vw, 1.2rem)',
           color: 'var(--text-secondary)',
           maxWidth: '820px',
-          margin: '0 auto 40px auto',
+          margin: '0 auto 32px auto',
           lineHeight: '1.6',
           fontWeight: 400
         }}>
           AIRGATE isn't just a question bank. It is an intelligent practice accelerator that audits your solving speed, plugs negative marking leaks (-0.33 / -0.66), and trains you under exact 3-hour exam pressure.
         </p>
 
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div className="hero-buttons" style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button 
             className="btn btn-primary"
             onClick={() => navigate('/practice')}
-            style={{ padding: '15px 36px', fontSize: '1.05rem', fontWeight: 800, borderRadius: '12px', boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)' }}
+            style={{ padding: '13px 24px', fontSize: '0.98rem', fontWeight: 800, borderRadius: '12px', boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)' }}
           >
             Start Free Practice Arena <FiArrowRight style={{ marginLeft: '6px' }} />
           </button>
@@ -360,53 +367,54 @@ export default function LandingPage() {
               });
               setActiveModal('mockQuiz');
             }}
-            style={{ padding: '15px 32px', fontSize: '1.05rem', borderRadius: '12px', fontWeight: 700, borderColor: '#38bdf8', color: '#38bdf8' }}
+            style={{ padding: '13px 24px', fontSize: '0.98rem', borderRadius: '12px', fontWeight: 700, borderColor: '#38bdf8', color: '#38bdf8' }}
           >
             🎯 Take a Mock Test Now
           </button>
         </div>
 
         {/* Real-time Proof Numbers */}
-        <div style={{
+        <div className="stats-grid" style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '20px',
-          maxWidth: '900px',
-          margin: '70px auto 0 auto',
-          padding: '24px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+          gap: '16px',
+          maxWidth: '100%',
+          margin: '40px auto 0 auto',
+          padding: '20px 16px',
           borderRadius: '20px',
           background: 'rgba(15, 23, 42, 0.6)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(10px)'
+          backdropFilter: 'blur(10px)',
+          boxSizing: 'border-box'
         }}>
           <div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#38bdf8' }}>100%</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>Verified PYQs & Dual-AI Verifications</div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#38bdf8' }}>100%</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Verified PYQs & Dual-AI Verifications</div>
           </div>
           <div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#a855f7' }}>11 / 11</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>GATE Core Subjects Active</div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#a855f7' }}>11 / 11</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>GATE Core Subjects Active</div>
           </div>
           <div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#10b981' }}>0.01s</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>Instant Formula & Solution Parsing</div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981' }}>0.01s</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Instant Formula & Solution Parsing</div>
           </div>
         </div>
 
         {/* 🚀 UPCOMING EXAMS & BRANCHES BADGE */}
         <div style={{
-          marginTop: '48px',
-          padding: '20px 28px',
+          padding: '16px 20px',
           borderRadius: '16px',
           background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
           border: '1px solid rgba(6, 182, 212, 0.25)',
-          maxWidth: '820px',
-          margin: '40px auto 0 auto',
+          maxWidth: '100%',
+          margin: '32px auto 0 auto',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '16px'
+          gap: '16px',
+          boxSizing: 'border-box'
         }}>
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
