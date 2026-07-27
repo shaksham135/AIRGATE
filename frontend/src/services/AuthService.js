@@ -77,46 +77,56 @@ class AuthService {
     if (!user || !user.token) return null;
 
     const now = Date.now();
-    // Refresh instantly if forced or 5 seconds passed
-    if (!force && (now - this.lastCheckedTime < 5000)) {
+    // Return cached user if checked within the last 60 seconds (unless forced)
+    if (!force && this.lastCheckedTime && (now - this.lastCheckedTime < 60000)) {
       return user;
     }
-    this.lastCheckedTime = now;
 
-    try {
-      const response = await axios.get(API_CONFIG.BASE_URL + '/api/users/me', {
-        headers: this.getAuthHeader()
-      });
-
-      const dbUser = response.data;
-      
-      const updatedUser = {
-        ...user,
-        role: dbUser.role,
-        isPremium: dbUser.isPremium,
-        premiumExpiresAt: dbUser.premiumExpiresAt,
-        isBanned: dbUser.isBanned
-      };
-      
-      // Update if any properties changed
-      if (
-        user.role !== updatedUser.role ||
-        user.isPremium !== updatedUser.isPremium ||
-        user.premiumExpiresAt !== updatedUser.premiumExpiresAt ||
-        user.isBanned !== updatedUser.isBanned
-      ) {
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        return updatedUser;
-      }
-      return user;
-    } catch (e) {
-      console.error('Failed to sync user status from server:', e);
-      if (e.response && (e.response.status === 401 || e.response.status === 403)) {
-        this.logout();
-        window.location.reload();
-      }
-      throw e;
+    // Deduplicate in-flight requests across concurrent component mounts
+    if (this.inFlightMePromise) {
+      return this.inFlightMePromise;
     }
+
+    this.inFlightMePromise = (async () => {
+      try {
+        const response = await axios.get(API_CONFIG.BASE_URL + '/api/users/me', {
+          headers: this.getAuthHeader()
+        });
+
+        this.lastCheckedTime = Date.now();
+        const dbUser = response.data;
+        
+        const updatedUser = {
+          ...user,
+          role: dbUser.role,
+          isPremium: dbUser.isPremium,
+          premiumExpiresAt: dbUser.premiumExpiresAt,
+          isBanned: dbUser.isBanned
+        };
+        
+        if (
+          user.role !== updatedUser.role ||
+          user.isPremium !== updatedUser.isPremium ||
+          user.premiumExpiresAt !== updatedUser.premiumExpiresAt ||
+          user.isBanned !== updatedUser.isBanned
+        ) {
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          return updatedUser;
+        }
+        return user;
+      } catch (e) {
+        console.error('Failed to sync user status from server:', e);
+        if (e.response && (e.response.status === 401 || e.response.status === 403)) {
+          this.logout();
+          window.location.reload();
+        }
+        throw e;
+      } finally {
+        this.inFlightMePromise = null;
+      }
+    })();
+
+    return this.inFlightMePromise;
   }
 }
 
