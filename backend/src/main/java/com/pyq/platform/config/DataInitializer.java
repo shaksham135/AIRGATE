@@ -42,14 +42,16 @@ public class DataInitializer implements CommandLineRunner {
         if (userRepository.count() == 0) {
             log.info("Seeding default accounts...");
 
-            // Read passwords from environment variables; never fall back to hard-coded strings in production
+            // Read admin credentials from environment variables dynamically
+            String adminUser  = resolvePassword("ADMIN_USERNAME",   "admin");
+            String adminEmail = resolvePassword("ADMIN_EMAIL",      "admin@airgate.in");
             String adminPwd   = resolvePassword("ADMIN_PASSWORD",   "ChangeMe_Admin@2025!");
             String editorPwd  = resolvePassword("EDITOR_PASSWORD",  "ChangeMe_Editor@2025!");
             String studentPwd = resolvePassword("STUDENT_PASSWORD", "ChangeMe_Student@2025!");
 
             userRepository.save(User.builder()
-                    .username("admin")
-                    .email("admin@pyqplatform.com")
+                    .username(adminUser)
+                    .email(adminEmail)
                     .passwordHash(passwordEncoder.encode(adminPwd))
                     .role(User.UserRole.ADMIN)
                     .build());
