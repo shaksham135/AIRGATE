@@ -46,7 +46,10 @@ public class SolveController {
     // Solve question and record result
     @PostMapping("/questions/{id}/solve")
     @PreAuthorize("isAuthenticated()")
-    @CacheEvict(value = "questions", allEntries = true)
+    @org.springframework.cache.annotation.Caching(evict = {
+        @CacheEvict(value = "questions", allEntries = true),
+        @CacheEvict(value = "userSolveStats", key = "#userDetails.id")
+    })
     public ResponseEntity<?> solveQuestion(
             @PathVariable("id") Long id,
             @RequestBody Map<String, String> payload,
@@ -153,6 +156,7 @@ public class SolveController {
     // Get solve stats
     @GetMapping("/questions/solve/stats")
     @PreAuthorize("isAuthenticated()")
+    @org.springframework.cache.annotation.Cacheable(value = "userSolveStats", key = "#userDetails.id")
     public ResponseEntity<?> getStats(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         Long userId = userDetails.getId();
         long totalSolved = userQuestionSolveRepository.countByUserId(userId);

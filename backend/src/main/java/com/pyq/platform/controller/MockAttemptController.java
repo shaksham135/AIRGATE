@@ -38,6 +38,7 @@ public class MockAttemptController {
 
     @PostMapping("/submit")
     @PreAuthorize("isAuthenticated()")
+    @org.springframework.cache.annotation.CacheEvict(value = "mockHistory", key = "#userDetails.id")
     public ResponseEntity<?> submitMockAttempt(
             @RequestBody MockAttemptSubmissionDTO dto,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -59,23 +60,23 @@ public class MockAttemptController {
                     .skippedCount(dto.getSkippedCount())
                     .score(dto.getScore())
                     .negativeWastage(dto.getNegativeWastage())
-                    .autoSubmitted(dto.getAutoSubmitted())
-                    .mode(dto.getMode())
+                    .autoSubmitted(dto.getAutoSubmitted() != null ? dto.getAutoSubmitted() : false)
+                    .mode(dto.getMode() != null ? dto.getMode() : "FULL_MOCK")
                     .build();
 
             List<MockAttemptAnswer> attemptAnswers = new ArrayList<>();
             if (dto.getAnswers() != null) {
-                for (MockAttemptAnswerDTO ansDto : dto.getAnswers()) {
-                    Question q = questionRepository.findById(ansDto.getQuestionId()).orElse(null);
+                for (MockAttemptAnswerDTO aDto : dto.getAnswers()) {
+                    Question q = questionRepository.findById(aDto.getQuestionId()).orElse(null);
                     if (q != null) {
-                        MockAttemptAnswer ans = MockAttemptAnswer.builder()
+                        MockAttemptAnswer answer = MockAttemptAnswer.builder()
                                 .attempt(attempt)
                                 .question(q)
-                                .selectedAnswer(ansDto.getSelectedAnswer())
-                                .isCorrect(ansDto.getIsCorrect())
-                                .marksAwarded(ansDto.getMarksAwarded())
+                                .selectedAnswer(aDto.getSelectedAnswer())
+                                .isCorrect(aDto.getIsCorrect())
+                                .marksAwarded(aDto.getMarksAwarded())
                                 .build();
-                        attemptAnswers.add(ans);
+                        attemptAnswers.add(answer);
                     }
                 }
             }
@@ -94,6 +95,7 @@ public class MockAttemptController {
     @GetMapping("/history")
     @PreAuthorize("isAuthenticated()")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(value = "mockHistory", key = "#userDetails.id")
     public ResponseEntity<?> getMockHistory(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         try {
             List<MockAttempt> attempts = mockAttemptRepository.findByUserIdOrderBySubmittedAtDesc(userDetails.getId());
@@ -108,6 +110,7 @@ public class MockAttemptController {
     @DeleteMapping("/history")
     @PreAuthorize("isAuthenticated()")
     @org.springframework.transaction.annotation.Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = "mockHistory", key = "#userDetails.id")
     public ResponseEntity<?> clearMockHistory(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         try {
             mockAttemptRepository.deleteByUserId(userDetails.getId());

@@ -23,19 +23,9 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         CaffeineCacheManager manager = new CaffeineCacheManager();
-
-        manager.registerCustomCache("userDetails",
-                Caffeine.newBuilder()
-                        .expireAfterWrite(5, TimeUnit.MINUTES)
-                        .maximumSize(1_000)
-                        .build());
-
-        manager.registerCustomCache("questions",
-                Caffeine.newBuilder()
-                        .expireAfterWrite(5, TimeUnit.MINUTES)
-                        .maximumSize(500)
-                        .build());
-
+        manager.setCaffeine(Caffeine.newBuilder()
+                .expireAfterWrite(10, TimeUnit.MINUTES)
+                .maximumSize(5_000));
         return manager;
     }
 }
