@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -70,38 +71,70 @@ public class CommentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(new MessageResponse("Comment posted successfully!"));
     }
 
-    // Get Comments Tree
+    // Get Comments Tree - Optimized In-Memory Batch Tree Building (Sub-10ms)
     @GetMapping("/questions/{id}/comments")
     public ResponseEntity<List<CommentDTO>> getComments(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
         Long currentUserId = userDetails != null ? userDetails.getId() : null;
-        List<DiscussionComment> roots = commentRepository.findByQuestionIdAndParentCommentIsNullOrderByCreatedAtAsc(id);
         
+        // 1. Fetch all comments for this question in 1 single query
+        List<DiscussionComment> allComments = commentRepository.findByQuestionIdOrderByCreatedAtAsc(id);
+        if (allComments.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        // 2. Fetch all votes for these comments in 1 single query
+        List<DiscussionVote> allVotes = voteRepository.findByCommentQuestionId(id);
+
+        // Group votes in memory
+        java.util.Map<Long, Long> upvoteCounts = allVotes.stream()
+                .filter(v -> "UPVOTE".equalsIgnoreCase(v.getVoteType()))
+                .collect(Collectors.groupingBy(v -> v.getComment().getId(), Collectors.counting()));
+
+        java.util.Map<Long, Long> downvoteCounts = allVotes.stream()
+                .filter(v -> "DOWNVOTE".equalsIgnoreCase(v.getVoteType()))
+                .collect(Collectors.groupingBy(v -> v.getComment().getId(), Collectors.counting()));
+
+        java.util.Map<Long, String> userVotes = new java.util.HashMap<>();
+        if (currentUserId != null) {
+            allVotes.stream()
+                    .filter(v -> currentUserId.equals(v.getUser().getId()))
+                    .forEach(v -> userVotes.put(v.getComment().getId(), v.getVoteType()));
+        }
+
+        // Group comments by parentCommentId
+        java.util.Map<Long, List<DiscussionComment>> repliesMap = allComments.stream()
+                .filter(c -> c.getParentComment() != null)
+                .collect(Collectors.groupingBy(c -> c.getParentComment().getId()));
+
+        // Filter root comments
+        List<DiscussionComment> roots = allComments.stream()
+                .filter(c -> c.getParentComment() == null)
+                .toList();
+
         List<CommentDTO> tree = roots.stream()
-                .map(c -> buildCommentDTO(c, currentUserId))
+                .map(c -> buildCommentDTOFast(c, repliesMap, upvoteCounts, downvoteCounts, userVotes))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(tree);
     }
 
-    private CommentDTO buildCommentDTO(DiscussionComment comment, Long currentUserId) {
-        long upvotes = voteRepository.countByCommentIdAndVoteType(comment.getId(), "UPVOTE");
-        long downvotes = voteRepository.countByCommentIdAndVoteType(comment.getId(), "DOWNVOTE");
+    private CommentDTO buildCommentDTOFast(
+            DiscussionComment comment,
+            java.util.Map<Long, List<DiscussionComment>> repliesMap,
+            java.util.Map<Long, Long> upvoteCounts,
+            java.util.Map<Long, Long> downvoteCounts,
+            java.util.Map<Long, String> userVotes) {
 
-        String voteStatus = null;
-        if (currentUserId != null) {
-            Optional<DiscussionVote> voteOpt = voteRepository.findByCommentIdAndUserId(comment.getId(), currentUserId);
-            if (voteOpt.isPresent()) {
-                voteStatus = voteOpt.get().getVoteType();
-            }
-        }
+        long upvotes = upvoteCounts.getOrDefault(comment.getId(), 0L);
+        long downvotes = downvoteCounts.getOrDefault(comment.getId(), 0L);
+        String voteStatus = userVotes.get(comment.getId());
 
-        // Fetch replies recursively
-        List<DiscussionComment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(comment.getId());
+        List<DiscussionComment> replies = repliesMap.getOrDefault(comment.getId(), Collections.emptyList());
         List<CommentDTO> replyDTOs = replies.stream()
-                .map(r -> buildCommentDTO(r, currentUserId))
+                .map(r -> buildCommentDTOFast(r, repliesMap, upvoteCounts, downvoteCounts, userVotes))
                 .collect(Collectors.toList());
 
         return CommentDTO.builder()

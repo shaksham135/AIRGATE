@@ -56,6 +56,10 @@ public class UserDetailsImpl implements UserDetails {
         return isPremium;
     }
 
+    public boolean isBanned() {
+        return isBanned;
+    }
+
     public java.time.LocalDateTime getPremiumExpiresAt() {
         return premiumExpiresAt;
     }

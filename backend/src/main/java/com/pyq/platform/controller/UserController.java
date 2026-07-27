@@ -48,7 +48,7 @@ public class UserController {
     }
 
     @PutMapping("/premium")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> upgradeToPremium(
             @org.springframework.web.bind.annotation.RequestParam(name = "duration", defaultValue = "1") int durationMonths,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -77,17 +77,20 @@ public class UserController {
     @org.springframework.web.bind.annotation.GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getCurrentUserStatus(@AuthenticationPrincipal UserDetailsImpl userDetails) {
-        User user = userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new RuntimeException("Error: User not found."));
+        String roleStr = userDetails.getAuthorities().stream()
+                .findFirst()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .orElse("ROLE_USER")
+                .replace("ROLE_", "");
 
         Map<String, Object> response = new HashMap<>();
-        response.put("id", user.getId());
-        response.put("username", user.getUsername());
-        response.put("email", user.getEmail());
-        response.put("role", user.getRole().name());
-        response.put("isPremium", Boolean.TRUE.equals(user.getIsPremium()));
-        response.put("premiumExpiresAt", user.getPremiumExpiresAt());
-        response.put("isBanned", Boolean.TRUE.equals(user.getIsBanned()));
+        response.put("id", userDetails.getId());
+        response.put("username", userDetails.getUsername());
+        response.put("email", userDetails.getEmail());
+        response.put("role", roleStr);
+        response.put("isPremium", userDetails.isPremium());
+        response.put("premiumExpiresAt", userDetails.getPremiumExpiresAt());
+        response.put("isBanned", userDetails.isBanned());
 
         return ResponseEntity.ok(response);
     }

@@ -241,8 +241,8 @@ public class AuthController {
 
         User user = userOpt.get();
 
-        // Generate 6-digit OTP
-        String otp = String.format("%06d", new java.util.Random().nextInt(999999));
+        // Generate cryptographically secure 6-digit OTP
+        String otp = String.valueOf(100000 + new java.security.SecureRandom().nextInt(900000));
         user.setPasswordResetOtp(otp);
         user.setOtpExpiresAt(java.time.LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);

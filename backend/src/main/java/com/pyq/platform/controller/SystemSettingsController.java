@@ -2,6 +2,8 @@ package com.pyq.platform.controller;
 
 import com.pyq.platform.entity.SystemSettings;
 import com.pyq.platform.repository.SystemSettingsRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,14 +25,14 @@ public class SystemSettingsController {
                 .orElseGet(() -> {
                     SystemSettings defaultSettings = SystemSettings.builder()
                             .id(1)
-                            .premiumPriceInr(99.0)
-                            .premiumDurationMonths(1)
-                            .aiDailyLimitPremium(50)
+                            .premiumPriceInr(299.0)
+                            .premiumDurationMonths(3)
+                            .aiDailyLimitPremium(100)
                             .isMaintenanceMode(false)
-                            .tier1PriceInr(99.0)
+                            .tier1PriceInr(199.0)
                             .tier1DurationMonths(1)
-                            .tier1SpecialOffer("Best for quick revisions")
-                            .tier2PriceInr(249.0)
+                            .tier1SpecialOffer("Starter Pass")
+                            .tier2PriceInr(299.0)
                             .tier2DurationMonths(3)
                             .tier2SpecialOffer("Save 15% - Most Popular")
                             .tier3PriceInr(449.0)
@@ -48,6 +50,7 @@ public class SystemSettingsController {
 
     @GetMapping("/public-meta")
     @PreAuthorize("permitAll()")
+    @Cacheable(value = "publicMeta")
     public ResponseEntity<?> getPublicSeoMeta() {
         SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
         if (settings == null) {
@@ -71,6 +74,7 @@ public class SystemSettingsController {
 
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
+    @CacheEvict(value = "publicMeta", allEntries = true)
     public ResponseEntity<?> updateSettings(@RequestBody SystemSettings newSettings) {
         SystemSettings settings = systemSettingsRepository.findById(1)
                 .orElse(SystemSettings.builder().id(1).build());

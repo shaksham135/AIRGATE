@@ -9,4 +9,5 @@ import java.util.List;
 public interface DiscussionCommentRepository extends JpaRepository<DiscussionComment, Long> {
     List<DiscussionComment> findByQuestionIdAndParentCommentIsNullOrderByCreatedAtAsc(Long questionId);
     List<DiscussionComment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
+    List<DiscussionComment> findByQuestionIdOrderByCreatedAtAsc(Long questionId);
 }
