@@ -98,20 +98,21 @@ public class AdminAiGeneratorController {
         Long totalRejected = 0L;
 
         try {
-            totalAccepted = ledgerRepository.countTotalAcceptedQuestions();
-            if (totalAccepted == null) totalAccepted = 0L;
-        } catch (Exception ignored) {}
-
-        try {
-            totalRejected = ledgerRepository.countTotalRejectedQuestions();
-            if (totalRejected == null) totalRejected = 0L;
+            Object[] counts = ledgerRepository.findTotalCounts();
+            if (counts != null && counts.length > 0) {
+                Object[] row = (Object[]) (counts[0] instanceof Object[] ? counts[0] : counts);
+                if (row.length >= 2) {
+                    totalAccepted = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+                    totalRejected = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+                }
+            }
         } catch (Exception ignored) {}
 
         // Fallback: If ledger count is 0, count actual AI generated questions in database
         if (totalAccepted == 0L) {
             try {
-                long nightlyCount = questionRepository.findByPdfSourceName("AI_NIGHTLY_GENERATOR").size();
-                long manualCount = questionRepository.findByPdfSourceName("AI_GENERATED").size();
+                long nightlyCount = questionRepository.countByPdfSourceName("AI_NIGHTLY_GENERATOR");
+                long manualCount = questionRepository.countByPdfSourceName("AI_GENERATED");
                 totalAccepted = nightlyCount + manualCount;
             } catch (Exception ignored) {}
         }

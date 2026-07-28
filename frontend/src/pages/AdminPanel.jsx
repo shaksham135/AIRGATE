@@ -461,14 +461,15 @@ export default function AdminPanel() {
       navigate('/explore');
       return;
     }
+    // Stagger initial API requests to prevent TiDB Cloud connection pool contention
     fetchStats();
-    fetchSubjects();
-    fetchReports();
-    fetchBgStats();
-    fetchGroqUsage();
-    fetchAdminMetrics();
-    fetchSettings();
-    fetchBugs();
+    setTimeout(fetchSubjects, 40);
+    setTimeout(fetchSettings, 80);
+    setTimeout(fetchReports, 120);
+    setTimeout(fetchBugs, 160);
+    setTimeout(fetchBgStats, 200);
+    setTimeout(fetchGroqUsage, 240);
+    setTimeout(fetchAdminMetrics, 280);
 
     // Poll background stats every 30 seconds for real-time progress tracking
     const interval = setInterval(() => {

@@ -299,6 +299,7 @@ public class AdminActionController {
     }
 
     @GetMapping("/admin/analytics/dashboard")
+    @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'adminAnalyticsDashboard'")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAdminAnalyticsDashboard() {
         Map<String, Object> metrics = new java.util.HashMap<>();

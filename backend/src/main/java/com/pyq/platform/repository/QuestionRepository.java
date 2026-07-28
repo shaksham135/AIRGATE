@@ -50,6 +50,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     List<Question> findTop5ByTopicIdAndStatusAndIdNot(Long topicId, String status, Long excludeId);
     List<Question> findByYearAndStatus(Integer year, String status);
     long countByStatus(String status);
+    long countByPdfSourceName(String pdfSourceName);
     List<Question> findByStatusAndPublishAtBefore(String status, java.time.LocalDateTime time);
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT q.year FROM Question q WHERE q.status = 'APPROVED' ORDER BY q.year DESC")

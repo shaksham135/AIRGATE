@@ -23,4 +23,7 @@ public interface AiGenerationLedgerRepository extends JpaRepository<AiGeneration
 
     @Query("SELECT COALESCE(SUM(l.totalRejected), 0) FROM AiGenerationLedger l")
     Long countTotalRejectedQuestions();
+
+    @Query("SELECT COALESCE(SUM(l.totalAccepted), 0), COALESCE(SUM(l.totalRejected), 0) FROM AiGenerationLedger l")
+    Object[] findTotalCounts();
 }
