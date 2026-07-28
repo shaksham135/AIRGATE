@@ -38,6 +38,9 @@ public class EmailService {
     @Value("${spring.mail.password:}")
     private String mailPassword;
 
+    @Value("${brevo.api.key:}")
+    private String brevoApiKey;
+
     /**
      * Send raw HTML email helper
      */
@@ -103,13 +106,16 @@ public class EmailService {
     }
 
     private boolean sendViaBrevoHttpApi(String toEmail, String subject, String htmlContent) {
-        if (mailPassword == null || mailPassword.isBlank()) return false;
+        if (brevoApiKey == null || brevoApiKey.isBlank()) {
+            log.warn("BREVO_API_KEY not configured — skipping Brevo HTTP API fallback for {}", toEmail);
+            return false;
+        }
         try {
             log.info("📧 Attempting Brevo HTTP API (Port 443 HTTPS) fallback for {}", toEmail);
             String url = "https://api.brevo.com/v3/smtp/email";
             org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
             headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-            headers.set("api-key", mailPassword);
+            headers.set("api-key", brevoApiKey);
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             com.fasterxml.jackson.databind.node.ObjectNode body = mapper.createObjectNode();
