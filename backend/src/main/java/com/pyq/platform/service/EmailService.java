@@ -76,7 +76,20 @@ public class EmailService {
             log.info("Email [{}] successfully sent to {}", emailType, toEmail);
             return true;
         } catch (Exception e) {
-            log.error("Failed to send [{}] email to {}: {}", emailType, toEmail, e.getMessage());
+            log.warn("Failed to send [{}] email to {} via SMTP ({}). Trying Brevo HTTP API...", emailType, toEmail, e.getMessage());
+            
+            boolean httpSuccess = sendViaBrevoHttpApi(toEmail, subject, htmlContent);
+            if (httpSuccess) {
+                emailLogRepository.save(EmailLog.builder()
+                        .recipientEmail(toEmail)
+                        .subject(subject)
+                        .emailType(emailType)
+                        .status("SENT_VIA_HTTP_API")
+                        .sentAt(LocalDateTime.now())
+                        .build());
+                return true;
+            }
+
             emailLogRepository.save(EmailLog.builder()
                     .recipientEmail(toEmail)
                     .subject(subject)
@@ -87,6 +100,46 @@ public class EmailService {
                     .build());
             return false;
         }
+    }
+
+    private boolean sendViaBrevoHttpApi(String toEmail, String subject, String htmlContent) {
+        if (mailPassword == null || mailPassword.isBlank()) return false;
+        try {
+            log.info("📧 Attempting Brevo HTTP API (Port 443 HTTPS) fallback for {}", toEmail);
+            String url = "https://api.brevo.com/v3/smtp/email";
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+            headers.set("api-key", mailPassword);
+
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.node.ObjectNode body = mapper.createObjectNode();
+            
+            String cleanSenderEmail = (fromEmail != null && fromEmail.contains("<") && fromEmail.contains(">"))
+                    ? fromEmail.substring(fromEmail.indexOf("<") + 1, fromEmail.indexOf(">")).trim()
+                    : (fromEmail != null ? fromEmail.trim() : "support@airgate.in");
+
+            com.fasterxml.jackson.databind.node.ObjectNode sender = body.putObject("sender");
+            sender.put("name", "AIRGATE");
+            sender.put("email", cleanSenderEmail);
+
+            com.fasterxml.jackson.databind.node.ArrayNode toArr = body.putArray("to");
+            toArr.addObject().put("email", toEmail);
+
+            body.put("subject", subject);
+            body.put("htmlContent", htmlContent);
+
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(body.toString(), headers);
+            org.springframework.http.ResponseEntity<String> res = restTemplate.postForEntity(url, entity, String.class);
+
+            if (res.getStatusCode().is2xxSuccessful()) {
+                log.info("✅ Email successfully delivered to {} via Brevo HTTP API!", toEmail);
+                return true;
+            }
+        } catch (Exception httpEx) {
+            log.error("Brevo HTTP API fallback failed for {}: {}", toEmail, httpEx.getMessage());
+        }
+        return false;
     }
 
     /**
