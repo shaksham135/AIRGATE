@@ -14,6 +14,7 @@ export default function ReviewQueue() {
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
@@ -79,7 +80,6 @@ export default function ReviewQueue() {
   // Sync state with current question in queue
   useEffect(() => {
     if (questions.length > 0 && currentIndex < questions.length) {
-      fetchSubjects();
       const q = questions[currentIndex];
       setText(q.text);
       setQuestionType(q.questionType);
@@ -214,10 +214,17 @@ export default function ReviewQueue() {
   const fetchPendingQuestions = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING&size=100`, {
+      let response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING_REVIEW&size=100`, {
         headers: AuthService.getAuthHeader()
       });
-      setQuestions(response.data && Array.isArray(response.data.content) ? response.data.content : []);
+      let fetched = response.data && Array.isArray(response.data.content) ? response.data.content : [];
+      if (fetched.length === 0) {
+        response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING&size=100`, {
+          headers: AuthService.getAuthHeader()
+        });
+        fetched = response.data && Array.isArray(response.data.content) ? response.data.content : [];
+      }
+      setQuestions(fetched);
       setCurrentIndex(0);
     } catch (e) {
       setError('Failed to fetch pending questions queue!');
@@ -239,14 +246,17 @@ export default function ReviewQueue() {
   };
 
   const triggerApprove = async () => {
+    if (isSubmitting) return;
     setError('');
     setSuccess('');
+    setIsSubmitting(true);
     const q = questions[currentIndex];
 
     let finalOptions = [];
     if (questionType !== 'NAT') {
       if (options.some(opt => !opt.trim())) {
         setError('Please fill in all option fields.');
+        setIsSubmitting(false);
         return;
       }
       finalOptions = options;
@@ -289,13 +299,17 @@ export default function ReviewQueue() {
 
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to approve question!');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const triggerReject = async () => {
+    if (isSubmitting) return;
     const q = questions[currentIndex];
     if (!window.confirm('Archive/reject this question block? It will be soft-deleted.')) return;
 
+    setIsSubmitting(true);
     try {
       // Soft-delete to ARCHIVED state
       const payload = {
@@ -327,6 +341,8 @@ export default function ReviewQueue() {
       }, 1000);
     } catch (e) {
       setError('Failed to archive/reject question.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -972,7 +988,14 @@ export default function ReviewQueue() {
             </div>
 
             <div style={{ borderTop: '1px solid #1f2937', paddingTop: '20px', marginTop: '20px', marginBottom: '24px' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f3f4f6', marginBottom: '16px' }}>🔑 Correct Answer & Solution</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f3f4f6' }}>🔑 Correct Answer & Solution</div>
+                {aiSuggestedAnswer && (
+                  <span style={{ fontSize: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                    🤖 AI Auto-Selected: {aiSuggestedAnswer}
+                  </span>
+                )}
+              </div>
               
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label className="form-label" style={{ color: '#9ca3af' }}>Correct Answer / Value</label>
@@ -981,7 +1004,7 @@ export default function ReviewQueue() {
                     className="form-select" 
                     value={aiSuggestedAnswer} 
                     onChange={(e) => setAiSuggestedAnswer(e.target.value)}
-                    style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }}
+                    style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6', fontWeight: 600 }}
                   >
                     <option value="A">Option A</option>
                     <option value="B">Option B</option>
@@ -994,7 +1017,7 @@ export default function ReviewQueue() {
                     className="form-input" 
                     value={aiSuggestedAnswer} 
                     onChange={(e) => setAiSuggestedAnswer(e.target.value)}
-                    style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }}
+                    style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6', fontWeight: 600 }}
                     placeholder={questionType === 'MSQ' ? "e.g. A, B" : "e.g. 10 or 4.5 or 10-12"}
                     required
                   />
@@ -1019,16 +1042,18 @@ export default function ReviewQueue() {
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#10b981', border: 'none', fontWeight: 700 }}
+                disabled={isSubmitting}
+                style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 24px', backgroundColor: isSubmitting ? '#059669' : '#10b981', border: 'none', fontWeight: 700, opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
               >
-                <FiCheck /> Approve & Publish (A)
+                {isSubmitting ? <FiRotateCw className="spin" /> : <FiCheck />} {isSubmitting ? 'Approving...' : 'Approve & Publish (A)'}
               </button>
               
               <button 
                 type="button" 
                 className="btn btn-outline" 
                 onClick={handleSaveDraft} 
-                style={{ flex: 1, border: '1px solid #334155', color: '#e2e8f0', fontWeight: 600 }}
+                disabled={isSubmitting}
+                style={{ flex: 1, border: '1px solid #334155', color: '#e2e8f0', fontWeight: 600, opacity: isSubmitting ? 0.5 : 1 }}
               >
                 Save Draft
               </button>
@@ -1037,7 +1062,8 @@ export default function ReviewQueue() {
                 type="button" 
                 className="btn btn-outline" 
                 onClick={triggerReject} 
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', border: '1px solid #f87171', color: '#f87171' }}
+                disabled={isSubmitting}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', border: '1px solid #f87171', color: '#f87171', opacity: isSubmitting ? 0.5 : 1 }}
               >
                 <FiTrash /> Reject (R)
               </button>
@@ -1046,7 +1072,8 @@ export default function ReviewQueue() {
                 type="button" 
                 className="btn btn-outline" 
                 onClick={handleSkip} 
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', border: '1px solid #334155', color: '#9ca3af' }}
+                disabled={isSubmitting}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', border: '1px solid #334155', color: '#9ca3af', opacity: isSubmitting ? 0.5 : 1 }}
               >
                 Skip <FiFastForward />
               </button>

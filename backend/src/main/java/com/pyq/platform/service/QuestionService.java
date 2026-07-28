@@ -266,8 +266,9 @@ public class QuestionService {
         }
         existing.setTags(tags);
 
-        // Update Options
+        // Update Options safely with explicit cleanup
         if (optionTexts != null) {
+            optionRepository.deleteByQuestionIdIn(Collections.singletonList(existing.getId()));
             existing.getOptions().clear();
             for (int i = 0; i < optionTexts.size(); i++) {
                 String label = String.valueOf((char) ('A' + i));
