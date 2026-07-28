@@ -24,7 +24,7 @@ export default function Explorer() {
   const [loading, setLoading] = useState(false);
   const [availableYears, setAvailableYears] = useState([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
 
   // Custom Confirmation Modal state
   const [confirmModal, setConfirmModal] = useState({

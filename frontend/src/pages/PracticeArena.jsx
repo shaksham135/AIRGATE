@@ -27,7 +27,7 @@ export default function PracticeArena() {
   const [selectedTopicId, setSelectedTopicId] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState('ALL');
   const [selectedType, setSelectedType] = useState('ALL');
-  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
 
   // Pagination
   const [page, setPage] = useState(0);

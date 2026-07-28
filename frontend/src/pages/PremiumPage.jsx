@@ -385,22 +385,26 @@ export default function PremiumPage() {
 
             {/* Plan Price amount and Duration */}
             {(() => {
-              let currentPrice = 99.0;
-              let currentDuration = 1;
-              let currentOffer = '';
+              const t1 = tiers?.tier1 || { price: 99.0, duration: 1, offer: 'Best for quick revisions' };
+              const t2 = tiers?.tier2 || { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' };
+              const t3 = tiers?.tier3 || { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' };
+
+              let currentPrice = t1.price;
+              let currentDuration = t1.duration;
+              let currentOffer = t1.offer;
               
-              if (selectedDuration === tiers.tier1.duration) {
-                currentPrice = tiers.tier1.price;
-                currentDuration = tiers.tier1.duration;
-                currentOffer = tiers.tier1.offer;
-              } else if (selectedDuration === tiers.tier2.duration) {
-                currentPrice = tiers.tier2.price;
-                currentDuration = tiers.tier2.duration;
-                currentOffer = tiers.tier2.offer;
-              } else if (selectedDuration === tiers.tier3.duration) {
-                currentPrice = tiers.tier3.price;
-                currentDuration = tiers.tier3.duration;
-                currentOffer = tiers.tier3.offer;
+              if (selectedDuration === t1.duration) {
+                currentPrice = t1.price;
+                currentDuration = t1.duration;
+                currentOffer = t1.offer;
+              } else if (selectedDuration === t2.duration) {
+                currentPrice = t2.price;
+                currentDuration = t2.duration;
+                currentOffer = t2.offer;
+              } else if (selectedDuration === t3.duration) {
+                currentPrice = t3.price;
+                currentDuration = t3.duration;
+                currentOffer = t3.offer;
               }
 
               return (
