@@ -317,7 +317,8 @@ public class QuestionService {
             mockAttemptAnswerRepository.deleteByQuestionIdIn(questionIds);
             optionRepository.deleteByQuestionIdIn(questionIds);
 
-            questionRepository.deleteAllById(questionIds);
+            questionRepository.deleteQuestionTagsIn(questionIds);
+            questionRepository.deleteQuestionsBulk(questionIds);
             log.info("Successfully deleted {} questions and all associated dependent records.", questionIds.size());
         } catch (Exception ex) {
             log.error("Error during cascading question deletion: {}", ex.getMessage());

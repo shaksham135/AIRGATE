@@ -27,10 +27,10 @@ public class QuestionRevision {
     private String newText;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "edited_by", nullable = false)
+    @JoinColumn(name = "edited_by", nullable = true)
     private User editedBy;
 
-    @Column(name = "edited_at", nullable = false, updatable = false)
+    @Column(name = "edited_at", nullable = true, updatable = false)
     private LocalDateTime editedAt;
 
     @PrePersist

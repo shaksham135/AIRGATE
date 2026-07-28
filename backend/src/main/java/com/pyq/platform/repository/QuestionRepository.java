@@ -36,11 +36,13 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByPdfSourceName(String pdfSourceName);
+    @org.springframework.data.jpa.repository.Query(value = "DELETE FROM question_tags WHERE question_id IN (:questionIds)", nativeQuery = true)
+    void deleteQuestionTagsIn(@org.springframework.data.repository.query.Param("questionIds") List<Long> questionIds);
 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteBySubjectIdAndPdfSourceName(Long subjectId, String pdfSourceName);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Question q WHERE q.id IN :questionIds")
+    void deleteQuestionsBulk(@org.springframework.data.repository.query.Param("questionIds") List<Long> questionIds);
 
     List<Question> findBySubjectIdAndStatus(Long subjectId, String status);
     List<Question> findByTopicIdAndStatus(Long topicId, String status);
