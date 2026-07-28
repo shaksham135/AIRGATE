@@ -42,6 +42,8 @@ function ProtectedAdminRoute({ children }) {
 
 
 
+let publicMetaCache = null;
+
 function DashboardLayout({ children }) {
   const currentUser = AuthService.getCurrentUser();
   const navigate = useNavigate();
@@ -52,45 +54,65 @@ function DashboardLayout({ children }) {
   const [showPremiumModal, setShowPremiumModal] = React.useState(false);
   const [showBugModal, setShowBugModal] = React.useState(false);
 
-  // Sync public SEO Meta Tags dynamically from backend System Settings
+  // Pre-fetch admin route chunks in background for zero-delay sidebar navigation
   React.useEffect(() => {
+    if (AuthService.isAdminOrEditor()) {
+      import('./pages/AdminPanel');
+      import('./pages/AiGeneratorHub');
+      import('./pages/ReviewQueue');
+      import('./pages/UserManagement');
+      import('./pages/UploadManager');
+    }
+  }, []);
+
+  // Sync public SEO Meta Tags dynamically from backend System Settings (Cached per session)
+  React.useEffect(() => {
+    if (publicMetaCache) {
+      applyPublicMeta(publicMetaCache);
+      return;
+    }
     fetch(`${API_CONFIG.BASE_URL}/api/admin/settings/public-meta`)
       .then(res => res.json())
       .then(meta => {
-        if (meta.seoSiteTitle) {
-          document.title = meta.seoSiteTitle;
-        }
-        if (meta.seoMetaDescription) {
-          let descEl = document.querySelector('meta[name="description"]');
-          if (!descEl) {
-            descEl = document.createElement('meta');
-            descEl.name = 'description';
-            document.head.appendChild(descEl);
-          }
-          descEl.content = meta.seoMetaDescription;
-        }
-        if (meta.googleSiteVerification) {
-          let googleEl = document.querySelector('meta[name="google-site-verification"]');
-          if (!googleEl) {
-            googleEl = document.createElement('meta');
-            googleEl.name = 'google-site-verification';
-            document.head.appendChild(googleEl);
-          }
-          googleEl.content = meta.googleSiteVerification;
-        }
-        if (meta.umamiWebsiteId) {
-          let umamiScript = document.querySelector('script[data-website-id]');
-          if (!umamiScript) {
-            umamiScript = document.createElement('script');
-            umamiScript.async = true;
-            umamiScript.src = 'https://cloud.umami.is/script.js';
-            document.head.appendChild(umamiScript);
-          }
-          umamiScript.setAttribute('data-website-id', meta.umamiWebsiteId);
-        }
+        publicMetaCache = meta;
+        applyPublicMeta(meta);
       })
       .catch(() => {});
   }, []);
+
+  const applyPublicMeta = (meta) => {
+    if (meta.seoSiteTitle) {
+      document.title = meta.seoSiteTitle;
+    }
+    if (meta.seoMetaDescription) {
+      let descEl = document.querySelector('meta[name="description"]');
+      if (!descEl) {
+        descEl = document.createElement('meta');
+        descEl.name = 'description';
+        document.head.appendChild(descEl);
+      }
+      descEl.content = meta.seoMetaDescription;
+    }
+    if (meta.googleSiteVerification) {
+      let googleEl = document.querySelector('meta[name="google-site-verification"]');
+      if (!googleEl) {
+        googleEl = document.createElement('meta');
+        googleEl.name = 'google-site-verification';
+        document.head.appendChild(googleEl);
+      }
+      googleEl.content = meta.googleSiteVerification;
+    }
+    if (meta.umamiWebsiteId) {
+      let umamiScript = document.querySelector('script[data-website-id]');
+      if (!umamiScript) {
+        umamiScript = document.createElement('script');
+        umamiScript.async = true;
+        umamiScript.src = 'https://cloud.umami.is/script.js';
+        document.head.appendChild(umamiScript);
+      }
+      umamiScript.setAttribute('data-website-id', meta.umamiWebsiteId);
+    }
+  };
 
   const handleLogout = () => {
     AuthService.logout();

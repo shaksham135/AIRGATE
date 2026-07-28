@@ -22,8 +22,12 @@ export default function UploadManager() {
     }
 
     fetchJobs();
-    // Poll job statuses every 5 seconds
-    const interval = setInterval(fetchJobs, 5000);
+
+    // Adaptive polling: poll every 20s by default when idle
+    const interval = setInterval(() => {
+      fetchJobs();
+    }, 20000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -32,7 +36,14 @@ export default function UploadManager() {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/uploads/jobs`, {
         headers: AuthService.getAuthHeader()
       });
-      setJobs(Array.isArray(response.data) ? response.data : []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      setJobs(data);
+
+      // If any job is currently processing/parsing, check again in 5s
+      const hasActiveJob = data.some(j => j.status === 'PROCESSING' || j.status === 'PARSING' || j.status === 'PENDING' || j.status === 'EXTRACTING');
+      if (hasActiveJob) {
+        setTimeout(fetchJobs, 5000);
+      }
     } catch (e) {
       console.error('Failed to load jobs list', e);
       setJobs([]);
