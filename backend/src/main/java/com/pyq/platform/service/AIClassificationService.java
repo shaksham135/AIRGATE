@@ -43,7 +43,7 @@ public class AIClassificationService {
     private String fastModel;
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private RestTemplate restTemplate;
     private final GroqUsageService groqUsageService;
@@ -87,6 +87,7 @@ public class AIClassificationService {
         public String questionType; // MCQ, MSQ, NAT
         public int marks;
         public double negativeMarks;
+        public String difficulty; // EASY, MEDIUM, HARD
         public String subjectName;
         public String topicName;
         public String parentTopicName;
@@ -291,6 +292,7 @@ public class AIClassificationService {
         res.questionText = cleanTrailingAnswers(stripQuestionNumbering(parsedResult.path("questionText").asText(rawText)));
         res.marks = parsedResult.path("marks").asInt(1);
         res.negativeMarks = parsedResult.path("negativeMarks").asDouble(-0.33);
+        res.difficulty = parsedResult.path("difficulty").asText("MEDIUM").toUpperCase();
         res.subjectName = parsedResult.path("subjectName").asText("Programming and Data Structures");
         res.parentTopicName = parsedResult.path("parentTopicName").asText("Trees");
         res.topicName = parsedResult.path("topicName").asText("Binary Search Trees");
@@ -331,6 +333,7 @@ public class AIClassificationService {
         AIAnalysisResult res = new AIAnalysisResult();
         res.confidenceScore = 0.50; // Mock confidence indicator
         res.suggestedAnswer = "A";
+        res.difficulty = "MEDIUM";
         res.isFallback = true;
 
         res.suggestedExplanation = "Local fallback parser was used because Groq key is unconfigured or rate limited.";
