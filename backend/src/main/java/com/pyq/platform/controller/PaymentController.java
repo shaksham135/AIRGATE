@@ -53,7 +53,7 @@ public class PaymentController {
     }
 
     @GetMapping("/pricing")
-    @org.springframework.cache.annotation.Cacheable(value = "publicMeta")
+    @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'pricingTiersV2'")
     public ResponseEntity<?> getPricingTiers() {
         boolean enabled = isRazorpayConfigured();
         try {

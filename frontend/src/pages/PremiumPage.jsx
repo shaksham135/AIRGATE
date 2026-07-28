@@ -25,8 +25,15 @@ export default function PremiumPage() {
       try {
         const response = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/pricing`);
         if (response.data) {
-          setTiers(response.data);
-          setSelectedDuration(response.data.tier1?.duration || 1);
+          setTiers(prev => ({
+            enabled: response.data.enabled !== undefined ? response.data.enabled : prev.enabled,
+            tier1: response.data.tier1 || prev.tier1 || { price: 99.0, duration: 1, offer: 'Best for quick revisions' },
+            tier2: response.data.tier2 || prev.tier2 || { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' },
+            tier3: response.data.tier3 || prev.tier3 || { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' }
+          }));
+          if (response.data.tier1?.duration) {
+            setSelectedDuration(response.data.tier1.duration);
+          }
         }
       } catch (err) {
         console.error("Failed to load dynamic pricing tiers:", err);

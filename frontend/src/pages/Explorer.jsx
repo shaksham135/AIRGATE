@@ -785,38 +785,49 @@ export default function Explorer() {
   return (
     <div className="explorer-container" style={{ flexDirection: 'column', height: '100vh' }}>
       {/* Top filter dashboard bar */}
-      {isFiltersCollapsed ? (
-        <div style={{
+      {isFiltersCollapsed ? <div style={{
           backgroundColor: 'var(--bg-sidebar)',
           borderBottom: '1px solid var(--border-color)',
-          padding: '12px 40px',
+          padding: '10px 20px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-          transition: 'all 0.3s ease'
+          gap: '12px',
+          boxShadow: 'var(--shadow-sm)',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <FiSearch style={{ color: 'var(--text-muted)' }} />
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Search & Filters are collapsed
-            </span>
+          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flexGrow: 1, maxWidth: '560px' }}>
+            <div className="header-search-bar" style={{ width: '100%', height: '36px' }}>
+              <FiSearch style={{ color: 'var(--text-muted)' }} />
+              <input 
+                type="text" 
+                placeholder="Search PYQs by keyword (e.g. matrix, pipeline, tree)..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ height: '36px', fontSize: '0.84rem' }}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ height: '36px', padding: '0 16px', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
+              Search
+            </button>
+          </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {activeSearchQuery && (
-              <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
-                Query: "{activeSearchQuery}"
+              <span style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600 }}>
+                "{activeSearchQuery}"
               </span>
             )}
+            <button 
+              type="button"
+              className="btn btn-outline" 
+              onClick={() => setIsFiltersCollapsed(false)}
+              style={{ padding: '6px 14px', fontSize: '0.82rem', height: '36px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+            >
+              <FiFilter /> Filters
+            </button>
           </div>
-          <button 
-            type="button"
-            className="btn btn-outline" 
-            onClick={() => setIsFiltersCollapsed(false)}
-            style={{ padding: '6px 16px', fontSize: '0.85rem', height: '34px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <FiFilter /> Show Search & Filters
-          </button>
-        </div>
-      ) : (
+        </div> : (
         <div style={{
           backgroundColor: 'var(--bg-sidebar)',
           borderBottom: '1px solid var(--border-color)',
