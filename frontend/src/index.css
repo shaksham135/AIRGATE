@@ -1229,6 +1229,63 @@ html, body, #root {
   }
 }
 
+/* AI Generator Hub Mobile Responsive Styling */
+.ai-gen-hub-container {
+  padding: 32px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ai-gen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 16px;
+}
+
+.ai-gen-title {
+  font-size: 2.2rem;
+  color: #fff;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-gen-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(139, 92, 246, 0.15);
+}
+
+@media (max-width: 640px) {
+  .ai-gen-hub-container {
+    padding: 16px 12px !important;
+  }
+
+  .ai-gen-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .ai-gen-title {
+    font-size: 1.35rem !important;
+    gap: 8px !important;
+  }
+
+  .ai-gen-card {
+    padding: 18px 14px !important;
+    border-radius: 16px !important;
+  }
+}
+
 /* Admin Panel Table & Modal Mobile Scroll Containment */
 .table-responsive, .admin-table-wrapper {
   width: 100%;

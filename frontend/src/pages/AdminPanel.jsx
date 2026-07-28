@@ -1496,25 +1496,35 @@ export default function AdminPanel() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Users</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-title)' }}>{adminMetrics.totalUsers.toLocaleString()}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>+{adminMetrics.newSignupsToday} registered today</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : adminMetrics.totalUsers.toLocaleString()}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+                    {metricsLoading ? 'Calculating...' : `+${adminMetrics.newSignupsToday} registered today`}
+                  </span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Active Users (DAU)</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-secondary)', fontFamily: 'var(--font-title)' }}>{adminMetrics.dau.toLocaleString()}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-secondary)', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : adminMetrics.dau.toLocaleString()}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>Users active today</span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monthly Active Users (MAU)</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', fontFamily: 'var(--font-title)' }}>{adminMetrics.mau.toLocaleString()}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : adminMetrics.mau.toLocaleString()}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>Last 30 days active</span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>User Retention Index</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: 'var(--font-title)' }}>{adminMetrics.retentionIndex.toFixed(1)}%</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : `${adminMetrics.retentionIndex.toFixed(1)}%`}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>DAU / MAU ratio</span>
                 </div>
               </div>
@@ -1523,31 +1533,43 @@ export default function AdminPanel() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revenue (Total)</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: 'var(--font-title)' }}>₹{adminMetrics.totalRevenue.toLocaleString()}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>+₹{adminMetrics.revenueToday} collected today</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : `₹${adminMetrics.totalRevenue.toLocaleString()}`}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+                    {metricsLoading ? 'Fetching revenue...' : `+₹${adminMetrics.revenueToday} collected today`}
+                  </span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Questions Solved Today</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b', fontFamily: 'var(--font-title)' }}>{adminMetrics.questionsSolvedToday.toLocaleString()}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#f59e0b', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : adminMetrics.questionsSolvedToday.toLocaleString()}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>Total solving attempts today</span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Requests Today</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#ec4899', fontFamily: 'var(--font-title)' }}>{adminMetrics.aiRequestsToday.toLocaleString()}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#ec4899', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : adminMetrics.aiRequestsToday.toLocaleString()}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>Tutor queries processed</span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mock Exams Attempted</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#06b6d4', fontFamily: 'var(--font-title)' }}>{adminMetrics.mockTestsAttempted.toLocaleString()}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#06b6d4', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : adminMetrics.mockTestsAttempted.toLocaleString()}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>Dynamic mock generator runs</span>
                 </div>
 
                 <div style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revision PDFs Generated 📄</span>
-                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#8b5cf6', fontFamily: 'var(--font-title)' }}>{(adminMetrics.pdfCompilationsTotal || 0).toLocaleString()}</span>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: '#8b5cf6', fontFamily: 'var(--font-title)' }}>
+                    {metricsLoading ? <span style={{ opacity: 0.5, animation: 'pulse 1.5s infinite' }}>...</span> : (adminMetrics.pdfCompilationsTotal || 0).toLocaleString()}
+                  </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>Pro PDF downloads count</span>
                 </div>
               </div>

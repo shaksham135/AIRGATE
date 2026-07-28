@@ -177,8 +177,26 @@ function DashboardLayout({ children }) {
             </defs>
             <path d="M 16,74 A 48,48 0 1,1 104,74" stroke="url(#mobTopGrad)" strokeWidth="2.8" fill="none" opacity="0.9" />
             <circle cx="60" cy="12" r="4" fill="#00f2fe" />
+
+            <g transform="translate(16, 46)">
+              <circle cx="0" cy="0" r="12" fill="#090d16" stroke="#00f2fe" strokeWidth="2" />
+              <path d="M -5,5 L -5,-1 M -2,5 L -2,-4 M 1,5 L 1,-2 M 4,5 L 4,-6" stroke="#00f2fe" strokeWidth="2" strokeLinecap="round" />
+            </g>
+
+            <g transform="translate(104, 46)">
+              <circle cx="0" cy="0" r="12" fill="#090d16" stroke="#b537ff" strokeWidth="2" />
+              <rect x="-5.5" y="-7" width="11" height="14" rx="2" stroke="#b537ff" strokeWidth="1.8" fill="none" />
+              <path d="M -2.5,-1.5 L -0.5,1 L 3.5,-3" stroke="#b537ff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </g>
+
             <path d="M 60,16 L 102,94 L 86,94 L 60,45 L 34,94 L 18,94 Z" fill="url(#mobTopABody)" />
             <path d="M 72,55 C 72,42 48,40 48,56 C 48,70 72,68 72,60 L 58,60" stroke="url(#mobTopGBody)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+
+            <rect x="44" y="74" width="3" height="20" fill="#00f2fe" opacity="0.8" rx="1" />
+            <rect x="49" y="78" width="3" height="16" fill="#00f2fe" opacity="0.8" rx="1" />
+            <rect x="68" y="78" width="3" height="16" fill="#00f2fe" opacity="0.8" rx="1" />
+            <rect x="73" y="74" width="3" height="20" fill="#00f2fe" opacity="0.8" rx="1" />
+
             <rect x="54" y="80" width="12" height="14" fill="#00f2fe" rx="2" />
             <rect x="57" y="83" width="6" height="11" fill="#ffffff" rx="1" />
           </svg>

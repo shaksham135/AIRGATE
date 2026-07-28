@@ -384,24 +384,24 @@ export default function AiGeneratorHub() {
   });
 
   return (
-    <div style={{ padding: '32px', width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="ai-gen-hub-container">
       
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+      <div className="ai-gen-header">
         <div>
-          <h1 style={{ fontSize: '2.2rem', color: '#fff', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h1 className="ai-gen-title">
             <FiCpu style={{ color: '#8b5cf6' }} /> AI Question Generator Hub 🤖
           </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: 0 }}>
             Autonomous Nightly AI Question Generation, Dual-AI Verification & Question Access Control.
           </p>
         </div>
         <button 
           className="btn btn-outline" 
           onClick={() => navigate('/admin/panel')}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', fontWeight: 600, height: '42px' }}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, height: '38px', whiteSpace: 'nowrap', fontSize: '0.85rem' }}
         >
-          Open Admin Panel <FiExternalLink />
+          Open Admin Panel <FiExternalLink size={14} />
         </button>
       </div>
 
@@ -415,13 +415,7 @@ export default function AiGeneratorHub() {
         )}
 
         {/* Master Control Card */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
-          border: '1px solid rgba(139, 92, 246, 0.35)',
-          borderRadius: '20px',
-          padding: '32px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(139, 92, 246, 0.15)'
-        }}>
+        <div className="ai-gen-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
