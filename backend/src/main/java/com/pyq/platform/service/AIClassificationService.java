@@ -43,7 +43,7 @@ public class AIClassificationService {
     private String fastModel;
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private RestTemplate restTemplate;
     private final GroqUsageService groqUsageService;
@@ -136,94 +136,72 @@ public class AIClassificationService {
         String systemPrompt = buildClassifySystemPrompt();
         String userContent = "Context PDF Filename: " + filename + "\nRaw text to parse: " + rawText;
 
-        // ── PRIMARY: Google Gemini 1.5 Flash ──────────────────────────────────
+        // ── PRIMARY: Groq (with 3-Key Rotation for High-Speed PDF Ingestion) ───
+        String currentApiKey = getNextApiKey();
+        if (currentApiKey != null) {
+            int maxRetries = 3;
+            int retryDelayMs = 2000;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                    headers.set("Authorization", "Bearer " + currentApiKey);
+
+                    ObjectNode rootNode = objectMapper.createObjectNode();
+                    rootNode.put("model", fastModel);
+                    rootNode.put("temperature", 0.1);
+                    rootNode.put("max_tokens", 1500);
+
+                    ObjectNode responseFormatNode = rootNode.putObject("response_format");
+                    responseFormatNode.put("type", "json_object");
+
+                    ArrayNode messages = rootNode.putArray("messages");
+                    ObjectNode systemMsg = messages.addObject();
+                    systemMsg.put("role", "system");
+                    systemMsg.put("content", systemPrompt);
+
+                    ObjectNode userMsg = messages.addObject();
+                    userMsg.put("role", "user");
+                    userMsg.put("content", userContent);
+
+                    HttpEntity<String> entity = new HttpEntity<>(rootNode.toString(), headers);
+                    ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+
+                    JsonNode jsonResponse = objectMapper.readTree(response.getBody());
+                    long tokenUsage = jsonResponse.path("usage").path("total_tokens").asLong(0);
+                    if (tokenUsage > 0) {
+                        groqUsageService.addTokens(tokenUsage);
+                    }
+                    String jsonText = jsonResponse.path("choices").get(0).path("message").path("content").asText();
+                    return parseClassifyJson(jsonText, rawText);
+
+                } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                    if (apiKeys.size() > 1) {
+                        currentApiKey = getNextApiKey();
+                        log.info("Switched to next Groq API key: {}", currentApiKey.substring(0, Math.min(8, currentApiKey.length())) + "...");
+                        continue;
+                    }
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } catch (Exception e) {
+                    log.warn("Groq query attempt {} failed ({}), trying fallback...", attempt, e.getMessage());
+                }
+            }
+        }
+
+        // ── SECONDARY: Google Gemini ──────────────────────────────────────────
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
-                log.info("🌟 [PDF Classify] Using Google Gemini as primary...");
+                log.info("🌟 [PDF Classify] Using Google Gemini as fallback...");
                 String jsonText = callGeminiClassify(systemPrompt, userContent);
                 if (jsonText != null && !jsonText.isBlank()) {
                     return parseClassifyJson(jsonText, rawText);
                 }
             } catch (Exception e) {
-                log.warn("⚠️ [PDF Classify] Gemini failed ({}), falling back to Groq...", e.getMessage());
+                log.warn("⚠️ [PDF Classify] Gemini failed ({})", e.getMessage());
             }
         }
 
-        // ── FALLBACK: Groq ────────────────────────────────────────────────────
-        String currentApiKey = getNextApiKey();
-        if (currentApiKey == null) {
-            log.warn("No Groq API Key configured. Falling back to mock parsing.");
-            return generateMockAnalysis(rawText);
-        }
-
-        int maxRetries = 3;
-        int retryDelayMs = 2500;
-
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                HttpHeaders headers = new HttpHeaders();
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.set("Authorization", "Bearer " + currentApiKey);
-
-                ObjectNode rootNode = objectMapper.createObjectNode();
-                rootNode.put("model", fastModel);
-                rootNode.put("temperature", 0.1);
-                rootNode.put("max_tokens", 1500);
-
-                ObjectNode responseFormatNode = rootNode.putObject("response_format");
-                responseFormatNode.put("type", "json_object");
-
-                ArrayNode messages = rootNode.putArray("messages");
-                ObjectNode systemMsg = messages.addObject();
-                systemMsg.put("role", "system");
-                systemMsg.put("content", systemPrompt);
-
-                ObjectNode userMsg = messages.addObject();
-                userMsg.put("role", "user");
-                userMsg.put("content", userContent);
-
-                HttpEntity<String> entity = new HttpEntity<>(rootNode.toString(), headers);
-                ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity,
-                        String.class);
-
-                JsonNode jsonResponse = objectMapper.readTree(response.getBody());
-                long tokenUsage = jsonResponse.path("usage").path("total_tokens").asLong(0);
-                if (tokenUsage > 0) {
-                    groqUsageService.addTokens(tokenUsage);
-                } else if (response.getHeaders().containsKey("x-total-tokens")) {
-                    try {
-                        long hTokens = Long.parseLong(response.getHeaders().getFirst("x-total-tokens"));
-                        groqUsageService.addTokens(hTokens);
-                    } catch (NumberFormatException e) {
-                        // ignore
-                    }
-                }
-                String jsonText = jsonResponse.path("choices").get(0).path("message").path("content").asText();
-                return parseClassifyJson(jsonText, rawText);
-
-            } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
-                log.warn("Groq rate limit hit (429) on attempt {}/{} for question. Retrying in {}ms...", 
-                        attempt, maxRetries, retryDelayMs);
-                if (apiKeys.size() > 1) {
-                    currentApiKey = getNextApiKey();
-                    log.info("Switched to next Groq API key: {}", currentApiKey.substring(0, Math.min(8, currentApiKey.length())) + "...");
-                    continue;
-                }
-                try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
-                retryDelayMs *= 1.5;
-            } catch (Exception e) {
-                if (e.getMessage() != null && e.getMessage().contains("429") && apiKeys.size() > 1) {
-                    currentApiKey = getNextApiKey();
-                    log.info("Switched to next Groq API key due to rate limit: {}", currentApiKey.substring(0, Math.min(8, currentApiKey.length())) + "...");
-                    continue;
-                }
-                log.error("Groq AI query failed on attempt {}/{}: {}. Falling back to mock parsing.", 
-                        attempt, maxRetries, e.getMessage());
-                return generateMockAnalysis(rawText);
-            }
-        }
-
-        log.error("Failed to call Groq AI after {} attempts due to rate limiting. Falling back to mock parsing.", maxRetries);
         return generateMockAnalysis(rawText);
     }
 
