@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi';
 import PremiumGateModal from '../components/PremiumGateModal';
 import LoginGate from '../components/LoginGate';
+import './PracticeArena.css';
 
 export default function PracticeArena() {
   const [subjects, setSubjects] = useState([]);

@@ -9,13 +9,12 @@
 }
 
 .mock-arena-card {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(26, 36, 56, 0.96) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.25);
+  background: #131826;
+  border: 1px solid #242f47;
   border-radius: 24px;
   padding: 40px 36px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 30px rgba(139, 92, 246, 0.12);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
   text-align: center;
-  backdrop-filter: blur(16px);
   box-sizing: border-box;
 }
 

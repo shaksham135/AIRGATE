@@ -24,7 +24,6 @@ import java.util.*;
 public class QuestionService {
 
     private final QuestionRepository questionRepository;
-    private final SubjectRepository subjectRepository;
     private final TopicRepository topicRepository;
     private final TagRepository tagRepository;
     private final QuestionRevisionRepository revisionRepository;
@@ -38,10 +37,7 @@ public class QuestionService {
     private final UserAnswerRepository userAnswerRepository;
     private final MockAttemptAnswerRepository mockAttemptAnswerRepository;
 
-    @Cacheable(
-        value = "questions",
-        key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #status, #userId, #solvedStatus, #bookmarked, #pageable.pageNumber, #pageable.pageSize)"
-    )
+    @Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #status, #userId, #solvedStatus, #bookmarked, #pageable.pageNumber, #pageable.pageSize)")
     public Page<Question> searchQuestions(String query, Long subjectId, Long topicId, Integer year, String questionType,
             String tagName, String status, Long userId, String solvedStatus, Boolean bookmarked, Pageable pageable) {
         return questionRepository.findAll(new Specification<Question>() {
@@ -62,8 +58,7 @@ public class QuestionService {
                     String pattern = "%" + query.trim().toLowerCase() + "%";
                     predicates.add(cb.or(
                             cb.like(cb.lower(root.get("text")), pattern),
-                            cb.like(cb.lower(root.get("pdfSourceName")), pattern)
-                    ));
+                            cb.like(cb.lower(root.get("pdfSourceName")), pattern)));
                 }
 
                 // Subject ID Filter
@@ -108,14 +103,12 @@ public class QuestionService {
                     if ("SOLVED".equalsIgnoreCase(solvedStatus)) {
                         solveSub.where(cb.and(
                                 cb.equal(solveRoot.get("user").get("id"), userId),
-                                cb.equal(solveRoot.get("isCorrect"), true)
-                        ));
+                                cb.equal(solveRoot.get("isCorrect"), true)));
                         predicates.add(root.get("id").in(solveSub));
                     } else if ("WRONG".equalsIgnoreCase(solvedStatus)) {
                         solveSub.where(cb.and(
                                 cb.equal(solveRoot.get("user").get("id"), userId),
-                                cb.equal(solveRoot.get("isCorrect"), false)
-                        ));
+                                cb.equal(solveRoot.get("isCorrect"), false)));
                         predicates.add(root.get("id").in(solveSub));
                     } else if ("UNSOLVED".equalsIgnoreCase(solvedStatus)) {
                         solveSub.where(cb.equal(solveRoot.get("user").get("id"), userId));
@@ -168,7 +161,8 @@ public class QuestionService {
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1)
+                    hexString.append('0');
                 hexString.append(hex);
             }
             return hexString.toString();
@@ -179,7 +173,7 @@ public class QuestionService {
     }
 
     @Transactional
-    @CacheEvict(value = {"questions", "years"}, allEntries = true)
+    @CacheEvict(value = { "questions", "years" }, allEntries = true)
     public Question createQuestion(Question question, List<String> optionTexts, Set<String> tagNames) {
         // Generate and set unique hash
         String checksum = generateChecksum(question.getText());
@@ -193,7 +187,8 @@ public class QuestionService {
         if (tagNames != null) {
             for (String tName : tagNames) {
                 String normalizedTag = tName.trim().toLowerCase();
-                if (normalizedTag.isEmpty()) continue;
+                if (normalizedTag.isEmpty())
+                    continue;
                 Tag tag = tagRepository.findByName(normalizedTag)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(normalizedTag).build()));
                 tags.add(tag);
@@ -223,9 +218,9 @@ public class QuestionService {
     }
 
     @Transactional
-    @CacheEvict(value = {"questions", "years"}, allEntries = true)
+    @CacheEvict(value = { "questions", "years" }, allEntries = true)
     public Question updateQuestion(Long id, Question updatedData, List<String> optionTexts,
-                                   Set<String> tagNames, User editor) {
+            Set<String> tagNames, User editor) {
         Question existing = questionRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Question not found with ID: " + id));
 
@@ -262,7 +257,8 @@ public class QuestionService {
         if (tagNames != null) {
             for (String tName : tagNames) {
                 String normalizedTag = tName.trim().toLowerCase();
-                if (normalizedTag.isEmpty()) continue;
+                if (normalizedTag.isEmpty())
+                    continue;
                 Tag tag = tagRepository.findByName(normalizedTag)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(normalizedTag).build()));
                 tags.add(tag);
@@ -287,22 +283,26 @@ public class QuestionService {
     }
 
     @Transactional
-    @CacheEvict(value = {"questions", "years"}, allEntries = true)
+    @CacheEvict(value = { "questions", "years" }, allEntries = true)
     public Question saveQuestion(Question question) {
         return questionRepository.save(question);
     }
 
     @Transactional
-    @CacheEvict(value = {"questions", "practiceQuestions", "similarQuestions", "questionDetail", "years", "publicMeta"}, allEntries = true)
+    @CacheEvict(value = { "questions", "practiceQuestions", "similarQuestions", "questionDetail", "years",
+            "publicMeta" }, allEntries = true)
     public void deleteQuestion(Long id) {
-        if (id == null) return;
+        if (id == null)
+            return;
         deleteQuestionsWithDependencies(Collections.singletonList(id));
     }
 
     @Transactional
-    @CacheEvict(value = {"questions", "practiceQuestions", "similarQuestions", "questionDetail", "years", "publicMeta"}, allEntries = true)
+    @CacheEvict(value = { "questions", "practiceQuestions", "similarQuestions", "questionDetail", "years",
+            "publicMeta" }, allEntries = true)
     public void deleteQuestionsWithDependencies(List<Long> questionIds) {
-        if (questionIds == null || questionIds.isEmpty()) return;
+        if (questionIds == null || questionIds.isEmpty())
+            return;
 
         try {
             log.info("Starting safe cascading deletion for {} questions...", questionIds.size());
@@ -341,7 +341,7 @@ public class QuestionService {
 
     @Scheduled(fixedDelay = 60000)
     @Transactional
-    @CacheEvict(value = {"questions", "years"}, allEntries = true)
+    @CacheEvict(value = { "questions", "years" }, allEntries = true)
     public void processScheduledPublishing() {
         log.debug("ScheduledPublishing: Scanning for scheduled APPROVED questions ready to be published...");
         List<Question> ready = questionRepository.findByStatusAndPublishAtBefore("APPROVED", LocalDateTime.now());
@@ -349,7 +349,9 @@ public class QuestionService {
             for (Question q : ready) {
                 q.setStatus("PUBLISHED");
                 questionRepository.save(q);
-                log.info("ScheduledPublishing: Question ID {} auto-transitioned from APPROVED to PUBLISHED (publishAt: {})", q.getId(), q.getPublishAt());
+                log.info(
+                        "ScheduledPublishing: Question ID {} auto-transitioned from APPROVED to PUBLISHED (publishAt: {})",
+                        q.getId(), q.getPublishAt());
             }
         }
     }

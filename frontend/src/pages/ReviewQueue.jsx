@@ -8,6 +8,7 @@ import {
   FiRotateCw, FiZoomIn, FiSun, FiEye, FiSliders, FiCornerUpLeft, FiEdit, FiTrash 
 } from 'react-icons/fi';
 import { formatMathText, renderQuestionText, getAssetUrl } from '../utils/mathRenderer';
+import './ReviewQueue.css';
 
 export default function ReviewQueue() {
   const [questions, setQuestions] = useState([]);

@@ -4,16 +4,16 @@
   --font-title: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
 
-  /* Theme Colors */
+  /* Theme Colors - Solid Eye-Comfort High-Contrast Dark Palette */
   --bg-main: #090d16;
-  --bg-card: #111726;
-  --bg-sidebar: #0e1320;
-  --border-color: #1e293b;
+  --bg-card: #131826;
+  --bg-sidebar: #0b0f19;
+  --border-color: #242f47;
   
-  /* Text Colors */
+  /* Text Colors - High Contrast for GATE Study Comfort */
   --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
 
   /* Neon Accents */
   --color-primary: #8b5cf6; /* Electric Violet */
@@ -54,6 +54,19 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-title);
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+/* High Contrast Math Formula & Question Text for GATE Aspirants */
+.katex, .katex-display, .math-content {
+  color: #ffffff !important;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.question-text-content {
+  color: #f8fafc !important;
+  font-size: 1.02rem;
+  line-height: 1.65;
 }
 
 /* Custom Scrollbar */

@@ -4,6 +4,7 @@ import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import { FiUploadCloud, FiClock, FiCheckCircle, FiLoader, FiAlertTriangle, FiTrash2, FiFileText, FiLayers, FiDatabase, FiAlertCircle } from 'react-icons/fi';
+import './UploadManager.css';
 
 export default function UploadManager() {
   const [file, setFile] = useState(null);
