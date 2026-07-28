@@ -172,13 +172,14 @@ public class UploadService {
                     int year = extractYearFromFilename(jobOpt.get().getFilename());
 
                     // Call AI service for structured values (with local parser fallback if AI call fails)
-                    AIClassificationService.AIAnalysisResult aiRes;
+                    AIClassificationService.AIAnalysisResult aiResTemp;
                     try {
-                        aiRes = aiClassificationService.classifyQuestion(block.rawText, jobOpt.get().getFilename());
+                        aiResTemp = aiClassificationService.classifyQuestion(block.rawText, jobOpt.get().getFilename());
                     } catch (Exception aiErr) {
                         log.warn("AI Classification failed for block, using local fallback: {}", aiErr.getMessage());
-                        aiRes = aiClassificationService.generateMockAnalysis(block.rawText);
+                        aiResTemp = aiClassificationService.generateMockAnalysis(block.rawText);
                     }
+                    final AIClassificationService.AIAnalysisResult aiRes = aiResTemp;
 
                     // Duplicate detection via checksum hash and year
                     boolean isDuplicate = transactionTemplate.execute(status -> {

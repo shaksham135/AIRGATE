@@ -327,7 +327,7 @@ public class AIClassificationService {
         return res;
     }
 
-    private AIAnalysisResult generateMockAnalysis(String rawText) {
+    public AIAnalysisResult generateMockAnalysis(String rawText) {
         AIAnalysisResult res = new AIAnalysisResult();
         res.confidenceScore = 0.50; // Mock confidence indicator
         res.suggestedAnswer = "A";
