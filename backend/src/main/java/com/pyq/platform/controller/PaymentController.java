@@ -48,13 +48,19 @@ public class PaymentController {
         this.emailService = emailService;
     }
 
+    private boolean isRazorpayConfigured() {
+        return keyId != null && !keyId.isBlank() && !keyId.equalsIgnoreCase("placeholder") && !keyId.startsWith("YOUR_");
+    }
+
     @GetMapping("/pricing")
     @org.springframework.cache.annotation.Cacheable(value = "publicMeta")
     public ResponseEntity<?> getPricingTiers() {
+        boolean enabled = isRazorpayConfigured();
         try {
             com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
             if (settings != null) {
                 return ResponseEntity.ok(Map.of(
+                        "enabled", enabled,
                         "tier1", Map.of("price", settings.getTier1PriceInr(), "duration", settings.getTier1DurationMonths(), "offer", settings.getTier1SpecialOffer() != null ? settings.getTier1SpecialOffer() : ""),
                         "tier2", Map.of("price", settings.getTier2PriceInr(), "duration", settings.getTier2DurationMonths(), "offer", settings.getTier2SpecialOffer() != null ? settings.getTier2SpecialOffer() : ""),
                         "tier3", Map.of("price", settings.getTier3PriceInr(), "duration", settings.getTier3DurationMonths(), "offer", settings.getTier3SpecialOffer() != null ? settings.getTier3SpecialOffer() : "")
@@ -64,6 +70,7 @@ public class PaymentController {
             log.error("Failed to fetch settings pricing: {}", e.getMessage());
         }
         return ResponseEntity.ok(Map.of(
+                "enabled", enabled,
                 "tier1", Map.of("price", 99.0, "duration", 1, "offer", "Best for quick revisions"),
                 "tier2", Map.of("price", 249.0, "duration", 3, "offer", "Save 15% - Most Popular"),
                 "tier3", Map.of("price", 449.0, "duration", 6, "offer", "Save 25% - Complete Prep")

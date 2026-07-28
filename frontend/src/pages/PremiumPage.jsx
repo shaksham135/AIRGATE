@@ -457,20 +457,36 @@ export default function PremiumPage() {
               >
                 ✓ Subscriber Active
               </button>
+            ) : tiers.enabled === false ? (
+              <div>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: 0.9, cursor: 'not-allowed', borderColor: '#38bdf8', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.08)' }}
+                  disabled={true}
+                >
+                  Coming Soon 🚀
+                </button>
+                <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '10px', lineHeight: 1.45 }}>
+                  Payment gateway integration in progress. All GATE practice features are currently 100% FREE for all users!
+                </div>
+              </div>
             ) : (
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                onClick={handleUpgrade}
-                disabled={loading}
-              >
-                {loading ? <FiLoader className="spin" /> : <>Activate Aspirant Pro <FiAward /></>}
-              </button>
+              <div>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  onClick={handleUpgrade}
+                  disabled={loading}
+                >
+                  {loading ? <FiLoader className="spin" /> : <>Activate Aspirant Pro <FiAward /></>}
+                </button>
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '12px' }}>
+                  Instant upgrade. Cancel subscription anytime.
+                </div>
+              </div>
             )}
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '12px' }}>
-              Instant upgrade. Cancel subscription anytime.
-            </div>
           </div>
         </div>
       </div>

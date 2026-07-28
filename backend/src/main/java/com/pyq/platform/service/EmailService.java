@@ -32,10 +32,29 @@ public class EmailService {
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
     /**
      * Send raw HTML email helper
      */
     public boolean sendHtmlEmail(String toEmail, String subject, String htmlContent, String emailType) {
+        if (mailPassword == null || mailPassword.isBlank() || mailUsername == null || mailUsername.isBlank()) {
+            log.warn("SMTP Email dispatch skipped for [{}] to {}: SPRING_MAIL_USERNAME or SPRING_MAIL_PASSWORD env variable is not configured.", emailType, toEmail);
+            emailLogRepository.save(EmailLog.builder()
+                    .recipientEmail(toEmail)
+                    .subject(subject)
+                    .emailType(emailType)
+                    .status("SKIPPED_NO_SMTP_KEY")
+                    .sentAt(LocalDateTime.now())
+                    .errorMessage("SPRING_MAIL_USERNAME or SPRING_MAIL_PASSWORD env variable not set")
+                    .build());
+            return false;
+        }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");

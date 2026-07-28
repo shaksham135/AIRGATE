@@ -8,6 +8,19 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess }) 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [paymentsEnabled, setPaymentsEnabled] = useState(true);
+
+  React.useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/pricing`);
+        if (res.data && res.data.enabled === false) {
+          setPaymentsEnabled(false);
+        }
+      } catch (e) {}
+    };
+    checkStatus();
+  }, []);
 
   if (!isOpen) return null;
 
@@ -227,19 +240,30 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess }) 
               >
                 Maybe Later
               </button>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                style={{ flex: 2, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                onClick={handleUpgrade}
-                disabled={loading}
-              >
-                {loading ? 'Processing...' : (
-                  <>
-                    Activate Aspirant Pro <FiArrowRight />
-                  </>
-                )}
-              </button>
+              {!paymentsEnabled ? (
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  style={{ flex: 2, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: 0.9, cursor: 'not-allowed', borderColor: '#38bdf8', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.08)' }}
+                  disabled={true}
+                >
+                  Coming Soon 🚀
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  style={{ flex: 2, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  onClick={handleUpgrade}
+                  disabled={loading}
+                >
+                  {loading ? 'Processing...' : (
+                    <>
+                      Activate Aspirant Pro <FiArrowRight />
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         ) : (
