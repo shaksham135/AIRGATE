@@ -167,7 +167,7 @@ public class AIClassificationService {
                 ObjectNode rootNode = objectMapper.createObjectNode();
                 rootNode.put("model", fastModel);
                 rootNode.put("temperature", 0.1);
-                rootNode.put("max_tokens", 250);
+                rootNode.put("max_tokens", 1500);
 
                 ObjectNode responseFormatNode = rootNode.putObject("response_format");
                 responseFormatNode.put("type", "json_object");
@@ -253,7 +253,7 @@ public class AIClassificationService {
         // JSON mode config
         ObjectNode genConfig = objectMapper.createObjectNode();
         genConfig.put("temperature", 0.1);
-        genConfig.put("maxOutputTokens", 400);
+        genConfig.put("maxOutputTokens", 1500);
         genConfig.put("responseMimeType", "application/json");
         requestBody.set("generationConfig", genConfig);
 
@@ -277,7 +277,15 @@ public class AIClassificationService {
     }
 
     private AIAnalysisResult parseClassifyJson(String jsonText, String rawText) throws Exception {
-        JsonNode parsedResult = objectMapper.readTree(jsonText);
+        String cleanJson = jsonText != null ? jsonText.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim() : "";
+        JsonNode parsedResult;
+        try {
+            parsedResult = objectMapper.readTree(cleanJson);
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to parse AI JSON response, falling back to local block extraction: {}", e.getMessage());
+            return generateMockAnalysis(rawText);
+        }
+
         AIAnalysisResult res = new AIAnalysisResult();
         res.questionType = parsedResult.path("questionType").asText("MCQ").toUpperCase();
         res.questionText = cleanTrailingAnswers(stripQuestionNumbering(parsedResult.path("questionText").asText(rawText)));

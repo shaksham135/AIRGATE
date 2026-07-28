@@ -171,9 +171,14 @@ public class UploadService {
                     // Extract year from filename if possible
                     int year = extractYearFromFilename(jobOpt.get().getFilename());
 
-                    // Call AI service for structured values (outside transactional block to prevent database lock delays)
-                    AIClassificationService.AIAnalysisResult aiRes = aiClassificationService
-                            .classifyQuestion(block.rawText, jobOpt.get().getFilename());
+                    // Call AI service for structured values (with local parser fallback if AI call fails)
+                    AIClassificationService.AIAnalysisResult aiRes;
+                    try {
+                        aiRes = aiClassificationService.classifyQuestion(block.rawText, jobOpt.get().getFilename());
+                    } catch (Exception aiErr) {
+                        log.warn("AI Classification failed for block, using local fallback: {}", aiErr.getMessage());
+                        aiRes = aiClassificationService.generateMockAnalysis(block.rawText);
+                    }
 
                     // Duplicate detection via checksum hash and year
                     boolean isDuplicate = transactionTemplate.execute(status -> {
@@ -295,7 +300,7 @@ public class UploadService {
                     });
 
                 } catch (Exception e) {
-                    log.error("Failed to process question block for job {}: {}", jobId, e.getMessage());
+                    log.error("Failed to process question block for job {}: {}", jobId, e.getMessage(), e);
                     failed++;
                     final int currentFailed = failed;
                     transactionTemplate.executeWithoutResult(status -> {
