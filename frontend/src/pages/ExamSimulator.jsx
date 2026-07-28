@@ -8,6 +8,7 @@ import { formatMathText, renderQuestionText, renderOptionContent, getAssetUrl } 
 import API_CONFIG from '../config/api';
 import LoginGate from '../components/LoginGate';
 import PremiumGateModal from '../components/PremiumGateModal';
+import './ExamSimulator.css';
 
 export default function ExamSimulator() {
   return (
@@ -607,93 +608,53 @@ function MockTestArena() {
   // Render initial instruction screen
   if (!examStarted && !examSubmitted) {
     return (
-      <div style={{ padding: '40px', maxWidth: '800px', margin: '40px auto', width: '100%' }}>
-        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
-          <FiClock size={48} style={{ color: 'var(--color-primary)', marginBottom: '16px' }} />
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>Mock Test Arena — GATE</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.6 }}>
+      <div className="mock-arena-container">
+        <div className="mock-arena-card">
+          <div className="mock-header-icon">
+            <FiClock size={32} />
+          </div>
+          <h2 className="mock-arena-title">Mock Test Arena — GATE</h2>
+          <p className="mock-arena-subtitle">
             Test your preparation levels under actual exam conditions.
           </p>
 
           {/* 3 Modes Tab selector */}
-          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '28px', paddingBottom: '2px', justifyContent: 'center' }}>
+          <div className="mock-mode-tabs">
             <button 
               type="button"
-              className="tab-btn" 
+              className={`mock-tab-btn ${activeTab === 'standard' ? 'active-standard' : ''}`}
               onClick={() => setActiveTab('standard')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: activeTab === 'standard' ? 'var(--color-primary)' : 'var(--text-muted)',
-                borderBottom: activeTab === 'standard' ? '2px solid var(--color-primary)' : 'none',
-                padding: '10px 18px',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
             >
               📜 Official PYQ Exam
             </button>
             <button 
               type="button"
-              className="tab-btn" 
+              className={`mock-tab-btn ${activeTab === 'hybrid' ? 'active-hybrid' : ''}`}
               onClick={() => setActiveTab('hybrid')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: activeTab === 'hybrid' ? '#a855f7' : 'var(--text-muted)',
-                borderBottom: activeTab === 'hybrid' ? '2px solid #a855f7' : 'none',
-                padding: '10px 18px',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
             >
               ✨ Smart Hybrid Mock (70% Fresh + 30% PYQ)
             </button>
             <button 
               type="button"
-              className="tab-btn" 
+              className={`mock-tab-btn ${activeTab === 'custom' ? 'active-custom' : ''}`}
               onClick={() => setActiveTab('custom')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: activeTab === 'custom' ? 'var(--color-secondary)' : 'var(--text-muted)',
-                borderBottom: activeTab === 'custom' ? '2px solid var(--color-secondary)' : 'none',
-                padding: '10px 18px',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s'
-              }}
             >
               🎯 Subject Practice Mock (2 Free)
             </button>
           </div>
 
           {activeTab === 'standard' && (
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', lineHeight: 1.6 }}>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.6, fontSize: '0.88rem' }}>
               This simulator dynamically assembles a standard 100-mark mock paper based on 100% authentic Previous Years' GATE Question papers.
             </p>
           )}
 
           {activeTab === 'hybrid' && (
-            <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', marginBottom: '32px', textAlign: 'center' }}>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#c084fc', display: 'block', marginBottom: '6px' }}>
+            <div style={{ padding: '14px 16px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.2)', marginBottom: '24px', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#c084fc', display: 'block', marginBottom: '4px' }}>
                 🚀 Real Exam Readiness Mode
               </span>
-              <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.88rem', lineHeight: 1.5 }}>
+              <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.82rem', lineHeight: 1.45 }}>
                 Combines 70% <b>Double-Verified Conceptual Questions</b> with 30% High-Yield Official GATE PYQs to give you a true unseen exam experience!
               </p>
             </div>
@@ -701,26 +662,26 @@ function MockTestArena() {
 
           {activeTab !== 'custom' ? (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '36px', textAlign: 'left' }}>
-                <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>DURATION</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>180 Minutes</div>
+              <div className="mock-metrics-row">
+                <div className="mock-metric-card">
+                  <div className="mock-metric-label">DURATION</div>
+                  <div className="mock-metric-value">180 Mins</div>
                 </div>
-                <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>QUESTIONS</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>65 Items</div>
+                <div className="mock-metric-card">
+                  <div className="mock-metric-label">QUESTIONS</div>
+                  <div className="mock-metric-value">65 Items</div>
                 </div>
-                <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '16px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>MAX SCORE</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-secondary)', marginTop: '4px' }}>100 Marks</div>
+                <div className="mock-metric-card">
+                  <div className="mock-metric-label">MAX SCORE</div>
+                  <div className="mock-metric-value" style={{ color: 'var(--color-secondary)' }}>100 Marks</div>
                 </div>
               </div>
 
-              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '16px', borderRadius: '12px', textAlign: 'left', marginBottom: '40px' }}>
-                <h4 style={{ color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 700 }}>
+              <div className="mock-instructions-card">
+                <h4 className="mock-instructions-title">
                   <FiAlertTriangle /> Important Instructions:
                 </h4>
-                <ul style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
+                <ul className="mock-instructions-list">
                   <li>Multiple Choice Questions (MCQ) carry 1/3 negative marking for 1-mark, and 2/3 negative marking for 2-mark questions.</li>
                   <li>Numerical Answer Type (NAT) questions carry ZERO negative marking.</li>
                   <li>Leaving or refreshing the tab will not pause the timer.</li>
@@ -729,8 +690,7 @@ function MockTestArena() {
               </div>
 
               <button 
-                className="btn btn-primary" 
-                style={{ width: '220px', padding: '14px', fontSize: '1.05rem' }} 
+                className="btn btn-primary mock-start-action-btn" 
                 onClick={startExam} 
                 disabled={loading}
               >
