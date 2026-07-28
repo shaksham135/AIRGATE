@@ -425,7 +425,7 @@ export default function PracticeArena() {
 
         {/* Dropdown Filters Grid - Collapsible */}
         {!isFiltersCollapsed && (
-          <div className="practice-select-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
+          <div className="practice-select-grid" style={{ display: 'grid', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
             <select
               value={selectedSubjectId || ''}
               onChange={e => {

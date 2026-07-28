@@ -15,5 +15,12 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
     Optional<Bookmark> findByUserIdAndQuestionId(Long userId, Long questionId);
     boolean existsByUserIdAndQuestionId(Long userId, Long questionId);
     void deleteByUserIdAndQuestionId(Long userId, Long questionId);
+    
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionId(Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionIdIn(List<Long> questionIds);
+
     long countByUserId(Long userId);
 }

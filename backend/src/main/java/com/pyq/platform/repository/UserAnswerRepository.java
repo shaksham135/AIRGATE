@@ -23,5 +23,20 @@ public interface UserAnswerRepository extends JpaRepository<UserAnswer, Long> {
            "WHERE ua.question.id = :questionId " +
            "GROUP BY ua.id " +
            "ORDER BY score DESC")
+    List<Object[]> findAnswersWithScores(@Param("questionId") Long questionId);
+
+    @Query("SELECT ua, " +
+           "  SUM(CASE WHEN av.voteType = 'UPVOTE' THEN 1 WHEN av.voteType = 'DOWNVOTE' THEN -1 ELSE 0 END) as score " +
+           "FROM UserAnswer ua " +
+           "LEFT JOIN AnswerVote av ON av.userAnswer = ua " +
+           "WHERE ua.question.id = :questionId " +
+           "GROUP BY ua.id " +
+           "ORDER BY score DESC")
     List<Object[]> findAnswersWithScoresByQuestionId(@Param("questionId") Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionId(Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionIdIn(List<Long> questionIds);
 }

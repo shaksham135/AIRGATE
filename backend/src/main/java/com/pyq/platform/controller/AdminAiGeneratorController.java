@@ -27,6 +27,7 @@ public class AdminAiGeneratorController {
     private final com.pyq.platform.repository.QuestionRepository questionRepository;
     private final com.pyq.platform.mapper.QuestionMapper questionMapper;
     private final com.pyq.platform.service.AiQuestionGeneratorService generatorService;
+    private final com.pyq.platform.service.QuestionService questionService;
 
     @GetMapping("/questions")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -187,16 +188,24 @@ public class AdminAiGeneratorController {
     public ResponseEntity<Map<String, Object>> batchDeleteQuestions(@RequestParam(required = false) Long subjectId, @RequestBody(required = false) List<Long> questionIds) {
         Map<String, Object> res = new HashMap<>();
         if (questionIds != null && !questionIds.isEmpty()) {
-            questionRepository.deleteAllById(questionIds);
+            questionService.deleteQuestionsWithDependencies(questionIds);
             res.put("message", "Deleted " + questionIds.size() + " selected questions!");
         } else if (subjectId != null) {
-            questionRepository.deleteBySubjectIdAndPdfSourceName(subjectId, "AI_NIGHTLY_GENERATOR");
-            questionRepository.deleteBySubjectIdAndPdfSourceName(subjectId, "AI_GENERATED");
-            res.put("message", "Deleted all AI questions for selected subject!");
+            List<com.pyq.platform.entity.Question> list1 = questionRepository.findBySubjectIdAndPdfSourceName(subjectId, "AI_NIGHTLY_GENERATOR");
+            List<com.pyq.platform.entity.Question> list2 = questionRepository.findBySubjectIdAndPdfSourceName(subjectId, "AI_GENERATED");
+            List<Long> ids = new ArrayList<>();
+            if (list1 != null) list1.forEach(q -> ids.add(q.getId()));
+            if (list2 != null) list2.forEach(q -> ids.add(q.getId()));
+            questionService.deleteQuestionsWithDependencies(ids);
+            res.put("message", "Deleted " + ids.size() + " AI questions for selected subject!");
         } else {
-            questionRepository.deleteByPdfSourceName("AI_NIGHTLY_GENERATOR");
-            questionRepository.deleteByPdfSourceName("AI_GENERATED");
-            res.put("message", "All AI Generated questions deleted!");
+            List<com.pyq.platform.entity.Question> list1 = questionRepository.findByPdfSourceName("AI_NIGHTLY_GENERATOR");
+            List<com.pyq.platform.entity.Question> list2 = questionRepository.findByPdfSourceName("AI_GENERATED");
+            List<Long> ids = new ArrayList<>();
+            if (list1 != null) list1.forEach(q -> ids.add(q.getId()));
+            if (list2 != null) list2.forEach(q -> ids.add(q.getId()));
+            questionService.deleteQuestionsWithDependencies(ids);
+            res.put("message", "All " + ids.size() + " AI Generated questions deleted!");
         }
         res.put("success", true);
         return ResponseEntity.ok(res);

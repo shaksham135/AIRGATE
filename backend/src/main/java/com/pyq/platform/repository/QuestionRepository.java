@@ -32,6 +32,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     boolean existsByChecksumHashAndYear(String checksumHash, Integer year);
     List<Question> findByStatus(String status);
     List<Question> findByPdfSourceName(String pdfSourceName);
+    List<Question> findBySubjectIdAndPdfSourceName(Long subjectId, String pdfSourceName);
 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional

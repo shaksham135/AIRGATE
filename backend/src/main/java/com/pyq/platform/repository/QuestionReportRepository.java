@@ -14,5 +14,9 @@ public interface QuestionReportRepository extends JpaRepository<QuestionReport, 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "user", "question.subject", "question.topic"})
     List<QuestionReport> findAllByOrderByCreatedAtDesc();
 
+    @org.springframework.transaction.annotation.Transactional
     void deleteByQuestionId(Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionIdIn(List<Long> questionIds);
 }

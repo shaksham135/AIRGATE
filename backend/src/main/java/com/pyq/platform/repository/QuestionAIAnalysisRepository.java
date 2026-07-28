@@ -19,7 +19,9 @@ public interface QuestionAIAnalysisRepository extends JpaRepository<QuestionAIAn
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(qaa) FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED'")
     long countPendingApprovedByModelName(String modelName);
 
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionId(Long questionId);
 
-
-
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionIdIn(java.util.List<Long> questionIds);
 }

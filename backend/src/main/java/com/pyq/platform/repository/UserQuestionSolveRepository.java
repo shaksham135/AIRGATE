@@ -19,6 +19,12 @@ public interface UserQuestionSolveRepository extends JpaRepository<UserQuestionS
     @org.springframework.transaction.annotation.Transactional
     void deleteByUserId(Long userId);
 
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionId(Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionIdIn(List<Long> questionIds);
+
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(u) FROM UserQuestionSolve u WHERE u.solvedAt >= :since")
     long countSolvesSince(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
 

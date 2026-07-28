@@ -20,6 +20,7 @@ import java.util.*;
 @Service
 @Slf4j
 @Transactional
+@lombok.RequiredArgsConstructor
 public class QuestionService {
 
     private final QuestionRepository questionRepository;
@@ -28,17 +29,13 @@ public class QuestionService {
     private final TagRepository tagRepository;
     private final QuestionRevisionRepository revisionRepository;
     private final QuestionOptionRepository optionRepository;
-
-    public QuestionService(QuestionRepository questionRepository, SubjectRepository subjectRepository,
-                           TopicRepository topicRepository, TagRepository tagRepository,
-                           QuestionRevisionRepository revisionRepository, QuestionOptionRepository optionRepository) {
-        this.questionRepository = questionRepository;
-        this.subjectRepository = subjectRepository;
-        this.topicRepository = topicRepository;
-        this.tagRepository = tagRepository;
-        this.revisionRepository = revisionRepository;
-        this.optionRepository = optionRepository;
-    }
+    private final UserQuestionSolveRepository userQuestionSolveRepository;
+    private final BookmarkRepository bookmarkRepository;
+    private final QuestionAIAnalysisRepository questionAIAnalysisRepository;
+    private final DiscussionCommentRepository discussionCommentRepository;
+    private final QuestionReportRepository questionReportRepository;
+    private final ExplanationVoteRepository explanationVoteRepository;
+    private final UserAnswerRepository userAnswerRepository;
 
     @Cacheable(
         value = "questions",
@@ -295,9 +292,34 @@ public class QuestionService {
     }
 
     @Transactional
-    @CacheEvict(value = {"questions", "years"}, allEntries = true)
+    @CacheEvict(value = {"questions", "practiceQuestions", "similarQuestions", "questionDetail", "years", "publicMeta"}, allEntries = true)
     public void deleteQuestion(Long id) {
-        questionRepository.deleteById(id);
+        if (id == null) return;
+        deleteQuestionsWithDependencies(Collections.singletonList(id));
+    }
+
+    @Transactional
+    @CacheEvict(value = {"questions", "practiceQuestions", "similarQuestions", "questionDetail", "years", "publicMeta"}, allEntries = true)
+    public void deleteQuestionsWithDependencies(List<Long> questionIds) {
+        if (questionIds == null || questionIds.isEmpty()) return;
+
+        try {
+            log.info("Starting safe cascading deletion for {} questions...", questionIds.size());
+            userQuestionSolveRepository.deleteByQuestionIdIn(questionIds);
+            bookmarkRepository.deleteByQuestionIdIn(questionIds);
+            questionAIAnalysisRepository.deleteByQuestionIdIn(questionIds);
+            discussionCommentRepository.deleteByQuestionIdIn(questionIds);
+            questionReportRepository.deleteByQuestionIdIn(questionIds);
+            revisionRepository.deleteByQuestionIdIn(questionIds);
+            explanationVoteRepository.deleteByQuestionIdIn(questionIds);
+            userAnswerRepository.deleteByQuestionIdIn(questionIds);
+
+            questionRepository.deleteAllById(questionIds);
+            log.info("Successfully deleted {} questions and all associated dependent records.", questionIds.size());
+        } catch (Exception ex) {
+            log.error("Error during cascading question deletion: {}", ex.getMessage());
+            throw ex;
+        }
     }
 
     public long countQuestionsByStatus(String status) {

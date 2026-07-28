@@ -10,4 +10,10 @@ public interface DiscussionCommentRepository extends JpaRepository<DiscussionCom
     List<DiscussionComment> findByQuestionIdAndParentCommentIsNullOrderByCreatedAtAsc(Long questionId);
     List<DiscussionComment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
     List<DiscussionComment> findByQuestionIdOrderByCreatedAtAsc(Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionId(Long questionId);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByQuestionIdIn(List<Long> questionIds);
 }
