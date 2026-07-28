@@ -493,106 +493,64 @@ export default function PracticeArena() {
             const retryCount = resetCounts[q.id] || 0;
 
             return (
-              <div key={q.id} style={{
+              <div key={q.id} className="practice-card-box" style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '16px',
                 padding: '24px',
                 boxShadow: 'var(--shadow-sm)'
               }}>
-                {/* Header Badge */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ padding: '4px 10px', background: 'rgba(99, 102, 241, 0.2)', color: '#c4b5fd', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 800 }}>
-                      PRACTICE Q{page * pageSize + index + 1}
-                    </span>
-                    <span style={{ padding: '4px 10px', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', borderRadius: '6px', fontSize: '0.78rem' }}>
-                      {q.subjectName} • {q.topicName}
-                    </span>
-                    <span style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      background: q.difficulty === 'HARD' ? 'rgba(239, 68, 68, 0.2)' : q.difficulty === 'EASY' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                      color: q.difficulty === 'HARD' ? '#ef4444' : q.difficulty === 'EASY' ? '#10b981' : '#f59e0b'
-                    }}>
-                      {q.difficulty || 'MEDIUM'}
-                    </span>
+                {/* Minimal Modern Question Card Header */}
+                <div className="practice-card-header">
+                  <div className="practice-header-top-row">
+                    <div className="practice-header-badges">
+                      <span className="practice-badge-qno">
+                        Q{page * pageSize + index + 1}
+                      </span>
+                      <span className={`practice-badge-diff ${(q.difficulty || 'MEDIUM').toLowerCase()}`}>
+                        {q.difficulty || 'MEDIUM'}
+                      </span>
+                      <span className="practice-badge-type">
+                        {q.questionType}
+                      </span>
+                    </div>
+
+                    <div className="practice-header-actions">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/questions/${q.id}`)}
+                        title="View Detailed Question Page"
+                        className="practice-action-btn details-btn"
+                      >
+                        <FiExternalLink size={13} /> <span className="btn-label">Details</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleShareQuestion(e, q)}
+                        title="Share Direct Question Link"
+                        className={`practice-action-btn share-btn ${copiedShareId === q.id ? 'copied' : ''}`}
+                      >
+                        {copiedShareId === q.id ? <FiCheck size={13} /> : <FiShare2 size={13} />}
+                        <span className="btn-label">{copiedShareId === q.id ? 'Copied!' : 'Share'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReportQuestionId(q.id);
+                          setShowReportModal(true);
+                        }}
+                        title="Report an error in this question"
+                        className="practice-action-btn report-btn"
+                      >
+                        <FiAlertTriangle size={13} /> <span className="btn-label">Report</span>
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{q.questionType}</span>
 
-                    {/* View Details Page Link */}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/questions/${q.id}`)}
-                      title="View Detailed Question Page"
-                      style={{
-                        padding: '4px 8px',
-                        background: 'rgba(99, 102, 241, 0.12)',
-                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '6px',
-                        color: '#818cf8',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <FiExternalLink size={12} /> Details
-                    </button>
-
-                    {/* Share Question Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleShareQuestion(e, q)}
-                      title="Share Direct Question Link"
-                      style={{
-                        padding: '4px 10px',
-                        background: copiedShareId === q.id ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-                        border: `1px solid ${copiedShareId === q.id ? '#22c55e' : 'var(--border-color)'}`,
-                        borderRadius: '6px',
-                        color: copiedShareId === q.id ? '#22c55e' : 'var(--text-secondary)',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      {copiedShareId === q.id ? <FiCheck size={12} /> : <FiShare2 size={12} />}
-                      {copiedShareId === q.id ? 'Copied!' : 'Share'}
-                    </button>
-
-                    {/* Report Question Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReportQuestionId(q.id);
-                        setShowReportModal(true);
-                      }}
-                      title="Report an error in this question"
-                      style={{
-                        padding: '4px 8px',
-                        background: 'rgba(239, 68, 68, 0.12)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: '6px',
-                        color: '#ef4444',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <FiAlertTriangle size={12} /> Report
-                    </button>
+                  <div className="practice-header-sub">
+                    {q.subjectName} {q.topicName ? `• ${q.topicName}` : ''}
                   </div>
                 </div>
 

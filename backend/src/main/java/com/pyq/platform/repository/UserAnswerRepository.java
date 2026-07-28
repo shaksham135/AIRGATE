@@ -34,9 +34,13 @@ public interface UserAnswerRepository extends JpaRepository<UserAnswer, Long> {
            "ORDER BY score DESC")
     List<Object[]> findAnswersWithScoresByQuestionId(@Param("questionId") Long questionId);
 
+    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByQuestionId(Long questionId);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM UserAnswer ua WHERE ua.question.id = :questionId")
+    void deleteByQuestionId(@org.springframework.data.repository.query.Param("questionId") Long questionId);
 
+    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByQuestionIdIn(List<Long> questionIds);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM UserAnswer ua WHERE ua.question.id IN :questionIds")
+    void deleteByQuestionIdIn(@org.springframework.data.repository.query.Param("questionIds") List<Long> questionIds);
 }

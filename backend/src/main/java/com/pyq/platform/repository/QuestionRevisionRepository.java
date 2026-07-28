@@ -9,9 +9,13 @@ import java.util.List;
 public interface QuestionRevisionRepository extends JpaRepository<QuestionRevision, Long> {
     List<QuestionRevision> findByQuestionIdOrderByEditedAtDesc(Long questionId);
 
+    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByQuestionId(Long questionId);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM QuestionRevision qr WHERE qr.question.id = :questionId")
+    void deleteByQuestionId(@org.springframework.data.repository.query.Param("questionId") Long questionId);
 
+    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByQuestionIdIn(List<Long> questionIds);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM QuestionRevision qr WHERE qr.question.id IN :questionIds")
+    void deleteByQuestionIdIn(@org.springframework.data.repository.query.Param("questionIds") List<Long> questionIds);
 }

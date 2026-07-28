@@ -36,6 +36,7 @@ public class QuestionService {
     private final QuestionReportRepository questionReportRepository;
     private final ExplanationVoteRepository explanationVoteRepository;
     private final UserAnswerRepository userAnswerRepository;
+    private final MockAttemptAnswerRepository mockAttemptAnswerRepository;
 
     @Cacheable(
         value = "questions",
@@ -313,6 +314,8 @@ public class QuestionService {
             revisionRepository.deleteByQuestionIdIn(questionIds);
             explanationVoteRepository.deleteByQuestionIdIn(questionIds);
             userAnswerRepository.deleteByQuestionIdIn(questionIds);
+            mockAttemptAnswerRepository.deleteByQuestionIdIn(questionIds);
+            optionRepository.deleteByQuestionIdIn(questionIds);
 
             questionRepository.deleteAllById(questionIds);
             log.info("Successfully deleted {} questions and all associated dependent records.", questionIds.size());

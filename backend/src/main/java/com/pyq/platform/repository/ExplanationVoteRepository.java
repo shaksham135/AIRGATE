@@ -10,9 +10,13 @@ public interface ExplanationVoteRepository extends JpaRepository<ExplanationVote
     Optional<ExplanationVote> findByUserIdAndQuestionId(Long userId, Long questionId);
     long countByQuestionIdAndVoteType(Long questionId, ExplanationVote.VoteType voteType);
 
+    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByQuestionId(Long questionId);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM ExplanationVote ev WHERE ev.question.id = :questionId")
+    void deleteByQuestionId(@org.springframework.data.repository.query.Param("questionId") Long questionId);
 
+    @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
-    void deleteByQuestionIdIn(java.util.List<Long> questionIds);
+    @org.springframework.data.jpa.repository.Query("DELETE FROM ExplanationVote ev WHERE ev.question.id IN :questionIds")
+    void deleteByQuestionIdIn(@org.springframework.data.repository.query.Param("questionIds") java.util.List<Long> questionIds);
 }
