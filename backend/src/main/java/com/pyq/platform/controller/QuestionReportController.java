@@ -90,8 +90,8 @@ public class QuestionReportController {
         return reports.stream().map(r -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", r.getId());
-            map.put("questionId", r.getQuestion().getId());
-            map.put("questionText", r.getQuestion().getText());
+            map.put("questionId", r.getQuestion() != null ? r.getQuestion().getId() : null);
+            map.put("questionText", r.getQuestion() != null ? r.getQuestion().getText() : "[Question Removed]");
             map.put("subjectName", r.getQuestion() != null && r.getQuestion().getSubject() != null ? r.getQuestion().getSubject().getName() : "General CS");
             map.put("reportedBy", r.getReportedBy() != null ? r.getReportedBy().getUsername() : "Anonymous");
             map.put("reason", r.getReason());

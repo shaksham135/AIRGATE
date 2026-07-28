@@ -8,10 +8,10 @@ import java.util.List;
 @Repository
 public interface QuestionReportRepository extends JpaRepository<QuestionReport, Long> {
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "user", "question.subject", "question.topic"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "reportedBy", "question.subject", "question.topic"})
     List<QuestionReport> findByStatusOrderByCreatedAtDesc(String status);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "user", "question.subject", "question.topic"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"question", "reportedBy", "question.subject", "question.topic"})
     List<QuestionReport> findAllByOrderByCreatedAtDesc();
 
     @org.springframework.transaction.annotation.Transactional

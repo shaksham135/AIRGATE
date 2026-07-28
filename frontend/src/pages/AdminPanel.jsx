@@ -470,12 +470,11 @@ export default function AdminPanel() {
     fetchSettings();
     fetchBugs();
 
-    // Poll statistics every 10 seconds for real-time dashboard progress tracking
+    // Poll background stats every 30 seconds for real-time progress tracking
     const interval = setInterval(() => {
       fetchBgStats();
       fetchGroqUsage();
-      fetchAdminMetrics();
-    }, 10000);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
