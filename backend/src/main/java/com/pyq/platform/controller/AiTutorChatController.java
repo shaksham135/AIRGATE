@@ -27,10 +27,13 @@ import java.time.LocalDateTime;
 public class AiTutorChatController {
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
 
     @Value("${gemini.api.key.tutor:}")
     private String geminiTutorKey;  // PAID Gemini key — dedicated for AI Tutor only
+
+    @Value("${gemini.model:gemini-2.5-flash}")
+    private String geminiModel;     // Model to use for AI Tutor (same free-tier model)
 
     @Value("${groq.api.key:}")
     private String primaryKey;
@@ -218,14 +221,14 @@ public class AiTutorChatController {
 
                     HttpHeaders geminiHeaders = new HttpHeaders();
                     geminiHeaders.setContentType(MediaType.APPLICATION_JSON);
-                    String geminiUrl = GEMINI_API_URL + "?key=" + geminiTutorKey;
+                    String geminiUrl = GEMINI_BASE_URL + geminiModel + ":generateContent?key=" + geminiTutorKey;
                     ResponseEntity<String> geminiResp = restTemplate.exchange(
                         geminiUrl, HttpMethod.POST,
                         new HttpEntity<>(geminiBody.toString(), geminiHeaders), String.class);
 
                     JsonNode geminiJson = objectMapper.readTree(geminiResp.getBody());
                     reply = geminiJson.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText("");
-                    model = "gemini-1.5-flash";
+                    model = geminiModel;
                     promptTokens = geminiJson.path("usageMetadata").path("promptTokenCount").asInt(0);
                     completionTokens = geminiJson.path("usageMetadata").path("candidatesTokenCount").asInt(0);
 

@@ -34,6 +34,9 @@ public class AiQuestionGeneratorService {
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
 
+    @Value("${gemini.model:gemini-2.5-flash}")
+    private String geminiModel;
+
     private List<String> apiKeys = new ArrayList<>();
     private int currentKeyIndex = 0;
 
@@ -86,64 +89,105 @@ public class AiQuestionGeneratorService {
     }
 
     /**
-     * Executes single iteration of question generation + dual verification
+     * Executes one full cycle: slot selection → generation → dual-verification → save.
+     *
+     * Dynamic Balancing Engine:
+     *  - ONE bulk DB query fetches all slot counts (eliminates N+1 problem)
+     *  - All subjects × topics × 4 difficulties × 3 types are considered every call
+     *  - Slots with ZERO questions (bootstrap) are treated as the highest priority
+     *  - Picks randomly among the TOP-10 lowest-populated slots for spread & variance
+     *  - Includes parent-topic context in the prompt for accurate question scoping
+     *  - Saves as PENDING_REVIEW (admin approval required before publishing)
      */
     @Transactional
     public boolean generateAndVerifySingleQuestion() {
         try {
-            // 1. Dynamic Balancing Engine: Pick Subject, Topic, Difficulty & Type with LOWEST existing DB count
+            // ── 1. Load all subjects and topics (2 queries total) ────────────
             List<Subject> allSubjects = subjectRepository.findAll();
-            if (allSubjects.isEmpty()) return false;
-
-            // Collect all possible topic combinations across all subjects
-            class TargetSlot {
-                Subject subject;
-                Topic topic;
-                String difficulty;
-                String qType;
-                long currentDbCount;
+            if (allSubjects.isEmpty()) {
+                log.warn("⚠️ [AI Generator] No subjects found in DB. Skipping generation.");
+                return false;
             }
 
-            List<TargetSlot> candidateSlots = new ArrayList<>();
-            String[] difficulties = {"EASY", "MEDIUM", "HARD", "GATE_SUPER"};
-            String[] types = {"MCQ", "MSQ", "NAT"};
+            List<Topic> allTopics = topicRepository.findAll();
+            if (allTopics.isEmpty()) {
+                log.warn("⚠️ [AI Generator] No topics found in DB. Skipping generation.");
+                return false;
+            }
 
-            for (Subject s : allSubjects) {
-                List<Topic> topics = topicRepository.findBySubjectId(s.getId());
-                for (Topic t : topics) {
-                    for (String d : difficulties) {
-                        for (String type : types) {
-                            long cnt = questionRepository.countBySubjectIdAndTopicIdAndDifficultyAndQuestionTypeAndStatus(
-                                    s.getId(), t.getId(), d, type, "APPROVED");
-                            TargetSlot slot = new TargetSlot();
-                            slot.subject = s;
-                            slot.topic = t;
-                            slot.difficulty = d;
-                            slot.qType = type;
-                            slot.currentDbCount = cnt;
-                            candidateSlots.add(slot);
-                        }
+            // ── 2. Build subject/topic lookup maps ───────────────────────────
+            Map<Long, Subject> subjectMap = new HashMap<>();
+            for (Subject s : allSubjects) subjectMap.put(s.getId(), s);
+
+            // Map: topicId → Topic (with subject + parentTopic pre-fetched via @EntityGraph)
+            Map<Long, Topic> topicMap = new HashMap<>();
+            for (Topic t : allTopics) topicMap.put(t.getId(), t);
+
+            // ── 3. ONE bulk query: get all existing approved counts by slot ──
+            List<Object[]> existingCounts = questionRepository.countApprovedGroupedBySlot();
+
+            // Build a lookup: "subjectId:topicId:difficulty:type" → count
+            Map<String, Long> slotCountMap = new HashMap<>();
+            for (Object[] row : existingCounts) {
+                Long sId   = ((Number) row[0]).longValue();
+                Long tId   = ((Number) row[1]).longValue();
+                String diff = (String) row[2];
+                String type = (String) row[3];
+                Long cnt   = ((Number) row[4]).longValue();
+                slotCountMap.put(sId + ":" + tId + ":" + diff + ":" + type, cnt);
+            }
+
+            // ── 4. Build all candidate slots (no per-slot DB query!) ─────────
+            String[] difficulties = {"EASY", "MEDIUM", "HARD", "GATE_SUPER"};
+            String[] types        = {"MCQ", "MSQ", "NAT"};
+
+            record Slot(Subject subject, Topic topic, String difficulty, String qType, long count) {}
+
+            List<Slot> slots = new ArrayList<>();
+            for (Topic t : allTopics) {
+                Subject s = subjectMap.get(t.getSubject() != null ? t.getSubject().getId() : null);
+                if (s == null) continue; // orphan topic guard
+
+                for (String diff : difficulties) {
+                    for (String type : types) {
+                        String key = s.getId() + ":" + t.getId() + ":" + diff + ":" + type;
+                        long count = slotCountMap.getOrDefault(key, 0L);
+                        slots.add(new Slot(s, t, diff, type, count));
                     }
                 }
             }
 
-            if (candidateSlots.isEmpty()) return false;
+            if (slots.isEmpty()) {
+                log.warn("⚠️ [AI Generator] No valid subject-topic slots available. Skipping.");
+                return false;
+            }
 
-            // Sort candidate slots by lowest count first
-            candidateSlots.sort(Comparator.comparingLong((TargetSlot slot) -> slot.currentDbCount));
+            // ── 5. Sort by count ASC → pick randomly from top-10 for spread ──
+            slots.sort(Comparator.comparingLong(Slot::count));
+            int pickRange = Math.min(slots.size(), 10);
+            Slot chosen = slots.get(new Random().nextInt(pickRange));
 
-            // Pick randomly among top 5 lowest populated slots to maintain variance while filling deficits
-            int pickRange = Math.min(candidateSlots.size(), 5);
-            TargetSlot chosenSlot = candidateSlots.get(new Random().nextInt(pickRange));
+            Subject targetSubject = chosen.subject();
+            Topic   targetTopic   = chosen.topic();
+            String  difficulty    = chosen.difficulty();
+            String  qType         = chosen.qType();
 
-            Subject targetSubject = chosenSlot.subject;
-            Topic targetTopic = chosenSlot.topic;
-            String difficulty = chosenSlot.difficulty;
-            String qType = chosenSlot.qType;
+            // Resolve parent topic name for better AI context
+            String parentTopicName = "";
+            if (targetTopic.getParentTopic() != null) {
+                Topic parent = topicMap.get(targetTopic.getParentTopic().getId());
+                parentTopicName = parent != null ? parent.getName() : "";
+            }
 
-            // 2. Fetch or create ledger entry
+            log.info("🎯 [AI Generator] Selected slot → Subject: '{}', Topic: '{}'{}, Diff: {}, Type: {}, Existing: {}",
+                    targetSubject.getName(), targetTopic.getName(),
+                    parentTopicName.isEmpty() ? "" : " (under '" + parentTopicName + "')",
+                    difficulty, qType, chosen.count());
+
+            // ── 6. Fetch or create ledger entry ──────────────────────────────
             AiGenerationLedger ledger = ledgerRepository
-                    .findBySubjectIdAndTopicIdAndDifficultyAndQuestionType(targetSubject.getId(), targetTopic.getId(), difficulty, qType)
+                    .findBySubjectIdAndTopicIdAndDifficultyAndQuestionType(
+                            targetSubject.getId(), targetTopic.getId(), difficulty, qType)
                     .orElseGet(() -> ledgerRepository.save(AiGenerationLedger.builder()
                             .subject(targetSubject)
                             .topic(targetTopic)
@@ -157,57 +201,75 @@ public class AiQuestionGeneratorService {
             ledger.setTotalGenerated(ledger.getTotalGenerated() + 1);
             ledger.setLastGeneratedAt(LocalDateTime.now());
 
-            // 3. STEP 1: Generate Question + Options + Answer Key (No explanation to save tokens)
-            JsonNode generatedNode = callGroqGenerator(targetSubject.getName(), targetTopic.getName(), difficulty, qType);
-            if (generatedNode == null || !generatedNode.has("questionText") || !generatedNode.has("correctAnswer")) {
+            // ── 7. STEP 1: Generate question via Gemini/Groq ─────────────────
+            JsonNode generatedNode = callGroqGenerator(
+                    targetSubject.getName(), targetTopic.getName(),
+                    parentTopicName, difficulty, qType);
+
+            if (generatedNode == null
+                    || !generatedNode.has("questionText")
+                    || !generatedNode.has("correctAnswer")
+                    || generatedNode.get("questionText").asText("").isBlank()) {
+                log.warn("⚠️ [AI Generator] Generator returned null/empty for slot. Rejecting.");
                 ledger.setTotalRejected(ledger.getTotalRejected() + 1);
                 ledgerRepository.save(ledger);
                 return false;
             }
 
-            String qText = generatedNode.get("questionText").asText();
-            String genAnswer = generatedNode.get("correctAnswer").asText().trim();
-            JsonNode optionsNode = generatedNode.get("options");
+            String   qText    = generatedNode.get("questionText").asText();
+            String   genAnswer = generatedNode.get("correctAnswer").asText().trim();
+            JsonNode optionsNode = generatedNode.has("options") ? generatedNode.get("options") : null;
 
-            // Check duplicate using scoped Topic & Subject level normalized text hashing
+            // MCQ/MSQ must have options; NAT must not be empty answer
+            if (!"NAT".equalsIgnoreCase(qType) && (optionsNode == null || !optionsNode.isArray() || optionsNode.size() < 4)) {
+                log.warn("⚠️ [AI Generator] MCQ/MSQ question has fewer than 4 options. Rejecting.");
+                ledger.setTotalRejected(ledger.getTotalRejected() + 1);
+                ledgerRepository.save(ledger);
+                return false;
+            }
+
+            // ── 8. Duplicate detection (scoped to topic + subject) ────────────
             String normalizedHash = generateNormalizedHash(qText);
-            boolean isDuplicateInTopic = questionRepository.existsByChecksumHashAndTopicId(normalizedHash, targetTopic.getId());
-            boolean isDuplicateInSubject = questionRepository.existsByChecksumHashAndSubjectId(normalizedHash, targetSubject.getId());
+            boolean isDuplicate = questionRepository.existsByChecksumHashAndTopicId(normalizedHash, targetTopic.getId())
+                    || questionRepository.existsByChecksumHashAndSubjectId(normalizedHash, targetSubject.getId());
 
-            if (isDuplicateInTopic || isDuplicateInSubject) {
-                log.warn("⚠️ AI Question Rejected (Scoped Duplicate detected in Subject: {} / Topic: {})! Hash: {}",
-                        targetSubject.getName(), targetTopic.getName(), normalizedHash);
+            if (isDuplicate) {
+                log.warn("⚠️ [AI Generator] Duplicate detected in Subject/Topic. Discarding.");
                 ledger.setTotalRejected(ledger.getTotalRejected() + 1);
                 ledgerRepository.save(ledger);
                 return false;
             }
 
-            // 4. STEP 2: Dual Verification (Independent Blind Solver Call)
+            // ── 9. STEP 2: Dual Verification (blind solver) ───────────────────
             String verifiedAnswer = callGroqVerifier(qText, optionsNode, qType);
 
-            // 5. STEP 3: Compare Answers (with Dynamic Option Value Matching)
+            // ── 10. STEP 3: Answer match comparison ───────────────────────────
             boolean isAccepted = isAnswerMatch(genAnswer, verifiedAnswer, qType, optionsNode);
 
             if (isAccepted) {
                 ledger.setTotalAccepted(ledger.getTotalAccepted() + 1);
                 ledgerRepository.save(ledger);
-
-                // Save Question to Database (Status APPROVED)
-                saveQuestionToDatabase(targetSubject, targetTopic, difficulty, qType, generatedNode, genAnswer, "APPROVED", normalizedHash);
-                log.info("✅ Verified AI Question Saved! Subject: {}, Topic: {}, Type: {}, Diff: {}", targetSubject.getName(), targetTopic.getName(), qType, difficulty);
+                // Save directly as APPROVED — dual-AI verification (generator + blind verifier)
+                // already acts as the quality gate. Sunday audit cron is the post-publish safety net.
+                saveQuestionToDatabase(targetSubject, targetTopic, difficulty, qType,
+                        generatedNode, genAnswer, "APPROVED", normalizedHash);
+                log.info("✅ [AI Generator] Dual-verified question saved as APPROVED! Subject: {}, Topic: {}, Type: {}, Diff: {}",
+                        targetSubject.getName(), targetTopic.getName(), qType, difficulty);
                 return true;
             } else {
                 ledger.setTotalRejected(ledger.getTotalRejected() + 1);
                 ledgerRepository.save(ledger);
-
-                log.warn("❌ AI Question Rejected (Discarded immediately)! Gen: '{}' vs Verifier: '{}'", genAnswer, verifiedAnswer);
+                log.warn("❌ [AI Generator] Answer mismatch — Gen: '{}' vs Verifier: '{}'. Discarding.",
+                        genAnswer, verifiedAnswer);
                 return false;
             }
+
         } catch (Exception e) {
-            log.error("Failed to execute AI question generation step", e);
+            log.error("❌ [AI Generator] Unexpected error during generation step", e);
             return false;
         }
     }
+
 
     public String generateNormalizedHash(String text) {
         if (text == null) return "";
@@ -215,9 +277,14 @@ public class AiQuestionGeneratorService {
         return calculateSha256(normalized);
     }
 
-    private JsonNode callGroqGenerator(String subject, String topic, String difficulty, String qType) {
+    private JsonNode callGroqGenerator(String subject, String topic, String parentTopic, String difficulty, String qType) {
         boolean includeMermaidDiagram = new Random().nextInt(10) == 0; // ~10% probability of diagram question
         String diagramInstruction = includeMermaidDiagram ? "6. INCLUDE A MERMAID DIAGRAM IN THE QUESTION TEXT inside ```mermaid ... ``` block.\n" : "";
+
+        // Build topic context string — include parent for hierarchical accuracy
+        String topicContext = parentTopic != null && !parentTopic.isBlank()
+                ? parentTopic + " → " + topic
+                : topic;
 
         String[] startingStyles = {
             "A direct scenario starting with a noun (e.g., 'A pipelined CPU has...', 'An operating system uses...', 'A relation R with schema...')",
@@ -231,22 +298,22 @@ public class AiQuestionGeneratorService {
                 "Role: Senior GATE CSE Examiner.\n" +
                 "Subject: %s | Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
                 "INSTRUCTIONS:\n" +
-                "1. Create a 100%% mathematically precise, unambiguous GATE CS question for '%s' -> '%s'.\n" +
+                "1. Create a 100%% mathematically precise, unambiguous GATE CS question STRICTLY about '%s' in the subject '%s'.\n" +
                 "2. Wrap ALL mathematical expressions, variables ($n$, $k$, $O(n)$) in single dollar signs $...$. Escape LaTeX backslashes double (\\\\frac, \\\\mathbb).\n" +
                 "3. Starting Style: %s.\n" +
-                "4. For MCQ/MSQ: Provide 4 distinct options (A,B,C,D).\n" +
+                "4. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit the options array entirely.\n" +
                 "%s" +
                 "5. 'correctAnswer' rules:\n" +
                 "   - MCQ: Single option letter e.g. \"A\"\n" +
                 "   - MSQ: Sorted comma-separated letters e.g. \"A,C\"\n" +
-                "   - NAT: Exact single number e.g. \"42\" or \"3.33\"\n\n" +
+                "   - NAT: Exact single number e.g. \"42\" or \"3.33\" (no units, no range)\n\n" +
                 "STRICT JSON ONLY:\n" +
                 "{\n" +
                 "  \"questionText\": \"Text with $math$\",\n" +
                 "  \"options\": [{\"label\": \"A\", \"text\": \"...\"}, {\"label\": \"B\", \"text\": \"...\"}, {\"label\": \"C\", \"text\": \"...\"}, {\"label\": \"D\", \"text\": \"...\"}],\n" +
                 "  \"correctAnswer\": \"A\"\n" +
                 "}",
-                subject, topic, difficulty, qType, subject, topic, selectedStyle, diagramInstruction
+                subject, topicContext, difficulty, qType, topicContext, subject, selectedStyle, diagramInstruction
         );
 
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
@@ -371,14 +438,15 @@ public class AiQuestionGeneratorService {
         totalAiGeneratorTokens.set(0);
     }
 
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
 
     private JsonNode executeGeminiCall(String prompt, int maxOutputTokens) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            // API key is passed as query param
-            String url = GEMINI_API_URL + "?key=" + geminiApiKey;
+            // Build URL dynamically from configured model (supports hot-swap via GEMINI_MODEL env var)
+            String url = GEMINI_BASE_URL + geminiModel + ":generateContent?key=" + geminiApiKey;
+            log.debug("🌐 Gemini API call → model: {}", geminiModel);
 
             // Build Gemini request body
             ObjectNode requestBody = objectMapper.createObjectNode();

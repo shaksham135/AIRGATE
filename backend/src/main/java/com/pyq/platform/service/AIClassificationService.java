@@ -27,6 +27,9 @@ public class AIClassificationService {
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
 
+    @Value("${gemini.model:gemini-2.5-flash}")
+    private String geminiModel;
+
     @Value("${groq.api.key:}")
     private String groqApiKey1;
 
@@ -43,7 +46,7 @@ public class AIClassificationService {
     private String fastModel;
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private RestTemplate restTemplate;
     private final GroqUsageService groqUsageService;
@@ -206,7 +209,7 @@ public class AIClassificationService {
     }
 
     private String callGeminiClassify(String systemPrompt, String userContent) throws Exception {
-        String url = GEMINI_API_URL + "?key=" + geminiApiKey;
+        String url = GEMINI_BASE_URL + geminiModel + ":generateContent?key=" + geminiApiKey;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -678,11 +681,11 @@ public class AIClassificationService {
         String systemInstruction = "You are an expert GATE CSE professor. Follow the format exactly. "
                 + "Short section must be brief (1-4 lines). Detailed section must be thorough and never truncated.";
 
-        // ── PRIMARY: Google Gemini 1.5 Flash ────────────────────────────────
+        // ── PRIMARY: Google Gemini Flash ────────────────────────────────────
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
-                log.info("🌟 [Solution Generator] Using Google Gemini as primary...");
-                String url = GEMINI_API_URL + "?key=" + geminiApiKey;
+                log.info("🌟 [Solution Generator] Using Google Gemini ({}) as primary...", geminiModel);
+                String url = GEMINI_BASE_URL + geminiModel + ":generateContent?key=" + geminiApiKey;
                 HttpHeaders gemHeaders = new HttpHeaders();
                 gemHeaders.setContentType(MediaType.APPLICATION_JSON);
 

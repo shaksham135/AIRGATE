@@ -88,4 +88,14 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
 
     long countBySubjectIdAndTopicIdAndDifficultyAndQuestionTypeAndStatus(
         Long subjectId, Long topicId, String difficulty, String questionType, String status);
+
+    /**
+     * Bulk count query: Returns [subjectId, topicId, difficulty, questionType, count]
+     * for ALL approved questions in ONE DB call — eliminates N+1 in AI generator.
+     */
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT q.subject.id, q.topic.id, q.difficulty, q.questionType, COUNT(q) " +
+        "FROM Question q WHERE q.status = 'APPROVED' " +
+        "GROUP BY q.subject.id, q.topic.id, q.difficulty, q.questionType")
+    List<Object[]> countApprovedGroupedBySlot();
 }
