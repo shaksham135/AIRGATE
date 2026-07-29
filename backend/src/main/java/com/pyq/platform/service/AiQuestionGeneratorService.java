@@ -319,7 +319,7 @@ public class AiQuestionGeneratorService {
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
                 log.info("🚀 Attempting Question Generation via Google Gemini...");
-                JsonNode geminiRes = executeGeminiCall(prompt, 2048);
+                JsonNode geminiRes = executeGeminiCall(prompt, 4096);
                 if (geminiRes != null) return geminiRes;
             } catch (Exception e) {
                 log.warn("⚠️ Gemini generator call failed, falling back to Groq! Error: {}", e.getMessage());
@@ -353,7 +353,7 @@ public class AiQuestionGeneratorService {
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
                 log.info("🚀 Attempting Answer Verification via Google Gemini...");
-                JsonNode geminiRes = executeGeminiCall(sb.toString(), 1500);
+                JsonNode geminiRes = executeGeminiCall(sb.toString(), 4096);
                 if (geminiRes != null && geminiRes.has("answer")) {
                     return geminiRes.get("answer").asText();
                 }
