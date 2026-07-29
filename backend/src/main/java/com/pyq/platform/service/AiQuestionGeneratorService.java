@@ -319,7 +319,7 @@ public class AiQuestionGeneratorService {
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
                 log.info("🚀 Attempting Question Generation via Google Gemini...");
-                JsonNode geminiRes = executeGeminiCall(prompt, 550);
+                JsonNode geminiRes = executeGeminiCall(prompt, 2048);
                 if (geminiRes != null) return geminiRes;
             } catch (Exception e) {
                 log.warn("⚠️ Gemini generator call failed, falling back to Groq! Error: {}", e.getMessage());
@@ -353,7 +353,7 @@ public class AiQuestionGeneratorService {
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
                 log.info("🚀 Attempting Answer Verification via Google Gemini...");
-                JsonNode geminiRes = executeGeminiCall(sb.toString(), 500);
+                JsonNode geminiRes = executeGeminiCall(sb.toString(), 1500);
                 if (geminiRes != null && geminiRes.has("answer")) {
                     return geminiRes.get("answer").asText();
                 }
@@ -487,10 +487,21 @@ public class AiQuestionGeneratorService {
                 // Extract text from candidates[0].content.parts[0].text
                 JsonNode candidates = root.path("candidates");
                 if (candidates.isArray() && candidates.size() > 0) {
-                    String text = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+                    JsonNode cand = candidates.get(0);
+                    String finishReason = cand.path("finishReason").asText("");
+                    if ("MAX_TOKENS".equalsIgnoreCase(finishReason)) {
+                        log.warn("⚠️ Gemini response hit MAX_TOKENS truncation limit!");
+                    }
+                    String text = cand.path("content").path("parts").get(0).path("text").asText();
                     if (text != null && !text.isBlank()) {
-                        // Strip any markdown code fences if present
+                        // Strip any markdown code fences
                         text = text.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
+                        // Extract JSON substring between { and } if needed
+                        int startIdx = text.indexOf('{');
+                        int endIdx = text.lastIndexOf('}');
+                        if (startIdx != -1 && endIdx > startIdx) {
+                            text = text.substring(startIdx, endIdx + 1);
+                        }
                         return objectMapper.readTree(text);
                     }
                 }
