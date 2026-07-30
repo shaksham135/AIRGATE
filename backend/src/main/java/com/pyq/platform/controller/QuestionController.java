@@ -225,22 +225,24 @@ public class QuestionController {
                     .body(new MessageResponse("Error: Invalid Subject ID or Topic ID provided!"));
         }
 
-        User editor = userRepository.findById(userDetails.getId()).orElseThrow();
+        User editor = (userDetails != null && userDetails.getId() != null)
+                ? userRepository.findById(userDetails.getId()).orElse(null)
+                : null;
 
         Question updatedData = Question.builder()
                 .text(request.getText())
                 .questionType(request.getQuestionType())
-                .marks(request.getMarks())
-                .negativeMarks(request.getNegativeMarks())
-                .year(request.getYear())
+                .marks(request.getMarks() != null ? request.getMarks() : 1)
+                .negativeMarks(request.getNegativeMarks() != null ? request.getNegativeMarks() : 0.0)
+                .year(request.getYear() != null ? request.getYear() : 2026)
                 .subject(subject)
                 .topic(topic)
-                .pdfSourceName(request.getPdfSourceName())
-                .pdfSourcePath(request.getPdfSourcePath())
-                .pdfPageNumber(request.getPdfPageNumber())
+                .pdfSourceName(request.getPdfSourceName() != null ? request.getPdfSourceName() : "Manual Entry")
+                .pdfSourcePath(request.getPdfSourcePath() != null ? request.getPdfSourcePath() : "Manual Entry")
+                .pdfPageNumber(request.getPdfPageNumber() != null ? request.getPdfPageNumber() : 1)
                 .imagePath(request.getImagePath())
-                .status(request.getStatus())
-                .isCommunityVerified(false) // reset community badge if edited by editor to re-validate
+                .status(request.getStatus() != null ? request.getStatus() : "APPROVED")
+                .isCommunityVerified(false)
                 .build();
 
         try {
@@ -262,13 +264,14 @@ public class QuestionController {
                 if (reqExp != null && !reqExp.trim().isEmpty()) {
                     ai.setSuggestedExplanation(reqExp);
                 }
-                // If question is approved, we reset modelName to trigger regeneration of insights
-                if ("APPROVED".equalsIgnoreCase(updated.getStatus()) && !"fast-parse".equals(ai.getModelName())) {
-                    ai.setModelName("fast-parse");
-                    if (reqExp == null || reqExp.trim().isEmpty()) {
-                        ai.setSuggestedExplanation("### Detailed Solution\nThe correct answer is **" + ai.getSuggestedAnswer() + "**.");
-                    }
-                    ai.setMentorInsights(null);
+                if (ai.getSuggestedAnswer() == null || ai.getSuggestedAnswer().trim().isEmpty()) {
+                    ai.setSuggestedAnswer("A");
+                }
+                if (ai.getModelName() == null) {
+                    ai.setModelName("manual-entry");
+                }
+                if (ai.getConfidence() == null) {
+                    ai.setConfidence(1.0);
                 }
                 aiAnalysisRepository.save(ai);
             } else {
@@ -287,6 +290,10 @@ public class QuestionController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new MessageResponse(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to update question with ID {}: ", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Error updating question: " + e.getMessage()));
         }
     }
 

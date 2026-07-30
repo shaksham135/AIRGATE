@@ -225,7 +225,7 @@ public class QuestionService {
                 .orElseThrow(() -> new NoSuchElementException("Question not found with ID: " + id));
 
         // Save audit revision log
-        if (!existing.getText().equals(updatedData.getText())) {
+        if (existing.getText() != null && updatedData.getText() != null && !existing.getText().equals(updatedData.getText())) {
             revisionRepository.save(QuestionRevision.builder()
                     .question(existing)
                     .oldText(existing.getText())
@@ -235,34 +235,37 @@ public class QuestionService {
         }
 
         // Update fields
-        existing.setText(updatedData.getText());
-        existing.setQuestionType(updatedData.getQuestionType());
-        existing.setMarks(updatedData.getMarks());
-        existing.setNegativeMarks(updatedData.getNegativeMarks());
-        existing.setYear(updatedData.getYear());
-        existing.setSubject(updatedData.getSubject());
-        existing.setTopic(updatedData.getTopic());
-        existing.setPdfSourceName(updatedData.getPdfSourceName());
-        existing.setPdfSourcePath(updatedData.getPdfSourcePath());
-        existing.setPdfPageNumber(updatedData.getPdfPageNumber());
-        existing.setImagePath(updatedData.getImagePath());
-        existing.setStatus(updatedData.getStatus());
-        existing.setIsCommunityVerified(updatedData.getIsCommunityVerified());
+        if (updatedData.getText() != null) existing.setText(updatedData.getText());
+        if (updatedData.getQuestionType() != null) existing.setQuestionType(updatedData.getQuestionType());
+        if (updatedData.getMarks() != null) existing.setMarks(updatedData.getMarks());
+        if (updatedData.getNegativeMarks() != null) existing.setNegativeMarks(updatedData.getNegativeMarks());
+        if (updatedData.getYear() != null) existing.setYear(updatedData.getYear());
+        if (updatedData.getSubject() != null) existing.setSubject(updatedData.getSubject());
+        if (updatedData.getTopic() != null) existing.setTopic(updatedData.getTopic());
+        if (updatedData.getPdfSourceName() != null) existing.setPdfSourceName(updatedData.getPdfSourceName());
+        if (updatedData.getPdfSourcePath() != null) existing.setPdfSourcePath(updatedData.getPdfSourcePath());
+        if (updatedData.getPdfPageNumber() != null) existing.setPdfPageNumber(updatedData.getPdfPageNumber());
+        if (updatedData.getImagePath() != null) existing.setImagePath(updatedData.getImagePath());
+        if (updatedData.getStatus() != null) existing.setStatus(updatedData.getStatus());
+        if (updatedData.getIsCommunityVerified() != null) existing.setIsCommunityVerified(updatedData.getIsCommunityVerified());
 
         // Update Checksum safely without primary key collision
-        String newHash = generateChecksum(existing.getText());
-        if (!newHash.equals(existing.getChecksumHash())) {
-            Optional<Question> dup = questionRepository.findByChecksumHash(newHash);
-            if (dup.isPresent() && !dup.get().getId().equals(existing.getId())) {
-                newHash = generateChecksum(existing.getText() + "_" + existing.getId() + "_" + System.currentTimeMillis());
+        if (existing.getText() != null) {
+            String newHash = generateChecksum(existing.getText());
+            if (!newHash.equals(existing.getChecksumHash())) {
+                Optional<Question> dup = questionRepository.findByChecksumHash(newHash);
+                if (dup.isPresent() && !dup.get().getId().equals(existing.getId())) {
+                    newHash = generateChecksum(existing.getText() + "_" + existing.getId() + "_" + System.currentTimeMillis());
+                }
+                existing.setChecksumHash(newHash);
             }
-            existing.setChecksumHash(newHash);
         }
 
         // Resolve tags
         Set<Tag> tags = new HashSet<>();
         if (tagNames != null) {
             for (String tName : tagNames) {
+                if (tName == null) continue;
                 String normalizedTag = tName.trim().toLowerCase();
                 if (normalizedTag.isEmpty())
                     continue;
@@ -274,14 +277,15 @@ public class QuestionService {
         existing.setTags(tags);
 
         // Update Options safely via Hibernate orphanRemoval
-        if (optionTexts != null) {
+        if (optionTexts != null && !optionTexts.isEmpty()) {
             existing.getOptions().clear();
             for (int i = 0; i < optionTexts.size(); i++) {
+                String optTxt = optionTexts.get(i) != null ? optionTexts.get(i) : "";
                 String label = String.valueOf((char) ('A' + i));
                 existing.getOptions().add(QuestionOption.builder()
                         .question(existing)
                         .optionLabel(label)
-                        .optionText(optionTexts.get(i))
+                        .optionText(optTxt)
                         .build());
             }
         }
