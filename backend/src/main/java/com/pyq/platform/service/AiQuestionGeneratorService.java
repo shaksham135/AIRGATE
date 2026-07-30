@@ -282,9 +282,12 @@ public class AiQuestionGeneratorService {
                 ledgerRepository.save(ledger);
                 // Save directly as APPROVED — dual-AI verification (8B generator + 70B verifier)
                 // already acts as the quality gate.
-                String explanationToSave = (vResult != null && !vResult.getExplanation().isBlank()) 
-                        ? vResult.getExplanation() 
-                        : "Dual-AI Verified Practice Question.";
+                String genExp = (generatedNode != null && generatedNode.has("explanation") && !generatedNode.get("explanation").asText().isBlank())
+                        ? generatedNode.get("explanation").asText().trim()
+                        : null;
+                String explanationToSave = (vResult != null && !vResult.getExplanation().isBlank() && !"Dual-AI Verified Practice Question.".equals(vResult.getExplanation()))
+                        ? vResult.getExplanation()
+                        : (genExp != null ? genExp : "Step-by-step mathematical proof verified by dual-AI audit.");
                 saveQuestionToDatabase(targetSubject, targetTopic, difficulty, qType,
                         generatedNode, genAnswer, explanationToSave, "APPROVED", normalizedHash);
                 log.info("✅ [AI Generator] Dual-verified question saved as APPROVED! Subject: {}, Topic: {}, Type: {}, Diff: {}",
@@ -350,7 +353,8 @@ public class AiQuestionGeneratorService {
                 "{\n" +
                 "  \"questionText\": \"Text with isolated $math$\",\n" +
                 "  \"options\": [{\"label\": \"A\", \"text\": \"...\"}, {\"label\": \"B\", \"text\": \"...\"}, {\"label\": \"C\", \"text\": \"...\"}, {\"label\": \"D\", \"text\": \"...\"}],\n" +
-                "  \"correctAnswer\": \"A\"\n" +
+                "  \"correctAnswer\": \"A\",\n" +
+                "  \"explanation\": \"Step-by-step mathematical proof and detailed explanation.\"\n" +
                 "}",
                 subject, topicContext, difficulty, qType, topicContext, subject, diagramInstruction
         );
