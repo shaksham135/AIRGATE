@@ -26,10 +26,7 @@ public class CreateQuestionRequest {
     @DecimalMax(value = "2.0", message = "Negative marks must not exceed 2.0")
     private Double negativeMarks;
 
-    @NotNull(message = "Year is required")
-    @Min(value = 1990, message = "Year must be 1990 or later")
-    @Max(value = 2100, message = "Year must not exceed 2100")
-    private Integer year;
+    private Integer year = 2026;
 
     @NotNull(message = "Subject ID is required")
     @Positive(message = "Subject ID must be positive")

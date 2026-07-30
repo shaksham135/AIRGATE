@@ -249,8 +249,15 @@ public class QuestionService {
         existing.setStatus(updatedData.getStatus());
         existing.setIsCommunityVerified(updatedData.getIsCommunityVerified());
 
-        // Update Checksum
-        existing.setChecksumHash(generateChecksum(existing.getText()));
+        // Update Checksum safely without primary key collision
+        String newHash = generateChecksum(existing.getText());
+        if (!newHash.equals(existing.getChecksumHash())) {
+            Optional<Question> dup = questionRepository.findByChecksumHash(newHash);
+            if (dup.isPresent() && !dup.get().getId().equals(existing.getId())) {
+                newHash = generateChecksum(existing.getText() + "_" + existing.getId() + "_" + System.currentTimeMillis());
+            }
+            existing.setChecksumHash(newHash);
+        }
 
         // Resolve tags
         Set<Tag> tags = new HashSet<>();
@@ -266,9 +273,8 @@ public class QuestionService {
         }
         existing.setTags(tags);
 
-        // Update Options safely with explicit cleanup
+        // Update Options safely via Hibernate orphanRemoval
         if (optionTexts != null) {
-            optionRepository.deleteByQuestionIdIn(Collections.singletonList(existing.getId()));
             existing.getOptions().clear();
             for (int i = 0; i < optionTexts.size(); i++) {
                 String label = String.valueOf((char) ('A' + i));
