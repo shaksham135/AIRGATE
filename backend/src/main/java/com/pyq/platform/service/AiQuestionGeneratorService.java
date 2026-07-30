@@ -330,18 +330,19 @@ public class AiQuestionGeneratorService {
 
         String prompt = String.format(
                 "Role: Senior GATE CSE Examiner.\n" +
-                "Subject: %s | Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
-                "STRICT QUALITY & MATHEMATICAL ACCURACY RULES:\n" +
-                "1. Create a 100%% mathematically precise, unambiguous GATE CS question STRICTLY about '%s' in the subject '%s'.\n" +
-                "2. Wrap ALL mathematical expressions, variables ($n$, $k$, $O(n)$) in single dollar signs $...$. Escape LaTeX backslashes double (\\\\frac, \\\\mathbb).\n" +
-                "3. Starting Style: %s.\n" +
-                "4. CRITICAL MCQ RULE: For MCQ, you MUST calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
-                "5. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit the options array entirely.\n" +
+                "Target Subject: %s | Target Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
+                "STRICT QUALITY, KATEX & MATHEMATICAL BOUNDARY RULES:\n" +
+                "1. SUBJECT BOUNDARY: The question MUST be 100%% strictly about '%s' within '%s'. DO NOT mix topics or concepts from other subjects (e.g. Digital Logic questions belong ONLY to Digital Logic, Databases belong ONLY to Databases).\n" +
+                "2. KATEX / LATEX FORMATTING (MANDATORY): Wrap EVERY single mathematical variable ($n$, $k$, $x$), equation, operator ($A \\oplus B$, $\\vee$, $\\wedge$), set ({$A,B,C$}), power ($2^n-1$), subscript ($a_n = 2 \\cdot 3^{n-1}$), matrix, or complexity ($O(n \\log n)$) in single dollar signs $...$ for inline math or $$...$$ for block math. Double-escape backslashes in JSON (\\\\frac, \\\\cdot, \\\\oplus, \\\\in).\n" +
+                "3. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText.\n" +
+                "4. Starting Style: %s.\n" +
+                "5. CRITICAL MCQ RULE: Calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
+                "6. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit options array entirely.\n" +
                 "%s" +
-                "6. 'correctAnswer' rules:\n" +
-                "   - MCQ: Single option letter e.g. \"A\"\n" +
+                "7. 'correctAnswer' format:\n" +
+                "   - MCQ: Single letter e.g. \"A\"\n" +
                 "   - MSQ: Sorted comma-separated letters e.g. \"A,C\"\n" +
-                "   - NAT: Exact single number e.g. \"42\" or \"3.33\" (no units, no range)\n\n" +
+                "   - NAT: Single exact number e.g. \"42\" or \"3.33\"\n\n" +
                 "STRICT JSON ONLY:\n" +
                 "{\n" +
                 "  \"questionText\": \"Text with $math$\",\n" +

@@ -160,6 +160,22 @@ public class DataInitializer implements CommandLineRunner {
             topicRepository.save(Topic.builder().name("Quantitative Aptitude").subject(apt).build());
             topicRepository.save(Topic.builder().name("Verbal & Spatial Aptitude").subject(apt).build());
         }
+
+        // 3. Automatic Database Self-Healing: Repair any misassociated topics (e.g. topic named "Digital Logic" created under "Engineering Mathematics")
+        try {
+            subjectRepository.findByName("Digital Logic").ifPresent(realDigLogic -> {
+                List<Topic> misplaced = topicRepository.findByName("Digital Logic");
+                for (Topic t : misplaced) {
+                    if (t.getSubject() != null && !t.getSubject().getId().equals(realDigLogic.getId())) {
+                        log.info("🔧 Self-Healing DB: Moving misplaced Topic 'Digital Logic' from Subject '{}' to 'Digital Logic'", t.getSubject().getName());
+                        t.setSubject(realDigLogic);
+                        topicRepository.save(t);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Failed to run topic self-healing check: {}", e.getMessage());
+        }
     }
 
     /**

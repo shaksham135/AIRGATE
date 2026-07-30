@@ -16,6 +16,7 @@ public interface TopicRepository extends JpaRepository<Topic, Long> {
     List<Topic> findBySubjectIdAndParentTopicIsNull(Long subjectId);
 
     List<Topic> findByParentTopicId(Long parentTopicId);
+    List<Topic> findByName(String name);
     Optional<Topic> findByNameAndSubjectIdAndParentTopicId(String name, Long subjectId, Long parentTopicId);
     Optional<Topic> findByNameAndSubjectIdAndParentTopicIsNull(String name, Long subjectId);
 }
