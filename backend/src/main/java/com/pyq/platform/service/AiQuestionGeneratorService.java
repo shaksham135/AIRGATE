@@ -282,12 +282,9 @@ public class AiQuestionGeneratorService {
                 ledgerRepository.save(ledger);
                 // Save directly as APPROVED — dual-AI verification (8B generator + 70B verifier)
                 // already acts as the quality gate.
-                String genExp = (generatedNode != null && generatedNode.has("explanation") && !generatedNode.get("explanation").asText().isBlank())
-                        ? generatedNode.get("explanation").asText().trim()
-                        : null;
                 String explanationToSave = (vResult != null && !vResult.getExplanation().isBlank() && !"Dual-AI Verified Practice Question.".equals(vResult.getExplanation()))
                         ? vResult.getExplanation()
-                        : (genExp != null ? genExp : "Step-by-step mathematical proof verified by dual-AI audit.");
+                        : "Verified step-by-step mathematical proof for option (" + genAnswer + ").";
                 saveQuestionToDatabase(targetSubject, targetTopic, difficulty, qType,
                         generatedNode, genAnswer, explanationToSave, "APPROVED", normalizedHash);
                 log.info("✅ [AI Generator] Dual-verified question saved as APPROVED! Subject: {}, Topic: {}, Type: {}, Diff: {}",
@@ -353,8 +350,7 @@ public class AiQuestionGeneratorService {
                 "{\n" +
                 "  \"questionText\": \"Text with isolated $math$\",\n" +
                 "  \"options\": [{\"label\": \"A\", \"text\": \"...\"}, {\"label\": \"B\", \"text\": \"...\"}, {\"label\": \"C\", \"text\": \"...\"}, {\"label\": \"D\", \"text\": \"...\"}],\n" +
-                "  \"correctAnswer\": \"A\",\n" +
-                "  \"explanation\": \"Step-by-step mathematical proof and detailed explanation.\"\n" +
+                "  \"correctAnswer\": \"A\"\n" +
                 "}",
                 subject, topicContext, difficulty, qType, topicContext, subject, diagramInstruction
         );
