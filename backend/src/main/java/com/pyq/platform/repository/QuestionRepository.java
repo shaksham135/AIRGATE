@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSpecificationExecutor<Question> {
 
     @Override
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     @NonNull
     org.springframework.data.domain.Page<Question> findAll(
         @Nullable org.springframework.data.jpa.domain.Specification<Question> spec,
@@ -21,7 +21,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     );
 
     @Override
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     @NonNull
     Optional<Question> findById(@NonNull Long id);
 
@@ -30,6 +30,8 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     boolean existsByChecksumHashAndTopicId(String checksumHash, Long topicId);
     boolean existsByChecksumHashAndSubjectId(String checksumHash, Long subjectId);
     boolean existsByChecksumHashAndYear(String checksumHash, Integer year);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findByStatus(String status);
     List<Question> findByPdfSourceName(String pdfSourceName);
     List<Question> findBySubjectIdAndPdfSourceName(Long subjectId, String pdfSourceName);
@@ -49,13 +51,25 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @org.springframework.data.jpa.repository.Query("UPDATE Question q SET q.subject = q.topic.subject WHERE q.topic IS NOT NULL AND q.subject != q.topic.subject")
     int alignQuestionSubjectsWithTopics();
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findBySubjectIdAndStatus(Long subjectId, String status);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findByTopicIdAndStatus(Long topicId, String status);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findByTopicIdInAndStatus(List<Long> topicIds, String status);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findTop5ByTopicIdAndStatusAndIdNot(Long topicId, String status, Long excludeId);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findByYearAndStatus(Integer year, String status);
+
     long countByStatus(String status);
     long countByPdfSourceName(String pdfSourceName);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic", "aiAnalyses"})
     List<Question> findByStatusAndPublishAtBefore(String status, java.time.LocalDateTime time);
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT q.year FROM Question q WHERE q.status = 'APPROVED' ORDER BY q.year DESC")

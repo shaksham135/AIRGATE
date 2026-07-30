@@ -52,7 +52,16 @@ public class QuestionMapper {
         long helpful = 0;
         long notHelpful = 0;
 
-        if (fetchSubQueries) {
+        if (question.getAiAnalyses() != null && !question.getAiAnalyses().isEmpty()) {
+            QuestionAIAnalysis ai = question.getAiAnalyses().get(question.getAiAnalyses().size() - 1);
+            aiSuggestedAnswer = ai.getSuggestedAnswer();
+            aiSuggestedExplanation = ai.getSuggestedExplanation();
+            aiMentorInsights = ai.getMentorInsights();
+            questionConfidence = ai.getQuestionConfidence();
+            optionsConfidence = ai.getOptionsConfidence();
+            answerConfidence = ai.getAnswerConfidence();
+            rawAiJson = ai.getRawAiJson();
+        } else if (fetchSubQueries) {
             Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
                     .findFirstByQuestionIdOrderByCreatedAtDesc(question.getId());
             if (aiOpt.isPresent()) {
@@ -65,6 +74,9 @@ public class QuestionMapper {
                 answerConfidence = ai.getAnswerConfidence();
                 rawAiJson = ai.getRawAiJson();
             }
+        }
+
+        if (fetchSubQueries) {
             helpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.UPVOTE);
             notHelpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.DOWNVOTE);
         }
