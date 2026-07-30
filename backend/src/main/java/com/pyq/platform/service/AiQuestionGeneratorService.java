@@ -180,10 +180,22 @@ public class AiQuestionGeneratorService {
                 return false;
             }
 
-            // ── 5. Sort by count ASC → pick randomly from top-10 for spread ──
+            // ── 5. Sort by count ASC and group by Subject & Topic for diverse distribution ──
             slots.sort(Comparator.comparingLong(Slot::count));
-            int pickRange = Math.min(slots.size(), 10);
-            Slot chosen = slots.get(new Random().nextInt(pickRange));
+            long minCount = slots.get(0).count();
+
+            // Collect all slots that match the minimum question count
+            List<Slot> minCountSlots = new ArrayList<>();
+            for (Slot s : slots) {
+                if (s.count() == minCount) {
+                    minCountSlots.add(s);
+                } else {
+                    break;
+                }
+            }
+
+            // Pick a random slot from the minimum count pool (truly diverse across all subjects & topics)
+            Slot chosen = minCountSlots.get(new Random().nextInt(minCountSlots.size()));
 
             Subject targetSubject = chosen.subject();
             Topic   targetTopic   = chosen.topic();
@@ -319,13 +331,14 @@ public class AiQuestionGeneratorService {
         String prompt = String.format(
                 "Role: Senior GATE CSE Examiner.\n" +
                 "Subject: %s | Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
-                "INSTRUCTIONS:\n" +
+                "STRICT QUALITY & MATHEMATICAL ACCURACY RULES:\n" +
                 "1. Create a 100%% mathematically precise, unambiguous GATE CS question STRICTLY about '%s' in the subject '%s'.\n" +
                 "2. Wrap ALL mathematical expressions, variables ($n$, $k$, $O(n)$) in single dollar signs $...$. Escape LaTeX backslashes double (\\\\frac, \\\\mathbb).\n" +
                 "3. Starting Style: %s.\n" +
-                "4. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit the options array entirely.\n" +
+                "4. CRITICAL MCQ RULE: For MCQ, you MUST calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
+                "5. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit the options array entirely.\n" +
                 "%s" +
-                "5. 'correctAnswer' rules:\n" +
+                "6. 'correctAnswer' rules:\n" +
                 "   - MCQ: Single option letter e.g. \"A\"\n" +
                 "   - MSQ: Sorted comma-separated letters e.g. \"A,C\"\n" +
                 "   - NAT: Exact single number e.g. \"42\" or \"3.33\" (no units, no range)\n\n" +
@@ -338,10 +351,10 @@ public class AiQuestionGeneratorService {
                 subject, topicContext, difficulty, qType, topicContext, subject, selectedStyle, diagramInstruction
         );
 
-        // ── PRIMARY: Groq Llama 3.1 8B Instant (Fast, lightweight generator) ──
+        // ── PRIMARY: Groq Llama 3.3 70B (Heavy Reasoning Model for Precision Generation) ──
         try {
-            log.info("🤖 Attempting Question Generation via Groq Llama 3.1 8B (Fast Generator)...");
-            JsonNode groqRes = executeGroqCall(prompt, false, 500);
+            log.info("🤖 Attempting Question Generation via Groq Llama 3.3 70B (Heavy Generator)...");
+            JsonNode groqRes = executeGroqCall(prompt, true, 600);
             if (groqRes != null) return groqRes;
         } catch (Exception e) {
             log.warn("⚠️ Groq generator call failed, falling back to Gemini! Error: {}", e.getMessage());
