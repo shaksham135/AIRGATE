@@ -83,9 +83,27 @@ public class AiQuestionGeneratorService {
 
     private synchronized String getNextApiKey() {
         if (apiKeys.isEmpty()) return null;
-        String key = apiKeys.get(currentKeyIndex);
+        // Dynamic Time-based Key Division: Divide the 24-hour cycle equally across configured API keys
+        int currentHour = LocalDateTime.now().getHour();
+        int timeSegmentIndex = (currentHour / Math.max(1, 24 / apiKeys.size())) % apiKeys.size();
+
+        // Base key from active time segment + sequential shift on retry
+        int indexToUse = (timeSegmentIndex + currentKeyIndex) % apiKeys.size();
         currentKeyIndex = (currentKeyIndex + 1) % apiKeys.size();
-        return key;
+        return apiKeys.get(indexToUse);
+    }
+
+    public static class VerificationResult {
+        private final String answer;
+        private final String explanation;
+
+        public VerificationResult(String answer, String explanation) {
+            this.answer = answer != null ? answer.trim() : "";
+            this.explanation = explanation != null ? explanation.trim() : "Dual-AI Verified Practice Question.";
+        }
+
+        public String getAnswer() { return answer; }
+        public String getExplanation() { return explanation; }
     }
 
     /**
@@ -240,8 +258,9 @@ public class AiQuestionGeneratorService {
                 return false;
             }
 
-            // ── 9. STEP 2: Dual Verification (blind solver) ───────────────────
-            String verifiedAnswer = callGroqVerifier(qText, optionsNode, qType);
+            // ── 9. STEP 2: Dual Verification (blind solver via 70B Heavy Reasoning Model) ──
+            VerificationResult vResult = callGroqVerifier(qText, optionsNode, qType);
+            String verifiedAnswer = vResult != null ? vResult.getAnswer() : "";
 
             // ── 10. STEP 3: Answer match comparison ───────────────────────────
             boolean isAccepted = isAnswerMatch(genAnswer, verifiedAnswer, qType, optionsNode);
@@ -249,17 +268,20 @@ public class AiQuestionGeneratorService {
             if (isAccepted) {
                 ledger.setTotalAccepted(ledger.getTotalAccepted() + 1);
                 ledgerRepository.save(ledger);
-                // Save directly as APPROVED — dual-AI verification (generator + blind verifier)
-                // already acts as the quality gate. Sunday audit cron is the post-publish safety net.
+                // Save directly as APPROVED — dual-AI verification (8B generator + 70B verifier)
+                // already acts as the quality gate.
+                String explanationToSave = (vResult != null && !vResult.getExplanation().isBlank()) 
+                        ? vResult.getExplanation() 
+                        : "Dual-AI Verified Practice Question.";
                 saveQuestionToDatabase(targetSubject, targetTopic, difficulty, qType,
-                        generatedNode, genAnswer, "APPROVED", normalizedHash);
+                        generatedNode, genAnswer, explanationToSave, "APPROVED", normalizedHash);
                 log.info("✅ [AI Generator] Dual-verified question saved as APPROVED! Subject: {}, Topic: {}, Type: {}, Diff: {}",
                         targetSubject.getName(), targetTopic.getName(), qType, difficulty);
                 return true;
             } else {
                 ledger.setTotalRejected(ledger.getTotalRejected() + 1);
                 ledgerRepository.save(ledger);
-                log.warn("❌ [AI Generator] Answer mismatch — Gen: '{}' vs Verifier: '{}'. Discarding.",
+                log.warn("❌ [AI Generator] Answer mismatch — Gen (8B): '{}' vs Verifier (70B): '{}'. Discarding.",
                         genAnswer, verifiedAnswer);
                 return false;
             }
@@ -316,21 +338,29 @@ public class AiQuestionGeneratorService {
                 subject, topicContext, difficulty, qType, topicContext, subject, selectedStyle, diagramInstruction
         );
 
-        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-            try {
-                log.info("🚀 Attempting Question Generation via Google Gemini...");
-                JsonNode geminiRes = executeGeminiCall(prompt, 4096);
-                if (geminiRes != null) return geminiRes;
-            } catch (Exception e) {
-                log.warn("⚠️ Gemini generator call failed, falling back to Groq! Error: {}", e.getMessage());
-            }
+        // ── PRIMARY: Groq Llama 3.1 8B Instant (Fast, lightweight generator) ──
+        try {
+            log.info("🤖 Attempting Question Generation via Groq Llama 3.1 8B (Fast Generator)...");
+            JsonNode groqRes = executeGroqCall(prompt, false, 500);
+            if (groqRes != null) return groqRes;
+        } catch (Exception e) {
+            log.warn("⚠️ Groq generator call failed, falling back to Gemini! Error: {}", e.getMessage());
         }
 
-        log.info("🔌 Falling back to Groq Llama 3.3 70B for Question Generation...");
-        return executeGroqCall(prompt, true, 550);
+        // ── FALLBACK: Google Gemini ──
+        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
+            try {
+                log.info("🚀 Falling back to Google Gemini for Question Generation...");
+                JsonNode geminiRes = executeGeminiCall(prompt, 2048);
+                if (geminiRes != null) return geminiRes;
+            } catch (Exception e) {
+                log.warn("⚠️ Gemini generator call failed! Error: {}", e.getMessage());
+            }
+        }
+        return null;
     }
 
-    private String callGroqVerifier(String qText, JsonNode optionsNode, String qType) {
+    private VerificationResult callGroqVerifier(String qText, JsonNode optionsNode, String qType) {
         StringBuilder sb = new StringBuilder();
         sb.append("Role: Senior GATE CSE Evaluator.\n" +
                   "Solve this question independently step-by-step and determine the exact correct answer.\n\n" +
@@ -346,38 +376,40 @@ public class AiQuestionGeneratorService {
         }
         sb.append("\nINSTRUCTIONS:\n" +
                   "1. Work out the solution mathematically.\n" +
-                  "2. Output STRICT JSON:\n" +
-                  "   - \"explanation\": \"2-sentence mathematical proof.\",\n" +
-                  "   - \"answer\": \"A\" (for MCQ), \"A,C\" (for MSQ), or \"42\" (for NAT)\n");
+                  "2. Output STRICT JSON in a SINGLE response:\n" +
+                  "   - \"answer\": \"A\" (for MCQ), \"A,C\" (for MSQ), or \"42\" (for NAT)\n" +
+                  "   - \"explanation\": \"Concise 2-sentence mathematical proof explaining why the answer is correct.\"\n");
 
+        // ── PRIMARY: Groq Llama 3.3 70B (Heavy Reasoning Model for Blind Verification) ──
+        try {
+            log.info("🤖 Attempting Answer Verification via Groq Llama 3.3 70B (Heavy Verifier)...");
+            JsonNode res = executeGroqCall(sb.toString(), true, 450);
+            if (res != null) {
+                String ans = res.has("answer") ? res.get("answer").asText() : "";
+                String exp = res.has("explanation") ? res.get("explanation").asText() : "";
+                if (!ans.isBlank()) {
+                    return new VerificationResult(ans, exp);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Groq verifier call failed, falling back to Gemini! Error: {}", e.getMessage());
+        }
+
+        // ── FALLBACK: Google Gemini ──
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
-                log.info("🚀 Attempting Answer Verification via Google Gemini...");
-                JsonNode geminiRes = executeGeminiCall(sb.toString(), 4096);
+                log.info("🚀 Falling back to Google Gemini for Answer Verification...");
+                JsonNode geminiRes = executeGeminiCall(sb.toString(), 2048);
                 if (geminiRes != null && geminiRes.has("answer")) {
-                    return geminiRes.get("answer").asText();
+                    String ans = geminiRes.get("answer").asText();
+                    String exp = geminiRes.has("explanation") ? geminiRes.get("explanation").asText() : "";
+                    return new VerificationResult(ans, exp);
                 }
             } catch (Exception e) {
-                log.warn("⚠️ Gemini verifier call failed, falling back to Groq! Error: {}", e.getMessage());
+                log.warn("⚠️ Gemini verifier call failed! Error: {}", e.getMessage());
             }
         }
-
-        log.info("🔌 Falling back to Groq Llama 3.3 70B for Answer Verification...");
-        JsonNode res = executeGroqCall(sb.toString(), true, 800);
-        if (res != null) {
-            if (res.has("answer")) return res.get("answer").asText();
-            Iterator<String> fieldNames = res.fieldNames();
-            while (fieldNames.hasNext()) {
-                String field = fieldNames.next();
-                JsonNode child = res.get(field);
-                if (child != null && child.isObject() && child.has("answer")) {
-                    return child.get("answer").asText();
-                } else if (child != null && child.has("binom_value")) {
-                    return child.get("binom_value").asText();
-                }
-            }
-        }
-        return "";
+        return new VerificationResult("", "");
     }
 
     private JsonNode executeGroqCall(String prompt, boolean isHeavyModel, int maxTokens) {
@@ -578,7 +610,7 @@ public class AiQuestionGeneratorService {
         return Double.parseDouble(str);
     }
 
-    public void saveQuestionToDatabase(Subject subject, Topic topic, String difficulty, String qType, JsonNode node, String genAnswer, String status, String checksumHash) {
+    public void saveQuestionToDatabase(Subject subject, Topic topic, String difficulty, String qType, JsonNode node, String genAnswer, String explanation, String status, String checksumHash) {
         try {
             String qText = node.has("questionText") ? node.get("questionText").asText() : "";
 
@@ -613,14 +645,14 @@ public class AiQuestionGeneratorService {
             }
             q.setOptions(options);
 
-            // Add AI Analysis record with verified answer
+            // Add AI Analysis record with verified answer and short proof
             List<QuestionAIAnalysis> analyses = new ArrayList<>();
             analyses.add(QuestionAIAnalysis.builder()
                     .question(q)
                     .suggestedAnswer(genAnswer)
-                    .suggestedExplanation("Dual-AI Verified Practice Question.")
+                    .suggestedExplanation(explanation != null && !explanation.isBlank() ? explanation : "Dual-AI Verified Practice Question.")
                     .confidence(1.0)
-                    .modelName("Groq-Dual-AI")
+                    .modelName("Groq-8B-70B-Dual")
                     .build());
             q.setAiAnalyses(analyses);
 
@@ -693,7 +725,8 @@ public class AiQuestionGeneratorService {
 
                 String auditedAnswer = auditedNode.get("correctAnswer").asText().trim();
                 JsonNode auditedOptionsNode = auditedNode.get("options");
-                String verifierAnswer = callGroqVerifier(q.getText(), auditedOptionsNode, q.getQuestionType());
+                VerificationResult verifierRes = callGroqVerifier(q.getText(), auditedOptionsNode, q.getQuestionType());
+                String verifierAnswer = verifierRes != null ? verifierRes.getAnswer() : "";
 
                 if (isAnswerMatch(auditedAnswer, verifierAnswer, q.getQuestionType(), auditedOptionsNode)) {
                     successAttempts++;
