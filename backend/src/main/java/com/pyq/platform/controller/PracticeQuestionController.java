@@ -60,13 +60,14 @@ public class PracticeQuestionController {
      */
     @GetMapping("/questions")
     @Transactional(readOnly = true)
-    @org.springframework.cache.annotation.Cacheable(value = "practiceQuestions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #difficulty, #questionType, #page, #size)")
+    @org.springframework.cache.annotation.Cacheable(value = "practiceQuestions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #difficulty, #questionType, #solvedStatus, #page, #size, #userDetails != null ? #userDetails.getId() : 0)")
     public ResponseEntity<PageDTO<QuestionDTO>> getPracticeQuestions(
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "subjectId", required = false) Long subjectId,
             @RequestParam(name = "topicId", required = false) Long topicId,
             @RequestParam(name = "difficulty", required = false) String difficulty,
             @RequestParam(name = "type", required = false) String questionType,
+            @RequestParam(name = "solvedStatus", required = false) String solvedStatus,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -102,6 +103,22 @@ public class PracticeQuestionController {
                 // Question Type Filter (MCQ / MSQ / NAT)
                 if (questionType != null && !questionType.isBlank() && !"ALL".equalsIgnoreCase(questionType)) {
                     predicates.add(cb.equal(cb.upper(root.get("questionType")), questionType.toUpperCase()));
+                }
+
+                // Solved Status Filter (ALL / UNSOLVED / SOLVED)
+                if (solvedStatus != null && !solvedStatus.isBlank() && !"ALL".equalsIgnoreCase(solvedStatus) && userDetails != null && userDetails.getId() != null) {
+                    List<Long> solvedIds = solveRepository.findSolvedQuestionIdsByUserId(userDetails.getId());
+                    if ("SOLVED".equalsIgnoreCase(solvedStatus)) {
+                        if (solvedIds.isEmpty()) {
+                            predicates.add(cb.disjunction());
+                        } else {
+                            predicates.add(root.get("id").in(solvedIds));
+                        }
+                    } else if ("UNSOLVED".equalsIgnoreCase(solvedStatus)) {
+                        if (!solvedIds.isEmpty()) {
+                            predicates.add(cb.not(root.get("id").in(solvedIds)));
+                        }
+                    }
                 }
 
                 // Search query

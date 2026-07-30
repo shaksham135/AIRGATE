@@ -7,5 +7,6 @@ import java.util.List;
 
 @Repository
 public interface BugReportRepository extends JpaRepository<BugReport, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     List<BugReport> findAllByOrderByCreatedAtDesc();
 }

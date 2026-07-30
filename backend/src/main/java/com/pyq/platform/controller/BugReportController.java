@@ -42,6 +42,7 @@ public class BugReportController {
 
     @GetMapping("/admin/bugs")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<?> getAllBugs() {
         List<BugReport> list = bugReportRepository.findAllByOrderByCreatedAtDesc();
         // Map to display cleaner details
@@ -53,7 +54,15 @@ public class BugReportController {
             m.put("pageUrl", b.getPageUrl());
             m.put("status", b.getStatus());
             m.put("createdAt", b.getCreatedAt());
-            m.put("reportedBy", b.getUser() != null ? b.getUser().getUsername() : "Anonymous");
+            String username = "Anonymous";
+            try {
+                if (b.getUser() != null && org.hibernate.Hibernate.isInitialized(b.getUser())) {
+                    username = b.getUser().getUsername();
+                } else if (b.getUser() != null) {
+                    username = b.getUser().getUsername();
+                }
+            } catch (Exception ignored) {}
+            m.put("reportedBy", username);
             return m;
         }).toList();
         return ResponseEntity.ok(mapped);

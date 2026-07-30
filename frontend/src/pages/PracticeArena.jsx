@@ -27,6 +27,7 @@ export default function PracticeArena() {
   const [selectedTopicId, setSelectedTopicId] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState('ALL');
   const [selectedType, setSelectedType] = useState('ALL');
+  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState('ALL');
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
 
   // Pagination
@@ -136,7 +137,7 @@ export default function PracticeArena() {
 
   useEffect(() => {
     fetchPracticeQuestions(page);
-  }, [page, pageSize, selectedSubjectId, selectedTopicId, selectedDifficulty, selectedType, activeSearchQuery]);
+  }, [page, pageSize, selectedSubjectId, selectedTopicId, selectedDifficulty, selectedType, selectedSolvedStatus, activeSearchQuery]);
 
   const fetchDailyQuota = async () => {
     if (!currentUser) return;
@@ -185,6 +186,7 @@ export default function PracticeArena() {
     if (selectedTopicId) params.topicId = selectedTopicId;
     if (selectedDifficulty && selectedDifficulty !== 'ALL') params.difficulty = selectedDifficulty;
     if (selectedType && selectedType !== 'ALL') params.type = selectedType;
+    if (selectedSolvedStatus && selectedSolvedStatus !== 'ALL') params.solvedStatus = selectedSolvedStatus;
     if (activeSearchQuery && activeSearchQuery.trim()) params.query = activeSearchQuery.trim();
 
     const cacheKey = `practice_feed_${JSON.stringify(params)}`;
@@ -470,6 +472,16 @@ export default function PracticeArena() {
               <option value="MCQ">MCQ (Single Choice)</option>
               <option value="MSQ">MSQ (Multiple Select)</option>
               <option value="NAT">NAT (Numerical)</option>
+            </select>
+
+            <select
+              value={selectedSolvedStatus}
+              onChange={e => { setSelectedSolvedStatus(e.target.value); setPage(0); }}
+              style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
+            >
+              <option value="ALL">Status: All Questions</option>
+              <option value="UNSOLVED">Status: Unsolved Only</option>
+              <option value="SOLVED">Status: ✅ Solved Only</option>
             </select>
           </div>
         )}
