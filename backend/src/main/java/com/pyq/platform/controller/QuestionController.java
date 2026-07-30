@@ -2,10 +2,12 @@ package com.pyq.platform.controller;
 
 import com.pyq.platform.dto.*;
 import com.pyq.platform.entity.*;
+import com.pyq.platform.repository.BookmarkRepository;
 import com.pyq.platform.repository.QuestionAIAnalysisRepository;
 import com.pyq.platform.repository.QuestionRepository;
 import com.pyq.platform.repository.SubjectRepository;
 import com.pyq.platform.repository.TopicRepository;
+import com.pyq.platform.repository.UserQuestionSolveRepository;
 import com.pyq.platform.repository.UserRepository;
 import com.pyq.platform.security.UserDetailsImpl;
 import com.pyq.platform.service.CloudinaryService;
@@ -48,13 +50,17 @@ public class QuestionController {
     private final QuestionAIAnalysisRepository aiAnalysisRepository;
     private final CloudinaryService cloudinaryService;
     private final QuestionMapper questionMapper;
+    private final BookmarkRepository bookmarkRepository;
+    private final UserQuestionSolveRepository solveRepository;
 
     public QuestionController(QuestionService questionService, QuestionRepository questionRepository,
             SubjectRepository subjectRepository,
             TopicRepository topicRepository, UserRepository userRepository,
             QuestionAIAnalysisRepository aiAnalysisRepository,
             CloudinaryService cloudinaryService,
-            QuestionMapper questionMapper) {
+            QuestionMapper questionMapper,
+            BookmarkRepository bookmarkRepository,
+            UserQuestionSolveRepository solveRepository) {
         this.questionService = questionService;
         this.questionRepository = questionRepository;
         this.subjectRepository = subjectRepository;
@@ -63,6 +69,8 @@ public class QuestionController {
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.cloudinaryService = cloudinaryService;
         this.questionMapper = questionMapper;
+        this.bookmarkRepository = bookmarkRepository;
+        this.solveRepository = solveRepository;
     }
 
     // Public search with filters (anonymous access mapped in SecurityConfig)
@@ -116,6 +124,36 @@ public class QuestionController {
                     .body(new MessageResponse("Error: Question not found with ID: " + id));
         }
         return ResponseEntity.ok(convertToDTO(questionOpt.get()));
+    }
+
+    @GetMapping("/{id}/user-status")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getQuestionUserStatus(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.ok(Map.of(
+                    "isBookmarked", false,
+                    "isSolved", false,
+                    "isCorrect", false,
+                    "selectedOption", ""));
+        }
+
+        Long userId = userDetails.getId();
+        boolean isBookmarked = bookmarkRepository.existsByUserIdAndQuestionId(userId, id);
+        Optional<com.pyq.platform.entity.UserQuestionSolve> solveOpt = solveRepository.findByUserIdAndQuestionId(userId,
+                id);
+
+        boolean isSolved = solveOpt.isPresent();
+        boolean isCorrect = solveOpt.map(com.pyq.platform.entity.UserQuestionSolve::getIsCorrect).orElse(false);
+        String selectedOption = solveOpt.map(com.pyq.platform.entity.UserQuestionSolve::getSelectedOption).orElse("");
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("isBookmarked", isBookmarked);
+        res.put("isSolved", isSolved);
+        res.put("isCorrect", isCorrect);
+        res.put("selectedOption", selectedOption != null ? selectedOption : "");
+        return ResponseEntity.ok(res);
     }
 
     @GetMapping("/stats")
@@ -186,12 +224,15 @@ public class QuestionController {
 
         try {
             Question saved = questionService.createQuestion(question, request.getOptions(), request.getTags());
-            
+
             // Save initial AI Analysis with user-defined answer/explanation
-            String ans = request.getAiSuggestedAnswer() != null && !request.getAiSuggestedAnswer().trim().isEmpty() 
-                    ? request.getAiSuggestedAnswer() : "A";
-            String exp = request.getAiSuggestedExplanation() != null && !request.getAiSuggestedExplanation().trim().isEmpty() 
-                    ? request.getAiSuggestedExplanation() : "### Detailed Solution\nThe correct answer is **" + ans + "**.";
+            String ans = request.getAiSuggestedAnswer() != null && !request.getAiSuggestedAnswer().trim().isEmpty()
+                    ? request.getAiSuggestedAnswer()
+                    : "A";
+            String exp = request.getAiSuggestedExplanation() != null
+                    && !request.getAiSuggestedExplanation().trim().isEmpty()
+                            ? request.getAiSuggestedExplanation()
+                            : "### Detailed Solution\nThe correct answer is **" + ans + "**.";
             aiAnalysisRepository.save(QuestionAIAnalysis.builder()
                     .question(saved)
                     .suggestedAnswer(ans)
@@ -211,6 +252,8 @@ public class QuestionController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = { "questions", "practiceQuestions", "similarQuestions",
+            "questionDetail", "years", "publicMeta" }, allEntries = true)
     public ResponseEntity<?> updateQuestion(
             @PathVariable("id") Long id,
             @Valid @RequestBody CreateQuestionRequest request,
@@ -253,7 +296,7 @@ public class QuestionController {
             // Update or create QuestionAIAnalysis record
             Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
                     .findFirstByQuestionIdOrderByCreatedAtDesc(updated.getId());
-            
+
             String reqAns = request.getAiSuggestedAnswer();
             String reqExp = request.getAiSuggestedExplanation();
 
@@ -277,7 +320,8 @@ public class QuestionController {
                 aiAnalysisRepository.save(ai);
             } else {
                 String ans = (reqAns != null && !reqAns.trim().isEmpty()) ? reqAns : "A";
-                String exp = (reqExp != null && !reqExp.trim().isEmpty()) ? reqExp : "### Detailed Solution\nThe correct answer is **" + ans + "**.";
+                String exp = (reqExp != null && !reqExp.trim().isEmpty()) ? reqExp
+                        : "### Detailed Solution\nThe correct answer is **" + ans + "**.";
                 aiAnalysisRepository.save(QuestionAIAnalysis.builder()
                         .question(updated)
                         .suggestedAnswer(ans)
@@ -317,17 +361,20 @@ public class QuestionController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
     public ResponseEntity<byte[]> getQuestionPageImage(@PathVariable("id") Long id) {
         Optional<Question> questionOpt = questionService.getQuestionById(id);
-        if (questionOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        if (questionOpt.isEmpty())
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 
         Question question = questionOpt.get();
         String pdfPath = question.getPdfSourcePath();
         Integer pageNum = question.getPdfPageNumber();
-        if (pdfPath == null || pageNum == null) return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        if (pdfPath == null || pageNum == null)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
 
         File tempFile = null;
         try {
             ResolvedPdf resolved = resolvePdfFile(pdfPath);
-            if (resolved == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            if (resolved == null)
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             tempFile = resolved.tempFile;
 
             try (PDDocument document = PDDocument.load(resolved.pdfFile)) {
@@ -348,7 +395,8 @@ public class QuestionController {
             log.error("Failed to render PDF page image for question {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         } finally {
-            if (tempFile != null && tempFile.exists()) tempFile.delete();
+            if (tempFile != null && tempFile.exists())
+                tempFile.delete();
         }
     }
 
@@ -356,17 +404,20 @@ public class QuestionController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
     public ResponseEntity<String> getQuestionPageText(@PathVariable("id") Long id) {
         Optional<Question> questionOpt = questionService.getQuestionById(id);
-        if (questionOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        if (questionOpt.isEmpty())
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 
         Question question = questionOpt.get();
         String pdfPath = question.getPdfSourcePath();
         Integer pageNum = question.getPdfPageNumber();
-        if (pdfPath == null || pageNum == null) return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        if (pdfPath == null || pageNum == null)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
 
         File tempFile = null;
         try {
             ResolvedPdf resolved = resolvePdfFile(pdfPath);
-            if (resolved == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            if (resolved == null)
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             tempFile = resolved.tempFile;
 
             try (PDDocument document = PDDocument.load(resolved.pdfFile)) {
@@ -382,14 +433,19 @@ public class QuestionController {
             log.error("Failed to extract PDF page text for question {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         } finally {
-            if (tempFile != null && tempFile.exists()) tempFile.delete();
+            if (tempFile != null && tempFile.exists())
+                tempFile.delete();
         }
     }
 
     // ── Internal helper ────────────────────────────────────────────────────────
 
-    /** Holds a resolved PDF file handle plus an optional temp file to delete after use. */
-    private record ResolvedPdf(File pdfFile, File tempFile) {}
+    /**
+     * Holds a resolved PDF file handle plus an optional temp file to delete after
+     * use.
+     */
+    private record ResolvedPdf(File pdfFile, File tempFile) {
+    }
 
     /**
      * Resolves a PDF path (URL or local filesystem) into a concrete {@link File}.
@@ -408,13 +464,14 @@ public class QuestionController {
         // Try multiple local paths in priority order
         String filename = new File(pdfPath).getName();
         File[] candidates = {
-            new File(pdfPath),
-            new File("backend/" + pdfPath),
-            new File("uploads/pdfs/" + filename),
-            new File("backend/uploads/pdfs/" + filename)
+                new File(pdfPath),
+                new File("backend/" + pdfPath),
+                new File("uploads/pdfs/" + filename),
+                new File("backend/uploads/pdfs/" + filename)
         };
         for (File candidate : candidates) {
-            if (candidate.exists()) return new ResolvedPdf(candidate, null);
+            if (candidate.exists())
+                return new ResolvedPdf(candidate, null);
         }
         return null;
     }
@@ -507,23 +564,24 @@ public class QuestionController {
     public ResponseEntity<?> getSimulatorExam() {
 
         // GATE 2024 blueprint: [subjectKeyword, 1-mark count, 2-mark count]
-        // Each entry fetches directly from DB using ORDER BY RAND() — no full table load.
-        record BlueprintEntry(String keyword, int req1Mark, int req2Mark) {}
+        // Each entry fetches directly from DB using ORDER BY RAND() — no full table
+        // load.
+        record BlueprintEntry(String keyword, int req1Mark, int req2Mark) {
+        }
 
         List<BlueprintEntry> blueprint = List.of(
-            new BlueprintEntry("aptitude",     5, 5),
-            new BlueprintEntry("math",         4, 5),
-            new BlueprintEntry("discrete",     0, 0), // covered by "math" keyword umbrella
-            new BlueprintEntry("digital",      2, 1),
-            new BlueprintEntry("organization", 2, 2),
-            new BlueprintEntry("programming",  3, 3),
-            new BlueprintEntry("algorithm",    3, 3),
-            new BlueprintEntry("computation",  3, 3),
-            new BlueprintEntry("compiler",     2, 1),
-            new BlueprintEntry("operating",    3, 3),
-            new BlueprintEntry("database",     2, 2),
-            new BlueprintEntry("network",      1, 4)
-        );
+                new BlueprintEntry("aptitude", 5, 5),
+                new BlueprintEntry("math", 4, 5),
+                new BlueprintEntry("discrete", 0, 0), // covered by "math" keyword umbrella
+                new BlueprintEntry("digital", 2, 1),
+                new BlueprintEntry("organization", 2, 2),
+                new BlueprintEntry("programming", 3, 3),
+                new BlueprintEntry("algorithm", 3, 3),
+                new BlueprintEntry("computation", 3, 3),
+                new BlueprintEntry("compiler", 2, 1),
+                new BlueprintEntry("operating", 3, 3),
+                new BlueprintEntry("database", 2, 2),
+                new BlueprintEntry("network", 1, 4));
 
         List<QuestionDTO> selected = new ArrayList<>();
         Set<Long> selectedIds = new HashSet<>();
@@ -532,18 +590,21 @@ public class QuestionController {
         List<com.pyq.platform.entity.Subject> allSubjects = subjectRepository.findAll();
 
         for (BlueprintEntry entry : blueprint) {
-            if (entry.req1Mark() == 0 && entry.req2Mark() == 0) continue;
+            if (entry.req1Mark() == 0 && entry.req2Mark() == 0)
+                continue;
 
             // Find matching subjects by keyword
             List<Long> matchingSubjectIds = allSubjects.stream()
-                .filter(s -> s.getName().toLowerCase().contains(entry.keyword()))
-                .map(com.pyq.platform.entity.Subject::getId)
-                .collect(Collectors.toList());
+                    .filter(s -> s.getName().toLowerCase().contains(entry.keyword()))
+                    .map(com.pyq.platform.entity.Subject::getId)
+                    .collect(Collectors.toList());
 
-            if (matchingSubjectIds.isEmpty()) continue;
+            if (matchingSubjectIds.isEmpty())
+                continue;
 
             int totalNeeded = entry.req1Mark() + entry.req2Mark();
-            // Fetch slightly more than needed to account for mark-split filtering, then trim
+            // Fetch slightly more than needed to account for mark-split filtering, then
+            // trim
             int fetchLimit = totalNeeded * 3 + 10;
 
             List<Question> pool = new ArrayList<>();
@@ -553,16 +614,17 @@ public class QuestionController {
 
             // Split by marks
             List<Question> pool1 = pool.stream()
-                .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 1)
-                .distinct().collect(Collectors.toList());
+                    .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 1)
+                    .distinct().collect(Collectors.toList());
             List<Question> pool2 = pool.stream()
-                .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 2)
-                .distinct().collect(Collectors.toList());
+                    .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 2)
+                    .distinct().collect(Collectors.toList());
 
             // Pick up to required amounts
             int drawn1 = 0;
             for (Question q : pool1) {
-                if (drawn1 >= entry.req1Mark()) break;
+                if (drawn1 >= entry.req1Mark())
+                    break;
                 selected.add(questionMapper.convertToDTO(q));
                 selectedIds.add(q.getId());
                 drawn1++;
@@ -570,7 +632,8 @@ public class QuestionController {
 
             int drawn2 = 0;
             for (Question q : pool2) {
-                if (drawn2 >= entry.req2Mark()) break;
+                if (drawn2 >= entry.req2Mark())
+                    break;
                 selected.add(questionMapper.convertToDTO(q));
                 selectedIds.add(q.getId());
                 drawn2++;
@@ -582,7 +645,8 @@ public class QuestionController {
             int remaining = 65 - selected.size();
             List<Question> extras = questionRepository.findRandomApproved(remaining * 2);
             for (Question q : extras) {
-                if (selected.size() >= 65) break;
+                if (selected.size() >= 65)
+                    break;
                 if (!selectedIds.contains(q.getId())) {
                     selected.add(questionMapper.convertToDTO(q));
                     selectedIds.add(q.getId());
@@ -598,4 +662,3 @@ public class QuestionController {
         return ResponseEntity.ok(selected);
     }
 }
-

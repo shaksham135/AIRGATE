@@ -128,22 +128,20 @@ export default function QuestionDetail() {
 
       if (currentUser) {
         const headers = AuthService.getAuthHeader();
-        
-        // Check if bookmarked
-        const bookmarksRes = await axios.get(`${API_CONFIG.BASE_URL}/api/bookmarks`, { headers });
-        const bookmarkedIds = bookmarksRes.data.map(b => b.id);
-        setIsBookmarked(bookmarkedIds.includes(parseInt(id, 10)));
-
-        // Check if solved
-        const solvedRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved`, { headers });
-        const solvedRecord = solvedRes.data.find(s => s.question.id === parseInt(id, 10));
-        if (solvedRecord) {
-          setSelectedOption(solvedRecord.selectedOption);
-          setNatInput(solvedRecord.selectedOption || '');
-          if (qRes.data.questionType === 'MSQ' && solvedRecord.selectedOption) {
-            const letters = solvedRecord.selectedOption.toUpperCase().replace(/[^A-D]/g, '').split('');
-            setTempSelectedMsq(letters);
+        try {
+          const statusRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/user-status`, { headers });
+          const { isBookmarked: bm, isSolved: sol, selectedOption: opt } = statusRes.data || {};
+          setIsBookmarked(!!bm);
+          if (sol && opt) {
+            setSelectedOption(opt);
+            setNatInput(opt);
+            if (qRes.data.questionType === 'MSQ') {
+              const letters = opt.toUpperCase().replace(/[^A-D]/g, '').split('');
+              setTempSelectedMsq(letters);
+            }
           }
+        } catch (e) {
+          console.error('Failed to load user question status', e);
         }
       }
 

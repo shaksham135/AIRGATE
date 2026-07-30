@@ -94,6 +94,16 @@ public class BookmarkController {
         return ResponseEntity.ok(dtos);
     }
 
+    // Fast lightweight list of bookmarked question IDs
+    @GetMapping("/bookmarks/ids")
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<Long>> getBookmarkedQuestionIds(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        if (userDetails == null) return ResponseEntity.ok(List.of());
+        List<Long> ids = bookmarkRepository.findQuestionIdsByUserId(userDetails.getId());
+        return ResponseEntity.ok(ids);
+    }
+
     private QuestionDTO convertToDTO(Question question) {
         return questionMapper.convertToDTOFast(question);
     }

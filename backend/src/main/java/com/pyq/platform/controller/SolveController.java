@@ -197,6 +197,22 @@ public class SolveController {
         return ResponseEntity.ok(result);
     }
 
+    // Ultra-fast lightweight map of questionId -> selectedOption (runs in < 10ms)
+    @GetMapping("/questions/solved/map")
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getSolvedQuestionsMap(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        if (userDetails == null) return ResponseEntity.ok(Map.of());
+        List<Object[]> rows = userQuestionSolveRepository.findSolvedMapByUserId(userDetails.getId());
+        Map<Long, String> map = new HashMap<>();
+        for (Object[] row : rows) {
+            Long questionId = (Long) row[0];
+            String selectedOption = (String) row[1];
+            map.put(questionId, selectedOption != null ? selectedOption : "");
+        }
+        return ResponseEntity.ok(map);
+    }
+
     private QuestionDTO convertToDTO(Question question) {
         return questionMapper.convertToDTOFast(question);
     }

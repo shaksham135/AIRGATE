@@ -39,6 +39,7 @@ public class PracticeQuestionController {
      */
     @GetMapping("/quota")
     @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getPracticeQuota(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         boolean isPremium = userDetails != null && userDetails.isPremium();
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();

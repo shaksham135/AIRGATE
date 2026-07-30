@@ -19,6 +19,9 @@ public interface UserQuestionSolveRepository extends JpaRepository<UserQuestionS
     @org.springframework.data.jpa.repository.Query("SELECT uqs.question.id FROM UserQuestionSolve uqs WHERE uqs.user.id = :userId")
     List<Long> findSolvedQuestionIdsByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT uqs.question.id, uqs.selectedOption FROM UserQuestionSolve uqs WHERE uqs.user.id = :userId")
+    List<Object[]> findSolvedMapByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
+
     @org.springframework.transaction.annotation.Transactional
     void deleteByUserId(Long userId);
 

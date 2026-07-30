@@ -204,21 +204,17 @@ export default function Explorer() {
     }
 
     try {
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved`, {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved/map`, {
         headers: AuthService.getAuthHeader()
       });
-      const solvedMap = {};
+      const solvedMap = response.data || {};
       const msqMap = {};
-      if (Array.isArray(response.data)) {
-        response.data.forEach(item => {
-          if (item.question && item.question.id) {
-            solvedMap[item.question.id] = item.selectedOption;
-            if (item.question.questionType === 'MSQ' && item.selectedOption) {
-              msqMap[item.question.id] = item.selectedOption.toUpperCase().replace(/[^A-D]/g, '').split('');
-            }
-          }
-        });
-      }
+      Object.entries(solvedMap).forEach(([qId, selectedOpt]) => {
+        if (selectedOpt) {
+          const letters = selectedOpt.toUpperCase().replace(/[^A-D]/g, '').split('');
+          if (letters.length > 0) msqMap[qId] = letters;
+        }
+      });
       setSelectedOptions(solvedMap);
       setTempMsqSelections(msqMap);
       CacheService.set(cacheKey, { solvedMap, msqMap }, 120000); // 2 mins TTL
@@ -322,10 +318,10 @@ export default function Explorer() {
       setBookmarks(cached);
     }
     try {
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/bookmarks`, {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/bookmarks/ids`, {
         headers: AuthService.getAuthHeader()
       });
-      const bookmarkedIds = Array.isArray(response.data) ? response.data.map(q => q.id) : [];
+      const bookmarkedIds = Array.isArray(response.data) ? response.data : [];
       setBookmarks(bookmarkedIds);
       CacheService.set(cacheKey, bookmarkedIds, 120000); // 2 mins TTL
     } catch (e) {

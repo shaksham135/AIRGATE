@@ -218,7 +218,7 @@ public class QuestionService {
     }
 
     @Transactional
-    @CacheEvict(value = { "questions", "years" }, allEntries = true)
+    @CacheEvict(value = { "questions", "practiceQuestions", "similarQuestions", "questionDetail", "years", "publicMeta" }, allEntries = true)
     public Question updateQuestion(Long id, Question updatedData, List<String> optionTexts,
             Set<String> tagNames, User editor) {
         Question existing = questionRepository.findById(id)

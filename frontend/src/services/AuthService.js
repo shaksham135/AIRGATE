@@ -44,7 +44,9 @@ class AuthService {
 
   isAdminOrEditor() {
     const user = this.getCurrentUser();
-    return user && (user.role === 'ADMIN' || user.role === 'EDITOR');
+    if (!user) return false;
+    const r = (user.role || (Array.isArray(user.roles) ? user.roles[0] : user.roles) || '').toUpperCase();
+    return r === 'ADMIN' || r === 'ROLE_ADMIN' || r === 'EDITOR' || r === 'ROLE_EDITOR';
   }
 
   isPremium() {

@@ -13,8 +13,10 @@ CREATE INDEX idx_topic_name ON topics(name);
 CREATE INDEX idx_uqs_user ON user_question_solves(user_id);
 CREATE INDEX idx_uqs_question ON user_question_solves(question_id);
 CREATE INDEX idx_uqs_user_correct ON user_question_solves(user_id, is_correct);
+CREATE INDEX idx_uqs_user_solved_at ON user_question_solves(user_id, solved_at);
 
 CREATE INDEX idx_bm_user ON bookmarks(user_id);
 CREATE INDEX idx_bm_question ON bookmarks(question_id);
 
 CREATE INDEX idx_qa_model_name ON question_ai_analysis(model_name);
+CREATE INDEX idx_ev_question_vote ON explanation_votes(question_id, vote_type);
