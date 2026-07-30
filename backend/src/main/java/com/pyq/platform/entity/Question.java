@@ -9,7 +9,14 @@ import java.util.List;
 import java.util.Set;
 
 @Entity
-@Table(name = "questions")
+@Table(name = "questions", indexes = {
+    @Index(name = "idx_q_status", columnList = "status"),
+    @Index(name = "idx_q_subject_status", columnList = "subject_id, status"),
+    @Index(name = "idx_q_topic_status", columnList = "topic_id, status"),
+    @Index(name = "idx_q_year_status", columnList = "year, status"),
+    @Index(name = "idx_q_checksum", columnList = "checksum_hash"),
+    @Index(name = "idx_q_pdf_source", columnList = "pdf_source_name")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -95,10 +102,12 @@ public class Question {
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
     @Builder.Default
     private List<QuestionOption> options = new ArrayList<>();
 
     @OneToMany(mappedBy = "question", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
     @Builder.Default
     private List<QuestionAIAnalysis> aiAnalyses = new ArrayList<>();
 

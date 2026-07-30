@@ -10,7 +10,11 @@ import java.time.LocalDateTime;
     uniqueConstraints = @UniqueConstraint(
         name = "uk_user_bookmark_question",
         columnNames = {"user_id", "question_id"}
-    )
+    ),
+    indexes = {
+        @Index(name = "idx_bm_user", columnList = "user_id"),
+        @Index(name = "idx_bm_question", columnList = "question_id")
+    }
 )
 @Data
 @NoArgsConstructor
