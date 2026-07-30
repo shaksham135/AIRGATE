@@ -44,6 +44,11 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @org.springframework.data.jpa.repository.Query("DELETE FROM Question q WHERE q.id IN :questionIds")
     void deleteQuestionsBulk(@org.springframework.data.repository.query.Param("questionIds") List<Long> questionIds);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE Question q SET q.subject = q.topic.subject WHERE q.topic IS NOT NULL AND q.subject != q.topic.subject")
+    int alignQuestionSubjectsWithTopics();
+
     List<Question> findBySubjectIdAndStatus(Long subjectId, String status);
     List<Question> findByTopicIdAndStatus(Long topicId, String status);
     List<Question> findByTopicIdInAndStatus(List<Long> topicIds, String status);

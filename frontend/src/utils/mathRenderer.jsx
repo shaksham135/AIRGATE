@@ -89,6 +89,16 @@ export const sanitizeLatexString = (str) => {
   s = s.replace(/\bcdot([^\s])/g, ' \\cdot $1');
   s = s.replace(/andtheminor/gi, ' and the minor ');
 
+  // 4b. Auto-repair dollar signs that accidentally wrap English sentences/phrases (e.g. $...and require...units of processing time...$)
+  s = s.replace(/\$(?!\$)([\s\S]*?)\$/g, (fullMatch, content) => {
+    if (/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/i.test(content)) {
+      let repaired = content.replace(/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/gi, ' $1 ');
+      repaired = repaired.replace(/(?<!\$)\b([a-zA-Z]_[0-9a-zA-Z{}]+|[a-zA-Z]\^\{[^}]+\}|\\forall\s*[a-zA-Z]|\\exists\s*[a-zA-Z])(?!\$)/g, ' $$1$ ');
+      return repaired;
+    }
+    return fullMatch;
+  });
+
   // 5. Split string into already-wrapped math vs plain text segments
   const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,300}?\$)/g;
   const parts = [];

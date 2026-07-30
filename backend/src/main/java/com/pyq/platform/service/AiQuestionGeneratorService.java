@@ -332,10 +332,13 @@ public class AiQuestionGeneratorService {
                 "Role: Senior GATE CSE Examiner.\n" +
                 "Target Subject: %s | Target Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
                 "STRICT QUALITY, KATEX & MATHEMATICAL BOUNDARY RULES:\n" +
-                "1. SUBJECT BOUNDARY: The question MUST be 100%% strictly about '%s' within '%s'. DO NOT mix topics or concepts from other subjects (e.g. Digital Logic questions belong ONLY to Digital Logic, Databases belong ONLY to Databases).\n" +
-                "2. KATEX / LATEX FORMATTING (MANDATORY): Wrap EVERY single mathematical variable ($n$, $k$, $x$), equation, operator ($A \\oplus B$, $\\vee$, $\\wedge$), set ({$A,B,C$}), power ($2^n-1$), subscript ($a_n = 2 \\cdot 3^{n-1}$), matrix, or complexity ($O(n \\log n)$) in single dollar signs $...$ for inline math or $$...$$ for block math. Double-escape backslashes in JSON (\\\\frac, \\\\cdot, \\\\oplus, \\\\in).\n" +
-                "3. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText.\n" +
-                "4. Starting Style: %s.\n" +
+                "1. SUBJECT BOUNDARY: The question MUST be 100%% strictly about '%s' within '%s'. DO NOT mix topics or concepts from other subjects (e.g. Operating System questions belong ONLY to Operating System, Discrete Mathematics questions belong ONLY to Discrete Mathematics).\n" +
+                "2. KATEX / LATEX FORMATTING (MANDATORY & CRITICAL):\n" +
+                "   - DOLLAR SIGNS MUST ONLY WRAP INDIVIDUAL VARIABLES OR ISOLATED FORMULAS (e.g. Write: 'arrive at times $0$, $t_1$, $t_2$ and require $p_1$, $p_2$ units of processing time').\n" +
+                "   - NEVER wrap plain English words, sentences, or phrases ('and require', 'units of processing time', 'given that', 'where', 'respectively') INSIDE dollar signs!\n" +
+                "   - Double-escape backslashes in JSON (\\\\frac, \\\\cdot, \\\\oplus, \\\\in, \\\\forall, \\\\exists).\n" +
+                "3. NATURAL TEXTBOOK QUESTION STYLE: Write a crisp, authentic, textbook-grade GATE CS problem statement. DO NOT use artificial or awkward intros like 'During the execution of a predicate logic statement...'.\n" +
+                "4. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText.\n" +
                 "5. CRITICAL MCQ RULE: Calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
                 "6. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit options array entirely.\n" +
                 "%s" +
@@ -345,11 +348,11 @@ public class AiQuestionGeneratorService {
                 "   - NAT: Single exact number e.g. \"42\" or \"3.33\"\n\n" +
                 "STRICT JSON ONLY:\n" +
                 "{\n" +
-                "  \"questionText\": \"Text with $math$\",\n" +
+                "  \"questionText\": \"Text with isolated $math$\",\n" +
                 "  \"options\": [{\"label\": \"A\", \"text\": \"...\"}, {\"label\": \"B\", \"text\": \"...\"}, {\"label\": \"C\", \"text\": \"...\"}, {\"label\": \"D\", \"text\": \"...\"}],\n" +
                 "  \"correctAnswer\": \"A\"\n" +
                 "}",
-                subject, topicContext, difficulty, qType, topicContext, subject, selectedStyle, diagramInstruction
+                subject, topicContext, difficulty, qType, topicContext, subject, diagramInstruction
         );
 
         // ── PRIMARY: Groq Llama 3.3 70B (Heavy Reasoning Model for Precision Generation) ──

@@ -8,7 +8,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Component
 @Slf4j
@@ -161,18 +164,63 @@ public class DataInitializer implements CommandLineRunner {
             topicRepository.save(Topic.builder().name("Verbal & Spatial Aptitude").subject(apt).build());
         }
 
-        // 3. Automatic Database Self-Healing: Repair any misassociated topics (e.g. topic named "Digital Logic" created under "Engineering Mathematics")
+        // 3. Automatic Database Self-Healing: Align all topics & questions with canonical GATE CSE subjects
         try {
-            subjectRepository.findByName("Digital Logic").ifPresent(realDigLogic -> {
-                List<Topic> misplaced = topicRepository.findByName("Digital Logic");
-                for (Topic t : misplaced) {
-                    if (t.getSubject() != null && !t.getSubject().getId().equals(realDigLogic.getId())) {
-                        log.info("🔧 Self-Healing DB: Moving misplaced Topic 'Digital Logic' from Subject '{}' to 'Digital Logic'", t.getSubject().getName());
-                        t.setSubject(realDigLogic);
-                        topicRepository.save(t);
+            Map<String, String> topicToCanonicalSubjectMap = new HashMap<>();
+
+            // Operating Systems
+            topicToCanonicalSubjectMap.put("Process Scheduling", "Operating System");
+            topicToCanonicalSubjectMap.put("CPU Scheduling", "Operating System");
+            topicToCanonicalSubjectMap.put("System Calls & Processes", "Operating System");
+            topicToCanonicalSubjectMap.put("Memory Management", "Operating System");
+            topicToCanonicalSubjectMap.put("Virtual Memory & Deadlocks", "Operating System");
+
+            // Discrete Mathematics
+            topicToCanonicalSubjectMap.put("Predicate Logic", "Discrete Mathematics");
+            topicToCanonicalSubjectMap.put("Mathematical Logic", "Discrete Mathematics");
+            topicToCanonicalSubjectMap.put("Propositional Logic", "Discrete Mathematics");
+            topicToCanonicalSubjectMap.put("Set Theory & Relations", "Discrete Mathematics");
+            topicToCanonicalSubjectMap.put("Combinatorics", "Discrete Mathematics");
+            topicToCanonicalSubjectMap.put("Graph Theory", "Discrete Mathematics");
+
+            // Digital Logic
+            topicToCanonicalSubjectMap.put("Digital Logic", "Digital Logic");
+            topicToCanonicalSubjectMap.put("Boolean Algebra", "Digital Logic");
+            topicToCanonicalSubjectMap.put("Combinational Circuits", "Digital Logic");
+            topicToCanonicalSubjectMap.put("Sequential Circuits", "Digital Logic");
+            topicToCanonicalSubjectMap.put("Number Representation", "Digital Logic");
+            topicToCanonicalSubjectMap.put("Number Representation & Computer Arithmetic", "Digital Logic");
+            topicToCanonicalSubjectMap.put("2’s Complement Representation", "Digital Logic");
+
+            // Engineering Mathematics
+            topicToCanonicalSubjectMap.put("Linear Algebra", "Engineering Mathematics");
+            topicToCanonicalSubjectMap.put("Calculus", "Engineering Mathematics");
+            topicToCanonicalSubjectMap.put("Probability & Statistics", "Engineering Mathematics");
+
+            for (Map.Entry<String, String> entry : topicToCanonicalSubjectMap.entrySet()) {
+                String topicName = entry.getKey();
+                String targetSubjectName = entry.getValue();
+
+                Optional<Subject> targetSubOpt = subjectRepository.findByName(targetSubjectName);
+                if (targetSubOpt.isPresent()) {
+                    Subject targetSub = targetSubOpt.get();
+                    List<Topic> topicsToFix = topicRepository.findByName(topicName);
+                    for (Topic t : topicsToFix) {
+                        if (t.getSubject() != null && !t.getSubject().getId().equals(targetSub.getId())) {
+                            log.info("🔧 Self-Healing DB: Re-assigning Topic '{}' from Subject '{}' -> '{}'",
+                                    t.getName(), t.getSubject().getName(), targetSub.getName());
+                            t.setSubject(targetSub);
+                            topicRepository.save(t);
+                        }
                     }
                 }
-            });
+            }
+
+            // Sync any misaligned question.subject_id with question.topic.subject_id
+            int updatedCount = questionRepository.alignQuestionSubjectsWithTopics();
+            if (updatedCount > 0) {
+                log.info("🔧 Self-Healing DB: Aligned {} questions with their correct canonical topic subjects!", updatedCount);
+            }
         } catch (Exception e) {
             log.warn("Failed to run topic self-healing check: {}", e.getMessage());
         }
