@@ -35,6 +35,7 @@ public class QuestionMapper {
         if (question == null) return null;
 
         List<OptionDTO> options = question.getOptions() != null ? question.getOptions().stream()
+                .sorted(Comparator.comparing(QuestionOption::getOptionLabel, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
                 .collect(Collectors.toList()) : List.of();
 
@@ -52,7 +53,8 @@ public class QuestionMapper {
         long helpful = 0;
         long notHelpful = 0;
 
-        if (question.getAiAnalyses() != null && !question.getAiAnalyses().isEmpty()) {
+        boolean isAiInitialized = org.hibernate.Hibernate.isInitialized(question.getAiAnalyses());
+        if (isAiInitialized && question.getAiAnalyses() != null && !question.getAiAnalyses().isEmpty()) {
             QuestionAIAnalysis ai = question.getAiAnalyses().get(question.getAiAnalyses().size() - 1);
             aiSuggestedAnswer = ai.getSuggestedAnswer();
             aiSuggestedExplanation = ai.getSuggestedExplanation();
@@ -61,7 +63,7 @@ public class QuestionMapper {
             optionsConfidence = ai.getOptionsConfidence();
             answerConfidence = ai.getAnswerConfidence();
             rawAiJson = ai.getRawAiJson();
-        } else if (fetchSubQueries) {
+        } else {
             Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
                     .findFirstByQuestionIdOrderByCreatedAtDesc(question.getId());
             if (aiOpt.isPresent()) {

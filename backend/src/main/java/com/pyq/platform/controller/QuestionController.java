@@ -210,6 +210,7 @@ public class QuestionController {
     // Admin/Editor Update Question
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    @Transactional
     public ResponseEntity<?> updateQuestion(
             @PathVariable("id") Long id,
             @Valid @RequestBody CreateQuestionRequest request,
