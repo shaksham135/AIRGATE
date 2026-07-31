@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi';
 import PremiumGateModal from '../components/PremiumGateModal';
 import LoginGate from '../components/LoginGate';
+import AIRGATELoader from '../components/AIRGATELoader';
 import './PracticeArena.css';
 
 export default function PracticeArena() {
@@ -490,10 +491,7 @@ export default function PracticeArena() {
       {/* ── QUESTION FEED ─────────────────────────────────────────────────── */}
       <div id="practice-questions-start"></div>
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-          <FiLoader size={36} className="spin-animation" />
-          <p style={{ marginTop: '12px' }}>Loading Conceptual Practice Questions...</p>
-        </div>
+        <AIRGATELoader text="Loading Conceptual Practice Questions..." />
       ) : questions.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
           <h3>No Conceptual Questions Found</h3>
