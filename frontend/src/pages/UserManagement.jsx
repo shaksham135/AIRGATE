@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
+import AIRGATELoader from '../components/AIRGATELoader';
 import { FiChevronLeft, FiTrash2, FiStar, FiCheckCircle, FiUsers, FiEye, FiClock } from 'react-icons/fi';
 
 export default function UserManagement() {
@@ -191,7 +192,7 @@ export default function UserManagement() {
       {/* Users Table */}
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
         {usersLoading ? (
-          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>Loading users...</div>
+          <AIRGATELoader text="Loading User Database..." />
         ) : filteredUsers.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>No users found.</div>
         ) : (

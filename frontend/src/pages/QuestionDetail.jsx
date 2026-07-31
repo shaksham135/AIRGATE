@@ -6,6 +6,7 @@ import CacheService from '../services/CacheService';
 import { formatMathText, renderQuestionText, getAssetUrl, renderMentorAnalysis, checkAnswerCorrect, renderAiChatText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
 import PremiumGateModal from '../components/PremiumGateModal';
+import AIRGATELoader from '../components/AIRGATELoader';
 import { 
   FiBookmark, FiCheckCircle, FiXCircle, FiMessageSquare, FiActivity, 
   FiArrowLeft, FiThumbsUp, FiThumbsDown, FiClock, FiPlus, FiCornerDownRight, FiAlertTriangle, FiLoader, FiX, FiMaximize2, FiMinimize2,
@@ -506,7 +507,7 @@ export default function QuestionDetail() {
   };
 
   if (loading) {
-    return <div style={{ padding: '40px', color: 'var(--text-secondary)', textAlign: 'center' }}>Loading question details...</div>;
+    return <AIRGATELoader text="Loading Question & Derivation Solution..." />;
   }
 
   if (error || !question) {

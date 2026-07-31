@@ -3,6 +3,7 @@ import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
 import API_CONFIG from '../config/api';
+import AIRGATELoader from '../components/AIRGATELoader';
 import { FiUser, FiMail, FiShield, FiLock, FiTrash2, FiActivity, FiCheckCircle, FiAward, FiBookOpen } from 'react-icons/fi';
 
 export default function Profile() {
@@ -177,9 +178,7 @@ export default function Profile() {
           </h3>
 
           {loadingStats ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '140px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              Loading metrics...
-            </div>
+            <AIRGATELoader text="Loading Solver Metrics..." size="small" />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>

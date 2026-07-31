@@ -31,6 +31,7 @@ import { FiHome, FiUpload, FiLock, FiLogOut, FiFolder, FiGrid, FiUser, FiCheckSq
 import PremiumGateModal from './components/PremiumGateModal';
 import PromoBannerHeader from './components/PromoBannerHeader';
 import BugReportModal from './components/BugReportModal';
+import AIRGATELoader from './components/AIRGATELoader';
 import { FiAlertTriangle as FiBugAlert } from 'react-icons/fi';
 
 // Route guard: redirects non-admin/editor users to /explore
@@ -520,12 +521,8 @@ export default function App() {
     <ErrorBoundary>
       <Router>
         <Suspense fallback={
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0f172a', color: '#38bdf8', fontFamily: 'sans-serif' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div className="spinner" style={{ border: '4px solid rgba(56, 189, 248, 0.1)', borderTop: '4px solid #38bdf8', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 16px auto' }}></div>
-              <div>Loading Platform...</div>
-              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: 'var(--bg-main, #090d16)' }}>
+            <AIRGATELoader text="Loading AIRGATE Engine..." />
           </div>
         }>
           <AppRoutes />

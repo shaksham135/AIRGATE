@@ -5,6 +5,7 @@ import API_CONFIG from '../config/api';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
 import LoginGate from '../components/LoginGate';
+import AIRGATELoader from '../components/AIRGATELoader';
 import { FiClock, FiCheckCircle, FiXCircle, FiMinus, FiTrash2, FiBarChart2, FiCpu, FiAlertCircle, FiLoader } from 'react-icons/fi';
 import { renderQuestionText, renderOptionContent, getAssetUrl } from '../utils/mathRenderer';
 
@@ -129,12 +130,7 @@ function MockHistoryContent() {
   };
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', flexDirection: 'column', gap: '12px' }}>
-        <FiLoader className="spin" size={32} style={{ color: 'var(--color-primary)' }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading mock history...</span>
-      </div>
-    );
+    return <AIRGATELoader text="Loading Attempt Performance Records..." />;
   }
 
   if (history.length === 0) {
