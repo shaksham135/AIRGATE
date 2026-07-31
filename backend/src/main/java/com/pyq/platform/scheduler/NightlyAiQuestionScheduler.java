@@ -28,16 +28,16 @@ public class NightlyAiQuestionScheduler {
     }
 
     /**
-     * Cron runs at 00:00 AM IST every night
+     * Cron runs at 00:00 AM (12:00 AM midnight) IST every night
      */
-    @Scheduled(cron = "0 0 0 * * ?")
+    @Scheduled(cron = "0 0 0 * * ?", zone = "Asia/Kolkata")
     public void startNightlyBatch() {
-        log.info("⏰ 12:00 AM Trigger: Initiating Nightly Automated AI Question Generator Batch...");
+        log.info("⏰ 12:00 AM IST Trigger: Initiating Nightly Automated AI Question Generator Batch...");
         runBatchLoop(false);
     }
 
     /**
-     * Executes the 4-hour batch loop (00:00 AM - 04:00 AM)
+     * Executes the batch loop (e.g., 00:00 AM - 02:00 AM IST)
      */
     public void runBatchLoop(boolean isManualTest) {
         if (isBatchRunning) {
@@ -46,7 +46,7 @@ public class NightlyAiQuestionScheduler {
         }
 
         isBatchRunning = true;
-        int maxAttempts = isManualTest ? 5 : 1440; // 5 sample questions for manual test, 1440 max for 4-hour window
+        int maxAttempts = isManualTest ? 5 : 1440; // 5 sample questions for manual test, 1440 max for window
         int attemptCount = 0;
         int acceptedCount = 0;
 
@@ -59,14 +59,14 @@ public class NightlyAiQuestionScheduler {
                     break;
                 }
 
-                // Check 4-hour time window (00:00 AM to 04:00 AM) unless manual test
+                // Check time window in Indian Standard Time (IST - Asia/Kolkata)
                 if (!isManualTest) {
-                    int currentHour = LocalDateTime.now().getHour();
+                    int currentHour = LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata")).getHour();
                     int startHour = (settings != null && settings.getAiGeneratorStartHour() != null) ? settings.getAiGeneratorStartHour() : 0;
                     int endHour = (settings != null && settings.getAiGeneratorEndHour() != null) ? settings.getAiGeneratorEndHour() : 4;
 
                     if (currentHour < startHour || currentHour >= endHour) {
-                        log.info("⌛ 4-Hour window expired (Current hour: {}). Stopping Nightly AI Generator Batch.", currentHour);
+                        log.info("⌛ Time window expired (Current IST hour: {}, Start: {}, End: {}). Stopping Nightly AI Generator Batch.", currentHour, startHour, endHour);
                         break;
                     }
                 }

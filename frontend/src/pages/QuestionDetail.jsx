@@ -825,11 +825,11 @@ export default function QuestionDetail() {
         </div>
       </div>
 
-      {/* AI Solution Panel — two-tier: quick by default, detailed on demand */}
+      {/* Solution Panel — two-tier: quick by default, detailed on demand */}
       <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', marginTop: '28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '1.25rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FiActivity style={{ color: 'var(--color-primary)' }} /> AI Solution
+            <FiActivity style={{ color: 'var(--color-primary)' }} /> Solution
           </h3>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button 
@@ -870,7 +870,7 @@ export default function QuestionDetail() {
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginTop: '16px' }}>
             {/* Answer badge */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', padding: '12px 16px', backgroundColor: 'rgba(16,185,129,0.06)', borderRadius: '10px', border: '1px solid rgba(16,185,129,0.15)' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>AI Suggested Answer</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Correct Answer</span>
               <span className="badge badge-success" style={{ fontSize: '1.1rem', padding: '4px 16px' }}>
                 {question.questionType === 'NAT' ? '' : 'Option '}{question.aiSuggestedAnswer || '—'}
               </span>
@@ -879,11 +879,11 @@ export default function QuestionDetail() {
             {!showDetailedSolution ? (
               /* Short solution view */
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚡ Quick Solution</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚡ Solution Explanation</span>
                 <div style={{ marginTop: '10px', color: 'var(--text-primary)', lineHeight: '1.75', fontSize: '0.95rem', whiteSpace: 'pre-line' }}>
-                  {question.aiMentorInsights
-                    ? renderQuestionText(question.aiMentorInsights)
-                    : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Quick solution generating in background… check back shortly.</span>
+                  {(question.aiSuggestedExplanation || question.aiMentorInsights)
+                    ? renderQuestionText(question.aiSuggestedExplanation || question.aiMentorInsights)
+                    : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Solution generating in background… check back shortly.</span>
                   }
                 </div>
                 <button

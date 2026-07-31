@@ -689,9 +689,9 @@ export default function PracticeArena() {
                     <div style={{ fontWeight: 800, color: '#10b981', marginBottom: '6px', fontSize: '0.9rem' }}>
                       Correct Answer: {q.aiSuggestedAnswer || 'See Explanation'}
                     </div>
-                    {q.aiSuggestedExplanation && (
-                      <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                        {renderMentorAnalysis(q.aiSuggestedExplanation)}
+                    {(q.aiSuggestedExplanation || q.aiMentorInsights) && (
+                      <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5', marginTop: '6px' }}>
+                        {renderQuestionText(q.aiSuggestedExplanation || q.aiMentorInsights)}
                       </div>
                     )}
                   </div>

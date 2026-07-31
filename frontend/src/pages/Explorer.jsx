@@ -1522,7 +1522,7 @@ export default function Explorer() {
 
                       {/* Answer badge header */}
                       <div style={{ padding: '12px 20px', backgroundColor: 'rgba(16, 185, 129, 0.06)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Suggested Answer</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Correct Answer</span>
                         <span className="badge badge-success" style={{ fontSize: '1rem', padding: '4px 14px', letterSpacing: '0.05em' }}>
                           {q.questionType === 'NAT' ? '' : 'Option '}{q.aiSuggestedAnswer || '—'}
                         </span>
@@ -1532,12 +1532,12 @@ export default function Explorer() {
                       {!showDetailed && (
                         <div style={{ padding: '16px 20px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚡ Quick Solution</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚡ Solution Explanation</span>
                           </div>
                           <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', whiteSpace: 'pre-line' }}>
-                            {q.aiMentorInsights
-                              ? renderQuestionText(q.aiMentorInsights)
-                              : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Quick solution is being generated in background…</span>
+                            {(q.aiSuggestedExplanation || q.aiMentorInsights)
+                              ? renderQuestionText(q.aiSuggestedExplanation || q.aiMentorInsights)
+                              : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Solution is being generated in background…</span>
                             }
                           </div>
                           <button
