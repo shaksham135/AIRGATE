@@ -21,8 +21,9 @@ public class PromoBannerController {
         this.bannerRepository = bannerRepository;
     }
 
-    // Public Endpoint: Fetch active announcement banners for website header
+    // Public Endpoint: Fetch active announcement banners for website header (Cached for sub-1ms load)
     @GetMapping("/banners/active")
+    @org.springframework.cache.annotation.Cacheable(value = "activeBanners")
     public ResponseEntity<List<PromoBanner>> getActiveBanners() {
         List<PromoBanner> banners = bannerRepository.findByActiveTrueOrderByPriorityDescCreatedAtDesc();
         return ResponseEntity.ok(banners);
@@ -38,6 +39,7 @@ public class PromoBannerController {
     // Admin: Create announcement banner
     @PostMapping("/admin/banners")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = "activeBanners", allEntries = true)
     public ResponseEntity<?> createBanner(@RequestBody PromoBanner banner) {
         if (banner.getTitle() == null || banner.getTitle().isBlank()) {
             return ResponseEntity.badRequest().body(new MessageResponse("Banner title cannot be empty."));

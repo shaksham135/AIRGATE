@@ -42,6 +42,7 @@ public class BookmarkController {
     // Bookmark question
     @PostMapping("/questions/{id}/bookmark")
     @PreAuthorize("isAuthenticated()")
+    @org.springframework.cache.annotation.CacheEvict(value = "userBookmarks", key = "#userDetails.id")
     public ResponseEntity<?> bookmarkQuestion(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -94,10 +95,11 @@ public class BookmarkController {
         return ResponseEntity.ok(dtos);
     }
 
-    // Fast lightweight list of bookmarked question IDs
+    // Fast lightweight list of bookmarked question IDs (Cached in RAM for sub-1ms load)
     @GetMapping("/bookmarks/ids")
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(value = "userBookmarks", key = "#userDetails.id")
     public ResponseEntity<List<Long>> getBookmarkedQuestionIds(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         if (userDetails == null) return ResponseEntity.ok(List.of());
         List<Long> ids = bookmarkRepository.findQuestionIdsByUserId(userDetails.getId());

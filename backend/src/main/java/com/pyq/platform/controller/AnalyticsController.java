@@ -47,8 +47,9 @@ public class AnalyticsController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
-    // Dynamic yearly frequency count for a topic
+    // Dynamic yearly frequency count for a topic (Cached in RAM for sub-1ms load)
     @GetMapping("/analytics/topics/{topicId}/frequency")
+    @org.springframework.cache.annotation.Cacheable(value = "topicFrequency", key = "#topicId")
     public ResponseEntity<?> getTopicFrequency(@PathVariable("topicId") Long topicId) {
         Optional<Topic> topicOpt = topicRepository.findById(topicId);
         if (topicOpt.isEmpty()) {

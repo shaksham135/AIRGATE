@@ -107,19 +107,17 @@ public class PracticeQuestionController {
                     predicates.add(cb.equal(cb.upper(root.get("questionType")), questionType.toUpperCase()));
                 }
 
-                // Solved Status Filter (ALL / UNSOLVED / SOLVED)
+                // Solved Status Filter using fast database subquery
                 if (solvedStatus != null && !solvedStatus.isBlank() && !"ALL".equalsIgnoreCase(solvedStatus) && userDetails != null && userDetails.getId() != null) {
-                    List<Long> solvedIds = solveRepository.findSolvedQuestionIdsByUserId(userDetails.getId());
+                    Subquery<Long> solveSub = criteriaQuery.subquery(Long.class);
+                    Root<UserQuestionSolve> solveRoot = solveSub.from(UserQuestionSolve.class);
+                    solveSub.select(solveRoot.get("question").get("id"));
+                    solveSub.where(cb.equal(solveRoot.get("user").get("id"), userDetails.getId()));
+
                     if ("SOLVED".equalsIgnoreCase(solvedStatus)) {
-                        if (solvedIds.isEmpty()) {
-                            predicates.add(cb.disjunction());
-                        } else {
-                            predicates.add(root.get("id").in(solvedIds));
-                        }
+                        predicates.add(root.get("id").in(solveSub));
                     } else if ("UNSOLVED".equalsIgnoreCase(solvedStatus)) {
-                        if (!solvedIds.isEmpty()) {
-                            predicates.add(cb.not(root.get("id").in(solvedIds)));
-                        }
+                        predicates.add(cb.not(root.get("id").in(solveSub)));
                     }
                 }
 

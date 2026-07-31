@@ -15,6 +15,7 @@ public class SeoController {
     private String frontendUrl;
 
     @GetMapping(value = "/sitemap.xml", produces = MediaType.APPLICATION_XML_VALUE)
+    @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'sitemap'")
     public ResponseEntity<String> getSitemap() {
         String today = LocalDate.now().toString();
         String baseUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;

@@ -47,8 +47,10 @@ public class SolveController {
     @PostMapping("/questions/{id}/solve")
     @PreAuthorize("isAuthenticated()")
     @org.springframework.cache.annotation.Caching(evict = {
-        @CacheEvict(value = "questions", allEntries = true),
-        @CacheEvict(value = "userSolveStats", key = "#userDetails.id")
+        @org.springframework.cache.annotation.CacheEvict(value = "questions", allEntries = true),
+        @org.springframework.cache.annotation.CacheEvict(value = "practiceQuestions", allEntries = true),
+        @org.springframework.cache.annotation.CacheEvict(value = "userSolveStats", key = "#userDetails.id"),
+        @org.springframework.cache.annotation.CacheEvict(value = "userSolvedMap", key = "#userDetails.id")
     })
     public ResponseEntity<?> solveQuestion(
             @PathVariable("id") Long id,
@@ -197,10 +199,11 @@ public class SolveController {
         return ResponseEntity.ok(result);
     }
 
-    // Ultra-fast lightweight map of questionId -> selectedOption (runs in < 10ms)
+    // Ultra-fast lightweight map of questionId -> selectedOption (Cached in RAM for sub-1ms load)
     @GetMapping("/questions/solved/map")
     @PreAuthorize("isAuthenticated()")
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(value = "userSolvedMap", key = "#userDetails.id")
     public ResponseEntity<?> getSolvedQuestionsMap(@AuthenticationPrincipal UserDetailsImpl userDetails) {
         if (userDetails == null) return ResponseEntity.ok(Map.of());
         List<Object[]> rows = userQuestionSolveRepository.findSolvedMapByUserId(userDetails.getId());

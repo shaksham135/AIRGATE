@@ -24,6 +24,7 @@ public class PublicInfoController {
     }
 
     @GetMapping("/info")
+    @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'publicInfo'")
     public ResponseEntity<Map<String, Object>> getPlatformInfo() {
         SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
         Map<String, Object> response = new HashMap<>();
@@ -68,6 +69,7 @@ public class PublicInfoController {
     }
 
     @GetMapping("/support")
+    @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'supportInfo'")
     public ResponseEntity<Map<String, Object>> getSupportInfo() {
         SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
         Map<String, Object> response = new HashMap<>();
