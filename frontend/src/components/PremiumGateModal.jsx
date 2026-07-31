@@ -4,7 +4,7 @@ import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import { FiLock, FiCheck, FiCpu, FiClock, FiActivity, FiFileText, FiArrowRight, FiX } from 'react-icons/fi';
 
-export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess }) {
+export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, initialCoupon = '' }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -13,10 +13,16 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess }) 
   // Plan Tier & Coupon state
   const [selectedPlan, setSelectedPlan] = useState('SEASON'); // Default 6-Month Season Pass
   const [originalPrice, setOriginalPrice] = useState(499);
-  const [couponCode, setCouponCode] = useState('');
+  const [couponCode, setCouponCode] = useState(initialCoupon);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponMsg, setCouponMsg] = useState('');
+
+  React.useEffect(() => {
+    if (initialCoupon) {
+      setCouponCode(initialCoupon);
+    }
+  }, [initialCoupon]);
 
   React.useEffect(() => {
     const checkStatus = async () => {

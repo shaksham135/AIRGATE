@@ -312,6 +312,10 @@ export default function Explorer() {
 
   const fetchBookmarks = async () => {
     if (!currentUser) return;
+    if (Array.isArray(currentUser.bookmarkedQuestionIds) && currentUser.bookmarkedQuestionIds.length > 0) {
+      setBookmarks(currentUser.bookmarkedQuestionIds);
+      return;
+    }
     const cacheKey = `user_bookmarks_${currentUser.id || currentUser.username}`;
     const cached = CacheService.get(cacheKey);
     if (cached) {

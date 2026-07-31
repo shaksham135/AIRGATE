@@ -92,7 +92,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(Collections.singletonList("*")); // Allow all headers for robust preflight support
         configuration.setExposedHeaders(Collections.singletonList("Authorization"));
         configuration.setAllowCredentials(corsAllowCredentials);
-        configuration.setMaxAge(3600L);
+        configuration.setMaxAge(86400L);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

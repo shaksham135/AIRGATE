@@ -53,6 +53,7 @@ function DashboardLayout({ children }) {
   const [isCollapsed, setIsCollapsed] = React.useState(true);
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
   const [showPremiumModal, setShowPremiumModal] = React.useState(false);
+  const [autoCoupon, setAutoCoupon] = React.useState('');
   const [showBugModal, setShowBugModal] = React.useState(false);
 
   // Pre-fetch admin route chunks in background for zero-delay sidebar navigation
@@ -417,7 +418,10 @@ function DashboardLayout({ children }) {
 
       {/* Main Workspace */}
       <main className="main-content">
-        <PromoBannerHeader onApplyCoupon={() => setShowPremiumModal(true)} />
+        <PromoBannerHeader onApplyCoupon={(code) => {
+          setAutoCoupon(code || '');
+          setShowPremiumModal(true);
+        }} />
 
         {/* Child Router Content */}
         <div style={{ display: 'flex', flexGrow: 1, overflowY: 'auto' }}>
@@ -427,6 +431,7 @@ function DashboardLayout({ children }) {
 
       <PremiumGateModal 
         isOpen={showPremiumModal} 
+        initialCoupon={autoCoupon}
         onClose={() => setShowPremiumModal(false)} 
         onUpgradeSuccess={() => window.location.reload()} 
       />
@@ -498,6 +503,8 @@ function AppRoutes() {
       <Route path="/simulator/history" element={<DashboardLayout><MockHistory /></DashboardLayout>} />
       <Route path="/questions/:id" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
       <Route path="/premium" element={<DashboardLayout><PremiumPage /></DashboardLayout>} />
+      <Route path="/pricing" element={<DashboardLayout><PremiumPage /></DashboardLayout>} />
+      <Route path="/upgrade" element={<DashboardLayout><PremiumPage /></DashboardLayout>} />
 
       <Route path="/uploads" element={<ProtectedAdminRoute><DashboardLayout><UploadManager /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/review-queue" element={<ProtectedAdminRoute><DashboardLayout><ReviewQueue /></DashboardLayout></ProtectedAdminRoute>} />

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,9 +23,6 @@ import com.pyq.platform.entity.Bookmark;
 import com.pyq.platform.entity.UserQuestionSolve;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-
-import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
 
 @RestController
@@ -38,9 +36,9 @@ public class UserController {
     private final UserQuestionSolveRepository userQuestionSolveRepository;
 
     public UserController(UserRepository userRepository,
-                          LoginHistoryRepository loginHistoryRepository,
-                          BookmarkRepository bookmarkRepository,
-                          UserQuestionSolveRepository userQuestionSolveRepository) {
+            LoginHistoryRepository loginHistoryRepository,
+            BookmarkRepository bookmarkRepository,
+            UserQuestionSolveRepository userQuestionSolveRepository) {
         this.userRepository = userRepository;
         this.loginHistoryRepository = loginHistoryRepository;
         this.bookmarkRepository = bookmarkRepository;
@@ -91,6 +89,15 @@ public class UserController {
         response.put("isPremium", userDetails.isPremium());
         response.put("premiumExpiresAt", userDetails.getPremiumExpiresAt());
         response.put("isBanned", userDetails.isBanned());
+
+        // Fast light-weight pre-fetch of bookmarked question IDs to avoid separate HTTP
+        // request
+        try {
+            List<Long> bookmarkedIds = bookmarkRepository.findQuestionIdsByUserId(userDetails.getId());
+            response.put("bookmarkedQuestionIds", bookmarkedIds);
+        } catch (Exception ex) {
+            response.put("bookmarkedQuestionIds", Collections.emptyList());
+        }
 
         return ResponseEntity.ok(response);
     }
@@ -148,7 +155,7 @@ public class UserController {
         stats.put("isBanned", Boolean.TRUE.equals(user.getIsBanned()));
         stats.put("lastActiveAt", user.getLastActiveAt());
         stats.put("createdAt", user.getCreatedAt());
-        
+
         // Streaks
         stats.put("currentStreak", user.getCurrentStreak());
         stats.put("longestStreak", user.getLongestStreak());

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
 import { FiGift, FiX, FiArrowRight } from 'react-icons/fi';
 
 export default function PromoBannerHeader({ onApplyCoupon }) {
+  const navigate = useNavigate();
   const [banner, setBanner] = useState(null);
   const [dismissed, setDismissed] = useState(false);
 
@@ -68,8 +70,11 @@ export default function PromoBannerHeader({ onApplyCoupon }) {
         <a 
           href={banner.ctaLink || '/pricing'} 
           onClick={(e) => {
-            if (banner.couponCode && onApplyCoupon) {
+            e.preventDefault();
+            if (onApplyCoupon) {
               onApplyCoupon(banner.couponCode);
+            } else {
+              navigate(banner.ctaLink || '/pricing');
             }
           }}
           style={{
