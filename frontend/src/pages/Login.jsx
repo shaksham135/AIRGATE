@@ -40,7 +40,7 @@ export default function Login() {
       navigate('/explore');
       window.location.reload();
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid username or password!');
+      setError(err.response?.data?.message || 'Invalid username/email or password!');
     } finally {
       setLoading(false);
     }
@@ -344,13 +344,13 @@ export default function Login() {
 
         <form onSubmit={handleLogin}>
           <div className="form-group">
-            <label className="form-label">Username</label>
+            <label className="form-label">Username or Email</label>
             <input
               type="text"
               className="form-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
+              placeholder="Enter username or email"
               required
             />
           </div>
