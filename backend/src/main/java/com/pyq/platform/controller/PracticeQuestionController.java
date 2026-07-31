@@ -32,6 +32,7 @@ public class PracticeQuestionController {
     private final TopicRepository topicRepository;
     private final UserQuestionSolveRepository solveRepository;
     private final QuestionMapper questionMapper;
+    private final com.pyq.platform.service.QuestionService questionService;
 
     /**
      * GET /api/practice/quota
@@ -148,12 +149,6 @@ public class PracticeQuestionController {
     }
 
     private List<Long> getSubtopicIdsRecursive(Long topicId) {
-        List<Long> ids = new ArrayList<>();
-        ids.add(topicId);
-        List<Topic> children = topicRepository.findByParentTopicId(topicId);
-        for (Topic child : children) {
-            ids.addAll(getSubtopicIdsRecursive(child.getId()));
-        }
-        return ids;
+        return questionService.getSubtopicIdsRecursive(topicId);
     }
 }

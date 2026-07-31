@@ -77,11 +77,18 @@ export const getAssetUrl = (path) => {
  * - Safely normalizes JSON string escapes (\\frac -> \frac)
  * - Auto-encloses unwrapped LaTeX blocks (\frac, \begin{bmatrix})
  * - Preserves native KaTeX math formatting & layout without breaking line breaks or causing page overflow
- */
+const latexSanitizeCache = new Map();
+const MAX_LATEX_CACHE_SIZE = 500;
+
 export const sanitizeLatexString = (str) => {
   if (!str) return '';
 
-  let s = String(str);
+  const key = String(str);
+  if (latexSanitizeCache.has(key)) {
+    return latexSanitizeCache.get(key);
+  }
+
+  let s = key;
 
   // 1. Repair matrix environments where backslashes were stripped by JSON parsing
   // e.g. \begin{bmatrix}2&0&0\0&3&0\0&0&4\end{bmatrix} -> $$ \begin{bmatrix}2&0&0 \\ 0&3&0 \\ 0&0&4 \end{bmatrix} $$
@@ -159,6 +166,12 @@ export const sanitizeLatexString = (str) => {
     const lastIdx = dollarIndices[dollarIndices.length - 1];
     s = s.substring(0, lastIdx) + s.substring(lastIdx + 1);
   }
+
+  if (latexSanitizeCache.size >= MAX_LATEX_CACHE_SIZE) {
+    const firstKey = latexSanitizeCache.keys().next().value;
+    latexSanitizeCache.delete(firstKey);
+  }
+  latexSanitizeCache.set(key, s);
 
   return s;
 };

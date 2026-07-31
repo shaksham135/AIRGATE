@@ -138,8 +138,12 @@ public class QuestionService {
         }, pageable);
     }
 
-    private List<Long> getSubtopicIdsRecursive(Long topicId) {
+    private static final java.util.regex.Pattern WHITESPACE_PATTERN = java.util.regex.Pattern.compile("\\s+");
+
+    @Cacheable(value = "subtopicIds", key = "#topicId")
+    public List<Long> getSubtopicIdsRecursive(Long topicId) {
         List<Long> ids = new ArrayList<>();
+        if (topicId == null) return ids;
         ids.add(topicId);
         List<Topic> children = topicRepository.findByParentTopicId(topicId);
         for (Topic child : children) {
@@ -153,12 +157,13 @@ public class QuestionService {
     }
 
     public String generateChecksum(String text) {
+        if (text == null) return "";
         try {
-            // Strip whitespace, lowercase for normalization
-            String normalized = text.toLowerCase().replaceAll("\\s+", "");
+            // High-speed normalization using pre-compiled pattern
+            String normalized = WHITESPACE_PATTERN.matcher(text.toLowerCase()).replaceAll("");
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(normalized.getBytes("UTF-8"));
-            StringBuilder hexString = new StringBuilder();
+            StringBuilder hexString = new StringBuilder(64);
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
                 if (hex.length() == 1)

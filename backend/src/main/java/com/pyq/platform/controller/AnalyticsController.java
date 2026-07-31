@@ -20,13 +20,16 @@ public class AnalyticsController {
     private final QuestionRepository questionRepository;
     private final TopicRepository topicRepository;
     private final com.pyq.platform.repository.EmailLogRepository emailLogRepository;
+    private final com.pyq.platform.service.QuestionService questionService;
 
     public AnalyticsController(QuestionRepository questionRepository, 
                                TopicRepository topicRepository,
-                               com.pyq.platform.repository.EmailLogRepository emailLogRepository) {
+                               com.pyq.platform.repository.EmailLogRepository emailLogRepository,
+                               com.pyq.platform.service.QuestionService questionService) {
         this.questionRepository = questionRepository;
         this.topicRepository = topicRepository;
         this.emailLogRepository = emailLogRepository;
+        this.questionService = questionService;
     }
 
     @PostMapping("/analytics/pdf-download")
@@ -100,13 +103,7 @@ public class AnalyticsController {
     }
 
     private List<Long> getSubtopicIdsRecursive(Long topicId) {
-        List<Long> ids = new ArrayList<>();
-        ids.add(topicId);
-        List<Topic> children = topicRepository.findByParentTopicId(topicId);
-        for (Topic child : children) {
-            ids.addAll(getSubtopicIdsRecursive(child.getId()));
-        }
-        return ids;
+        return questionService.getSubtopicIdsRecursive(topicId);
     }
 
     private QuestionDTO convertToDTO(Question question) {

@@ -7,8 +7,10 @@ import java.util.List;
 
 @Repository
 public interface DiscussionCommentRepository extends JpaRepository<DiscussionComment, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "parentComment"})
     List<DiscussionComment> findByQuestionIdAndParentCommentIsNullOrderByCreatedAtAsc(Long questionId);
     List<DiscussionComment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "parentComment"})
     List<DiscussionComment> findByQuestionIdOrderByCreatedAtAsc(Long questionId);
 
     @org.springframework.data.jpa.repository.Modifying
