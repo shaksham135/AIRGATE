@@ -43,80 +43,76 @@ public class EmailService {
     private String brevoApiKey;
 
     /**
-     * Send raw HTML email helper
+     * Send raw HTML email helper via Direct Brevo REST API (Primary) with optional SMTP fallback
      */
     public boolean sendHtmlEmail(String toEmail, String subject, String htmlContent, String emailType) {
-        if (mailPassword == null || mailPassword.isBlank() || mailUsername == null || mailUsername.isBlank()) {
-            log.warn("SMTP Email dispatch skipped for [{}] to {}: SPRING_MAIL_USERNAME or SPRING_MAIL_PASSWORD env variable is not configured.", emailType, toEmail);
-            emailLogRepository.save(EmailLog.builder()
-                    .recipientEmail(toEmail)
-                    .subject(subject)
-                    .emailType(emailType)
-                    .status("SKIPPED_NO_SMTP_KEY")
-                    .sentAt(LocalDateTime.now())
-                    .errorMessage("SPRING_MAIL_USERNAME or SPRING_MAIL_PASSWORD env variable not set")
-                    .build());
-            return false;
-        }
+        String activeApiKey = (brevoApiKey != null && !brevoApiKey.isBlank()) ? brevoApiKey : mailPassword;
 
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
-
-            mailSender.send(message);
-
-            emailLogRepository.save(EmailLog.builder()
-                    .recipientEmail(toEmail)
-                    .subject(subject)
-                    .emailType(emailType)
-                    .status("SENT")
-                    .sentAt(LocalDateTime.now())
-                    .build());
-
-            log.info("Email [{}] successfully sent to {}", emailType, toEmail);
-            return true;
-        } catch (Exception e) {
-            log.warn("Failed to send [{}] email to {} via SMTP ({}). Trying Brevo HTTP API...", emailType, toEmail, e.getMessage());
-            
-            boolean httpSuccess = sendViaBrevoHttpApi(toEmail, subject, htmlContent);
+        // 1. Direct Brevo REST API Dispatch (PRIMARY - Port 443 HTTPS)
+        if (activeApiKey != null && !activeApiKey.isBlank()) {
+            boolean httpSuccess = sendViaBrevoHttpApi(toEmail, subject, htmlContent, activeApiKey);
             if (httpSuccess) {
                 emailLogRepository.save(EmailLog.builder()
                         .recipientEmail(toEmail)
                         .subject(subject)
                         .emailType(emailType)
-                        .status("SENT_VIA_HTTP_API")
+                        .status("SENT_VIA_BREVO_API")
                         .sentAt(LocalDateTime.now())
                         .build());
                 return true;
             }
-
-            emailLogRepository.save(EmailLog.builder()
-                    .recipientEmail(toEmail)
-                    .subject(subject)
-                    .emailType(emailType)
-                    .status("FAILED")
-                    .sentAt(LocalDateTime.now())
-                    .errorMessage(e.getMessage())
-                    .build());
-            return false;
         }
+
+        // 2. Optional SMTP Fallback
+        if (mailPassword != null && !mailPassword.isBlank() && mailUsername != null && !mailUsername.isBlank()) {
+            try {
+                MimeMessage message = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+                helper.setFrom(fromEmail);
+                helper.setTo(toEmail);
+                helper.setSubject(subject);
+                helper.setText(htmlContent, true);
+
+                mailSender.send(message);
+
+                emailLogRepository.save(EmailLog.builder()
+                        .recipientEmail(toEmail)
+                        .subject(subject)
+                        .emailType(emailType)
+                        .status("SENT_VIA_SMTP")
+                        .sentAt(LocalDateTime.now())
+                        .build());
+
+                log.info("Email [{}] successfully sent to {} via SMTP", emailType, toEmail);
+                return true;
+            } catch (Exception e) {
+                log.error("SMTP fallback dispatch failed for {}: {}", toEmail, e.getMessage());
+            }
+        }
+
+        log.warn("Email dispatch skipped for [{}] to {}: No valid Brevo API Key or SMTP credentials configured.", emailType, toEmail);
+        emailLogRepository.save(EmailLog.builder()
+                .recipientEmail(toEmail)
+                .subject(subject)
+                .emailType(emailType)
+                .status("SKIPPED_NO_API_KEY")
+                .sentAt(LocalDateTime.now())
+                .errorMessage("Neither BREVO_API_KEY nor SMTP credentials configured")
+                .build());
+        return false;
     }
 
-    private boolean sendViaBrevoHttpApi(String toEmail, String subject, String htmlContent) {
-        if (brevoApiKey == null || brevoApiKey.isBlank()) {
-            log.warn("BREVO_API_KEY not configured — skipping Brevo HTTP API fallback for {}", toEmail);
+    private boolean sendViaBrevoHttpApi(String toEmail, String subject, String htmlContent, String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("Brevo API key not configured — skipping Brevo HTTP API for {}", toEmail);
             return false;
         }
         try {
-            log.info("📧 Attempting Brevo HTTP API (Port 443 HTTPS) fallback for {}", toEmail);
+            log.info("📧 Sending email via Direct Brevo REST API (Port 443 HTTPS) for [{}] to {}", subject, toEmail);
             String url = "https://api.brevo.com/v3/smtp/email";
             org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
             headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-            headers.set("api-key", brevoApiKey);
+            headers.set("api-key", apiKey.trim());
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             com.fasterxml.jackson.databind.node.ObjectNode body = mapper.createObjectNode();
@@ -125,8 +121,12 @@ public class EmailService {
                     ? fromEmail.substring(fromEmail.indexOf("<") + 1, fromEmail.indexOf(">")).trim()
                     : (fromEmail != null ? fromEmail.trim() : "support@airgate.in");
 
+            String senderName = (fromEmail != null && fromEmail.contains("<"))
+                    ? fromEmail.substring(0, fromEmail.indexOf("<")).trim()
+                    : "AIRGATE";
+
             com.fasterxml.jackson.databind.node.ObjectNode sender = body.putObject("sender");
-            sender.put("name", "AIRGATE");
+            sender.put("name", senderName);
             sender.put("email", cleanSenderEmail);
 
             com.fasterxml.jackson.databind.node.ArrayNode toArr = body.putArray("to");
@@ -140,11 +140,11 @@ public class EmailService {
             org.springframework.http.ResponseEntity<String> res = restTemplate.postForEntity(url, entity, String.class);
 
             if (res.getStatusCode().is2xxSuccessful()) {
-                log.info("✅ Email successfully delivered to {} via Brevo HTTP API!", toEmail);
+                log.info("✅ Email successfully delivered to {} via Direct Brevo REST API!", toEmail);
                 return true;
             }
         } catch (Exception httpEx) {
-            log.error("Brevo HTTP API fallback failed for {}: {}", toEmail, httpEx.getMessage());
+            log.error("Direct Brevo REST API dispatch failed for {}: {}", toEmail, httpEx.getMessage());
         }
         return false;
     }
