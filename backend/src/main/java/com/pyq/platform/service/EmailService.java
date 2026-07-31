@@ -298,7 +298,7 @@ public class EmailService {
         </div>
         <p>Stay consistent, keep practicing, and remember: Every question solved brings you closer to your dream IISc / IIT!</p>
         <p>Warm regards,<br><strong>Team AIRGATE Mentors</strong></p>
-        """.formatted(frontendUrl);
+        """.replace("%s", frontendUrl);
         return buildBrandedLayout(username, body);
     }
 
@@ -315,7 +315,7 @@ public class EmailService {
           <a href="%s/simulator" class="cta-btn">🎯 Try a Smart Mock Exam</a>
         </div>
         <p>Keep pushing your limits!</p>
-        """.formatted(frontendUrl);
+        """.replace("%s", frontendUrl);
         return buildBrandedLayout(username, body);
     }
 
@@ -323,7 +323,7 @@ public class EmailService {
         String body = """
         <div style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
           <h3 style="color: #10b981; margin: 0 0 6px 0;">🎉 Congratulations! Your Aspirant Pro Membership is Active!</h3>
-          <p style="margin: 0; color: #a7f3d0; font-size: 14px;">Order ID: %s | Duration: %d Month(s)</p>
+          <p style="margin: 0; color: #a7f3d0; font-size: 14px;">Order ID: {ORDER_ID} | Duration: {DURATION} Month(s)</p>
         </div>
         <p>Thank you for upgrading to <strong>AIRGATE Aspirant Pro</strong>! Your membership unlocks all premium features designed for serious aspirants:</p>
         <ul style="padding-left: 20px;">
@@ -332,10 +332,13 @@ public class EmailService {
           <li><strong>🎯 Unlimited Custom Subject Mocks:</strong> Create targeted mock tests for weak subjects.</li>
         </ul>
         <div style="text-align: center;">
-          <a href="%s/explore" class="cta-btn">🔥 Access Pro Dashboard</a>
+          <a href="{FRONTEND_URL}/explore" class="cta-btn">🔥 Access Pro Dashboard</a>
         </div>
         <p>If you have any questions regarding your invoice or subscription, feel free to reply directly to this email.</p>
-        """.formatted(payment.getOrderId(), payment.getDurationMonths(), frontendUrl);
+        """
+        .replace("{ORDER_ID}", payment.getOrderId() != null ? payment.getOrderId() : "")
+        .replace("{DURATION}", String.valueOf(payment.getDurationMonths()))
+        .replace("{FRONTEND_URL}", frontendUrl);
         return buildBrandedLayout(username, body);
     }
 
@@ -350,17 +353,19 @@ public class EmailService {
           <h2 style="color: #ffffff; margin: 0 0 8px 0; font-size: 22px; font-weight: 800;">Your Password Reset OTP</h2>
           <p style="color: #94a3b8; font-size: 14px; margin: 0;">Valid for 10 minutes only</p>
         </div>
-        <p>Hi <strong>%s</strong>,</p>
+        <p>Hi <strong>{USERNAME}</strong>,</p>
         <p>We received a request to reset your AIRGATE account password. Use the OTP below to proceed:</p>
         <div style="text-align: center; margin: 32px 0;">
           <div style="display: inline-block; background: linear-gradient(135deg, #6366f1, #38bdf8); border-radius: 16px; padding: 20px 40px;">
-            <div style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace;">%s</div>
+            <div style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace;">{OTP}</div>
           </div>
         </div>
         <p style="color: #94a3b8; font-size: 13px;">⏰ This OTP expires in <strong style="color: #f59e0b;">10 minutes</strong>.</p>
         <p style="color: #94a3b8; font-size: 13px;">🔒 If you did NOT request this reset, please ignore this email. Your password remains unchanged and your account is secure.</p>
         <p>Stay focused on your GATE preparation! 🎯<br><strong>Team AIRGATE</strong></p>
-        """.formatted(username, otp);
+        """
+        .replace("{USERNAME}", username != null ? username : "Aspirant")
+        .replace("{OTP}", otp != null ? otp : "");
         String html = buildBrandedLayout(username, body);
         return sendHtmlEmail(toEmail, subject, html, "PASSWORD_RESET_OTP");
     }
