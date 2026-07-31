@@ -4,7 +4,7 @@ import 'katex/dist/katex.min.css';
 import mermaid from 'mermaid';
 import API_CONFIG from '../config/api';
 
-mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+mermaid.initialize({ startOnLoad: false, theme: 'dark', suppressErrorRendering: true });
 
 function MermaidBlock({ chart }) {
   const [svg, setSvg] = useState('');
@@ -12,18 +12,32 @@ function MermaidBlock({ chart }) {
   useEffect(() => {
     let isMounted = true;
     const renderChart = async () => {
+      if (!chart) return;
+
+      // Auto-correct common LLM Mermaid syntax quirks:
+      // 1. Fix "|label|>" -> "|label|" (e.g., -->|2x + 3y = 240|> B[120,0])
+      // 2. Fix unescaped arrows in label string
+      let sanitizedChart = chart
+        .replace(/\|([^|]+)\|>/g, '|$1|')
+        .replace(/-->\|([^|]+)\|>/g, '-->|$1|');
+
       try {
-        const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-        const { svg: renderedSvg } = await mermaid.render(id, chart);
+        const id = `mermaid-${Math.random().toString(36).substring(2, 11)}`;
+        const { svg: renderedSvg } = await mermaid.render(id, sanitizedChart);
         if (isMounted) setSvg(renderedSvg);
       } catch (err) {
-        console.error("Mermaid parsing error:", err);
-        if (isMounted) setSvg(`<pre style="color:var(--color-danger)">Syntax Error in Diagram: ${err.message}</pre>`);
+        if (isMounted) {
+          const safeCode = chart.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          setSvg(`
+            <div style="padding:12px; border:1px dashed var(--border-color, #444); border-radius:6px; color:var(--text-muted, #aaa); font-size:13px; text-align:left; width:100%;">
+              <div style="font-weight:600; margin-bottom:6px; color:#e5c07b;">📊 Diagram Code</div>
+              <pre style="margin:0; white-space:pre-wrap; font-family:monospace; font-size:12px;">${safeCode}</pre>
+            </div>
+          `);
+        }
       }
     };
-    if (chart) {
-      renderChart();
-    }
+    renderChart();
     return () => { isMounted = false; };
   }, [chart]);
 

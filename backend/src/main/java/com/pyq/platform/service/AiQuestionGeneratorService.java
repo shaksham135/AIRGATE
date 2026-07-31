@@ -338,7 +338,7 @@ public class AiQuestionGeneratorService {
                 "   - NEVER wrap plain English words, sentences, or phrases ('and require', 'units of processing time', 'given that', 'where', 'respectively') INSIDE dollar signs!\n" +
                 "   - Double-escape backslashes in JSON (\\\\frac, \\\\cdot, \\\\oplus, \\\\in, \\\\forall, \\\\exists).\n" +
                 "3. NATURAL TEXTBOOK QUESTION STYLE: Write a crisp, authentic, textbook-grade GATE CS problem statement. DO NOT use artificial or awkward intros like 'During the execution of a predicate logic statement...'.\n" +
-                "4. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText.\n" +
+                "4. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText. Use strict Mermaid syntax for edge labels (e.g. -->|Label| B). Never append extra '>' after pipe.\n" +
                 "5. CRITICAL MCQ RULE: Calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
                 "6. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit options array entirely.\n" +
                 "%s" +
