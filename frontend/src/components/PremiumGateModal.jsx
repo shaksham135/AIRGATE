@@ -10,9 +10,14 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
   const [error, setError] = useState('');
   const [paymentsEnabled, setPaymentsEnabled] = useState(true);
 
-  // Plan Tier & Coupon state
-  const [selectedPlan, setSelectedPlan] = useState('SEASON'); // Default 6-Month Season Pass
-  const [originalPrice, setOriginalPrice] = useState(499);
+  // Dynamic Multi-Tier Pricing state from DB
+  const [tiers, setTiers] = useState({
+    tier1: { price: 99.0, duration: 1, offer: 'Starter Pass' },
+    tier2: { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' },
+    tier3: { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' }
+  });
+
+  const [selectedDuration, setSelectedDuration] = useState(6);
   const [couponCode, setCouponCode] = useState(initialCoupon);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -25,15 +30,23 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
   }, [initialCoupon]);
 
   React.useEffect(() => {
-    const checkStatus = async () => {
+    const fetchTiers = async () => {
       try {
         const res = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/pricing`);
-        if (res.data && res.data.enabled === false) {
-          setPaymentsEnabled(false);
+        if (res.data) {
+          if (res.data.enabled === false) setPaymentsEnabled(false);
+          setTiers({
+            tier1: res.data.tier1 || { price: 99.0, duration: 1, offer: 'Starter Pass' },
+            tier2: res.data.tier2 || { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' },
+            tier3: res.data.tier3 || { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' }
+          });
+          if (res.data.tier3?.duration) {
+            setSelectedDuration(res.data.tier3.duration);
+          }
         }
       } catch (e) {}
     };
-    checkStatus();
+    fetchTiers();
   }, []);
 
   if (!isOpen) return null;
@@ -224,42 +237,28 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
             <div style={{ marginBottom: '20px' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Select Membership Plan</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                <div 
-                  onClick={() => { setSelectedPlan('MONTHLY'); setOriginalPrice(149); setAppliedCoupon(null); setCouponMsg(''); }}
-                  style={{
-                    padding: '10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
-                    border: selectedPlan === 'MONTHLY' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                    background: selectedPlan === 'MONTHLY' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
-                  }}
-                >
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1 Month</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹149</div>
-                </div>
-
-                <div 
-                  onClick={() => { setSelectedPlan('SEASON'); setOriginalPrice(499); setAppliedCoupon(null); setCouponMsg(''); }}
-                  style={{
-                    padding: '10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', position: 'relative',
-                    border: selectedPlan === 'SEASON' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                    background: selectedPlan === 'SEASON' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
-                  }}
-                >
-                  <span style={{ position: 'absolute', top: '-8px', right: '4px', background: '#10b981', color: '#000', fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px' }}>BEST VALUE</span>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>6 Months</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹499</div>
-                </div>
-
-                <div 
-                  onClick={() => { setSelectedPlan('ANNUAL'); setOriginalPrice(699); setAppliedCoupon(null); setCouponMsg(''); }}
-                  style={{
-                    padding: '10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
-                    border: selectedPlan === 'ANNUAL' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
-                    background: selectedPlan === 'ANNUAL' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
-                  }}
-                >
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1 Year</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹699</div>
-                </div>
+                {[tiers.tier1, tiers.tier2, tiers.tier3].map((t, idx) => {
+                  const isSelected = selectedDuration === t.duration;
+                  return (
+                    <div 
+                      key={idx}
+                      onClick={() => { setSelectedDuration(t.duration); setAppliedCoupon(null); setCouponMsg(''); }}
+                      style={{
+                        padding: '10px 8px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', position: 'relative',
+                        border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                        background: isSelected ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
+                      }}
+                    >
+                      {t.offer && t.offer.includes('%') && (
+                        <span style={{ position: 'absolute', top: '-8px', right: '4px', background: '#10b981', color: '#000', fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px' }}>
+                          SAVE
+                        </span>
+                      )}
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.duration} Month{t.duration > 1 ? 's' : ''}</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹{t.price}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -285,10 +284,11 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
                     setCouponLoading(true);
                     setCouponMsg('');
                     try {
+                      const activeTier = [tiers.tier1, tiers.tier2, tiers.tier3].find(t => t.duration === selectedDuration) || tiers.tier3;
+                      const currentPrice = activeTier ? activeTier.price : 449.0;
                       const res = await axios.post(`${API_CONFIG.BASE_URL}/api/coupons/validate`, {
-                        code: couponCode,
-                        planTier: selectedPlan,
-                        originalPrice: originalPrice
+                        code: couponCode.trim(),
+                        originalAmount: currentPrice
                       }, { headers: AuthService.getAuthHeader() });
 
                       if (res.data && res.data.valid) {

@@ -36,16 +36,19 @@ public class PaymentController {
     private final UserRepository userRepository;
     private final com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository;
     private final com.pyq.platform.service.EmailService emailService;
+    private final com.pyq.platform.service.CouponService couponService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public PaymentController(PaymentRepository paymentRepository, 
                              UserRepository userRepository,
                              com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository,
-                             com.pyq.platform.service.EmailService emailService) {
+                             com.pyq.platform.service.EmailService emailService,
+                             com.pyq.platform.service.CouponService couponService) {
         this.paymentRepository = paymentRepository;
         this.userRepository = userRepository;
         this.systemSettingsRepository = systemSettingsRepository;
         this.emailService = emailService;
+        this.couponService = couponService;
     }
 
     private boolean isRazorpayConfigured() {
@@ -81,6 +84,7 @@ public class PaymentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> createOrder(
             @RequestParam("duration") int durationMonths,
+            @RequestParam(name = "couponCode", required = false) String couponCode,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
         User user = userRepository.findById(userDetails.getId()).orElseThrow();
@@ -107,6 +111,21 @@ public class PaymentController {
         } catch (Exception e) {
             if (durationMonths == 3) amountInRupees = 249.0;
             else if (durationMonths == 6) amountInRupees = 449.0;
+        }
+
+        // Apply Coupon Discount if couponCode provided
+        if (couponCode != null && !couponCode.isBlank()) {
+            try {
+                com.pyq.platform.dto.CouponValidateRequest vReq = new com.pyq.platform.dto.CouponValidateRequest();
+                vReq.setCode(couponCode.trim());
+                vReq.setOriginalPrice(java.math.BigDecimal.valueOf(amountInRupees));
+                com.pyq.platform.dto.CouponValidateResponse vRes = couponService.validateCoupon(vReq, user.getId());
+                if (vRes != null && vRes.isValid() && vRes.getFinalPrice() != null) {
+                    amountInRupees = vRes.getFinalPrice().doubleValue();
+                }
+            } catch (Exception cEx) {
+                log.warn("Failed to apply coupon [{}] to order creation: {}", couponCode, cEx.getMessage());
+            }
         }
 
         // Sandbox check: if Razorpay keys are not configured, return a mock order

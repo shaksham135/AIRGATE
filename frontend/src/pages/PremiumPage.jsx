@@ -13,6 +13,12 @@ export default function PremiumPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMsg, setCouponMsg] = useState('');
+
   // Dynamic Multi-Tier Pricing state
   const [tiers, setTiers] = useState({
     tier1: { price: 99.0, duration: 1, offer: 'Best for quick revisions' },
@@ -74,8 +80,9 @@ export default function PremiumPage() {
     }
 
     try {
-      // 1. Create Order
-      const orderRes = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/create-order?duration=${selectedDuration}`, {}, {
+      // 1. Create Order with duration and optional couponCode
+      const couponParam = appliedCoupon ? `&couponCode=${encodeURIComponent(appliedCoupon.code || couponCode)}` : '';
+      const orderRes = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/create-order?duration=${selectedDuration}${couponParam}`, {}, {
         headers: AuthService.getAuthHeader()
       });
 
@@ -414,18 +421,47 @@ export default function PremiumPage() {
                 currentOffer = t3.offer;
               }
 
+              const finalPrice = appliedCoupon ? (appliedCoupon.finalPrice !== undefined ? appliedCoupon.finalPrice : appliedCoupon.discountedAmount) : currentPrice;
+
               return (
                 <div style={{ marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '3rem', fontWeight: 800, color: '#fff' }}>
-                      ₹{currentPrice}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                    {appliedCoupon ? (
+                      <>
+                        <span style={{ fontSize: '3rem', fontWeight: 800, color: '#10b981' }}>
+                          ₹{finalPrice}
+                        </span>
+                        <span style={{ fontSize: '1.4rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                          ₹{currentPrice}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: '3rem', fontWeight: 800, color: '#fff' }}>
+                        ₹{currentPrice}
+                      </span>
+                    )}
                     <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>
                       {currentDuration === 1 ? ' / month' : ` / ${currentDuration} months`}
                     </span>
                   </div>
 
-                  {currentOffer && (
+                  {appliedCoupon && (
+                    <div style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#10b981',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      marginBottom: '8px',
+                      display: 'inline-block'
+                    }}>
+                      🎟️ {appliedCoupon.code} Applied — Saved ₹{appliedCoupon.discountAmount}!
+                    </div>
+                  )}
+
+                  {currentOffer && !appliedCoupon && (
                     <div style={{ 
                       background: 'linear-gradient(90deg, rgba(168,85,247,0.15), rgba(6,182,212,0.15))',
                       border: '1px solid rgba(168,85,247,0.3)',
@@ -446,6 +482,72 @@ export default function PremiumPage() {
                 </div>
               );
             })()}
+
+            {/* Coupon Code Entry Section */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                Promo / Coupon Code
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Enter Code (e.g. GATE2026)"
+                  value={couponCode}
+                  onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                  disabled={upgraded}
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.88rem', textTransform: 'uppercase',
+                    fontFamily: 'monospace', fontWeight: 700
+                  }}
+                />
+                <button 
+                  type="button" 
+                  className="btn btn-outline"
+                  onClick={async () => {
+                    if (!couponCode.trim()) return;
+                    setCouponLoading(true);
+                    setCouponMsg('');
+                    try {
+                      const t1 = tiers?.tier1 || { price: 99.0, duration: 1 };
+                      const t2 = tiers?.tier2 || { price: 249.0, duration: 3 };
+                      const t3 = tiers?.tier3 || { price: 449.0, duration: 6 };
+                      let activePrice = t1.price;
+                      if (selectedDuration === t2.duration) activePrice = t2.price;
+                      else if (selectedDuration === t3.duration) activePrice = t3.price;
+
+                      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/coupons/validate`, {
+                        code: couponCode.trim(),
+                        originalPrice: activePrice
+                      }, { headers: AuthService.getAuthHeader() });
+
+                      if (res.data && res.data.valid) {
+                        setAppliedCoupon(res.data);
+                        setCouponMsg({ type: 'success', text: res.data.message });
+                      } else {
+                        setAppliedCoupon(null);
+                        setCouponMsg({ type: 'error', text: res.data?.message || 'Invalid Coupon Code' });
+                      }
+                    } catch (err) {
+                      setAppliedCoupon(null);
+                      setCouponMsg({ type: 'error', text: err.response?.data?.message || 'Failed to validate coupon' });
+                    } finally {
+                      setCouponLoading(false);
+                    }
+                  }}
+                  disabled={couponLoading || !couponCode.trim() || upgraded}
+                  style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                >
+                  {couponLoading ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+
+              {couponMsg && (
+                <div style={{ marginTop: '6px', fontSize: '0.8rem', color: couponMsg.type === 'success' ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                  {couponMsg.text}
+                </div>
+              )}
+            </div>
 
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px', marginBottom: '32px' }}>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
