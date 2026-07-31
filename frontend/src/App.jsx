@@ -29,6 +29,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { Analytics } from '@vercel/analytics/react';
 import { FiHome, FiUpload, FiLock, FiLogOut, FiFolder, FiGrid, FiUser, FiCheckSquare, FiMenu, FiChevronLeft, FiChevronRight, FiClock, FiList, FiStar, FiCpu } from 'react-icons/fi';
 import PremiumGateModal from './components/PremiumGateModal';
+import PromoBannerHeader from './components/PromoBannerHeader';
 import BugReportModal from './components/BugReportModal';
 import { FiAlertTriangle as FiBugAlert } from 'react-icons/fi';
 
@@ -416,6 +417,7 @@ function DashboardLayout({ children }) {
 
       {/* Main Workspace */}
       <main className="main-content">
+        <PromoBannerHeader onApplyCoupon={() => setShowPremiumModal(true)} />
 
         {/* Child Router Content */}
         <div style={{ display: 'flex', flexGrow: 1, overflowY: 'auto' }}>

@@ -18,6 +18,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/simulator")
@@ -65,9 +67,17 @@ public class MockAttemptController {
                     .build();
 
             List<MockAttemptAnswer> attemptAnswers = new ArrayList<>();
-            if (dto.getAnswers() != null) {
+            if (dto.getAnswers() != null && !dto.getAnswers().isEmpty()) {
+                List<Long> qIds = dto.getAnswers().stream()
+                        .map(MockAttemptAnswerDTO::getQuestionId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+
+                Map<Long, Question> questionMap = questionRepository.findAllById(qIds).stream()
+                        .collect(Collectors.toMap(Question::getId, q -> q));
+
                 for (MockAttemptAnswerDTO aDto : dto.getAnswers()) {
-                    Question q = questionRepository.findById(aDto.getQuestionId()).orElse(null);
+                    Question q = questionMap.get(aDto.getQuestionId());
                     if (q != null) {
                         MockAttemptAnswer answer = MockAttemptAnswer.builder()
                                 .attempt(attempt)

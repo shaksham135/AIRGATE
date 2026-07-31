@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
-import { FiGrid, FiFolderPlus, FiPlusCircle, FiFileText, FiActivity, FiLayers, FiAlertTriangle, FiCheck, FiExternalLink, FiUsers, FiArrowRight, FiSettings, FiInbox, FiAlertOctagon, FiLock, FiDatabase, FiDownload, FiCpu, FiPlay, FiPause, FiRefreshCw, FiMail, FiSend } from 'react-icons/fi';
+import { FiGrid, FiFolderPlus, FiPlusCircle, FiFileText, FiActivity, FiLayers, FiAlertTriangle, FiCheck, FiExternalLink, FiUsers, FiArrowRight, FiSettings, FiInbox, FiAlertOctagon, FiLock, FiDatabase, FiDownload, FiCpu, FiPlay, FiPause, FiRefreshCw, FiMail, FiSend, FiGift, FiTag } from 'react-icons/fi';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -118,6 +118,57 @@ export default function AdminPanel() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBodyHtml, setEmailBodyHtml] = useState('');
   const [customSingleEmail, setCustomSingleEmail] = useState('');
+
+  // Enterprise Coupons Hub State
+  const [coupons, setCoupons] = useState([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [couponDiscountType, setCouponDiscountType] = useState('PERCENTAGE');
+  const [couponDiscountValue, setCouponDiscountValue] = useState(50);
+  const [couponPlanTier, setCouponPlanTier] = useState('ALL');
+  const [couponMaxUses, setCouponMaxUses] = useState(100);
+  const [couponMinOrder, setCouponMinOrder] = useState(0);
+  const [couponActionMsg, setCouponActionMsg] = useState('');
+
+  // Dynamic Announcement Ad Banners State
+  const [banners, setBanners] = useState([]);
+  const [bannersLoading, setBannersLoading] = useState(false);
+  const [bannerTitle, setBannerTitle] = useState('');
+  const [bannerMessage, setBannerMessage] = useState('');
+  const [bannerCtaText, setBannerCtaText] = useState('Claim Offer');
+  const [bannerCtaLink, setBannerCtaLink] = useState('/pricing');
+  const [bannerCouponCode, setBannerCouponCode] = useState('');
+  const [bannerBgColor, setBannerBgColor] = useState('#8b5cf6');
+  const [bannerTextColor, setBannerTextColor] = useState('#ffffff');
+  const [bannerActionMsg, setBannerActionMsg] = useState('');
+
+  const fetchCoupons = async () => {
+    try {
+      setCouponsLoading(true);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/coupons`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setCoupons(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error('Failed to fetch coupons', e);
+    } finally {
+      setCouponsLoading(false);
+    }
+  };
+
+  const fetchBanners = async () => {
+    try {
+      setBannersLoading(true);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/banners`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setBanners(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error('Failed to fetch banners', e);
+    } finally {
+      setBannersLoading(false);
+    }
+  };
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailMsg, setEmailMsg] = useState('');
   const [emailLogs, setEmailLogs] = useState([]);
@@ -657,6 +708,8 @@ export default function AdminPanel() {
         }}>
           {[
             { key: 'metrics',  icon: <FiActivity size={14}/>,      label: 'Metrics',       accent: '#10b981' },
+            { key: 'coupons',  icon: <FiGift size={14}/>,          label: 'Coupons',       accent: '#ec4899', onClick: fetchCoupons },
+            { key: 'banners',  icon: <FiSend size={14}/>,          label: 'Ad Banners',     accent: '#8b5cf6', onClick: fetchBanners },
             { key: 'backups',  icon: <FiDatabase size={14}/>,      label: 'DB Vault',      accent: '#6366f1', suffix: '🔒' },
             { key: 'settings', icon: <FiSettings size={14}/>,      label: 'Settings',      accent: '#a855f7' },
             { key: 'bugs',     icon: <FiInbox size={14}/>,         label: 'User Bugs',     accent: '#ec4899', count: bugs.length },
@@ -723,6 +776,318 @@ export default function AdminPanel() {
 
 
 
+
+      {/* ENTERPRISE COUPONS MANAGEMENT TAB */}
+      {activeTab === 'coupons' && (
+        <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px 28px', marginBottom: '28px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: '#fff', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
+              <FiGift style={{ color: '#ec4899' }} /> Enterprise Coupon & Discount Engine
+            </h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Create tier-specific discount codes (1 Month, 3 Month, 6 Month Season, Annual, or All), set percentage/flat discounts, and enforce max usage limits.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '28px', marginBottom: '32px' }}>
+            {/* Left: Create Coupon Form */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '16px', fontWeight: 700 }}>
+                ➕ Generate New Coupon
+              </h3>
+
+              {couponActionMsg && (
+                <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                  {couponActionMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Coupon Code Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. GATE2026 or EARLYBIRD50" 
+                    value={couponCodeInput}
+                    onChange={e => setCouponCodeInput(e.target.value.toUpperCase())}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700 }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Discount Type</label>
+                    <select 
+                      value={couponDiscountType} 
+                      onChange={e => setCouponDiscountType(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff' }}
+                    >
+                      <option value="PERCENTAGE">Percentage (%)</option>
+                      <option value="FLAT">Flat Amount (₹)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Discount Value</label>
+                    <input 
+                      type="number" 
+                      value={couponDiscountValue} 
+                      onChange={e => setCouponDiscountValue(Number(e.target.value))}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', fontWeight: 700 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Applicable Plan Tier</label>
+                    <select 
+                      value={couponPlanTier} 
+                      onChange={e => setCouponPlanTier(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff' }}
+                    >
+                      <option value="ALL">ALL Tiers</option>
+                      <option value="MONTHLY">1 Month Pass</option>
+                      <option value="QUARTERLY">3 Month Pass</option>
+                      <option value="SEASON">6 Month Season Pass</option>
+                      <option value="ANNUAL">1 Year Pass</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Max Uses Limit</label>
+                    <input 
+                      type="number" 
+                      value={couponMaxUses} 
+                      onChange={e => setCouponMaxUses(Number(e.target.value))}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff' }}
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  type="button" 
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (!couponCodeInput.trim()) return alert("Enter coupon code name!");
+                    try {
+                      setCouponActionMsg('');
+                      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/coupons`, {
+                        code: couponCodeInput,
+                        discountType: couponDiscountType,
+                        discountValue: couponDiscountValue,
+                        applicableTier: couponPlanTier,
+                        maxUses: couponMaxUses,
+                        minOrderAmount: couponMinOrder
+                      }, { headers: AuthService.getAuthHeader() });
+
+                      if (res.data) {
+                        setCouponActionMsg(`🎉 Coupon '${res.data.code}' created successfully!`);
+                        setCouponCodeInput('');
+                        fetchCoupons();
+                      }
+                    } catch (e) {
+                      alert(e.response?.data?.message || "Failed to create coupon.");
+                    }
+                  }}
+                  style={{ marginTop: '8px', padding: '12px' }}
+                >
+                  Create Custom Coupon
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Active Coupons List */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '16px', fontWeight: 700 }}>
+                🎟️ Active Coupons ({coupons.length})
+              </h3>
+
+              {couponsLoading ? (
+                <p style={{ color: 'var(--text-muted)' }}>Loading coupons...</p>
+              ) : coupons.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No coupons created yet. Generate your first code on the left!</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {coupons.map(c => (
+                    <div key={c.id} style={{ padding: '14px', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#ec4899', fontSize: '1rem' }}>{c.code}</span>
+                          <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(99,102,241,0.15)', color: '#6366f1', fontWeight: 700 }}>
+                            {c.discountType === 'PERCENTAGE' ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                            Tier: {c.applicableTier}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Redemptions: <strong>{c.currentUses} / {c.maxUses}</strong>
+                        </div>
+                      </div>
+                      <button 
+                        className="btn btn-outline"
+                        onClick={async () => {
+                          if (!window.confirm(`Delete coupon '${c.code}'?`)) return;
+                          try {
+                            await axios.delete(`${API_CONFIG.BASE_URL}/api/admin/coupons/${c.id}`, { headers: AuthService.getAuthHeader() });
+                            fetchCoupons();
+                          } catch (e) { alert("Failed to delete coupon."); }
+                        }}
+                        style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', padding: '4px 10px', fontSize: '0.78rem' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DYNAMIC ANNOUNCEMENT AD BANNERS TAB */}
+      {activeTab === 'banners' && (
+        <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px 28px', marginBottom: '28px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: '#fff', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
+              <FiSend style={{ color: '#8b5cf6' }} /> Dynamic Announcement Ad Banner Manager
+            </h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Publish top website alert banners, promotional announcements, and discount offers with custom colors and attached CTA coupons.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '28px', marginBottom: '32px' }}>
+            {/* Left: Create Banner Form */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '16px', fontWeight: 700 }}>
+                📢 Publish New Ad Banner
+              </h3>
+
+              {bannerActionMsg && (
+                <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                  {bannerActionMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Banner Title</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Early Bird Launch Sale" 
+                    value={bannerTitle}
+                    onChange={e => setBannerTitle(e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', fontWeight: 600 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Announcement Message</label>
+                  <textarea 
+                    placeholder="e.g. Get 50% OFF AIRGATE PRO Season Pass for the first 100 students!" 
+                    value={bannerMessage}
+                    onChange={e => setBannerMessage(e.target.value)}
+                    rows={2}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>CTA Button Text</label>
+                    <input 
+                      type="text" 
+                      value={bannerCtaText} 
+                      onChange={e => setBannerCtaText(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Attached Coupon Code</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. GATE2026" 
+                      value={bannerCouponCode} 
+                      onChange={e => setBannerCouponCode(e.target.value.toUpperCase())}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', textTransform: 'uppercase', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  type="button" 
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (!bannerTitle.trim() || !bannerMessage.trim()) return alert("Title and message are required!");
+                    try {
+                      setBannerActionMsg('');
+                      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/banners`, {
+                        title: bannerTitle,
+                        message: bannerMessage,
+                        ctaText: bannerCtaText,
+                        ctaLink: bannerCtaLink,
+                        couponCode: bannerCouponCode,
+                        bgColor: bannerBgColor,
+                        textColor: bannerTextColor
+                      }, { headers: AuthService.getAuthHeader() });
+
+                      if (res.data) {
+                        setBannerActionMsg("📢 Ad Banner published successfully!");
+                        setBannerTitle('');
+                        setBannerMessage('');
+                        setBannerCouponCode('');
+                        fetchBanners();
+                      }
+                    } catch (e) { alert("Failed to publish banner."); }
+                  }}
+                  style={{ marginTop: '8px', padding: '12px' }}
+                >
+                  Publish Announcement Banner
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Active Banners List */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '16px', fontWeight: 700 }}>
+                📢 Active Website Banners ({banners.length})
+              </h3>
+
+              {bannersLoading ? (
+                <p style={{ color: 'var(--text-muted)' }}>Loading banners...</p>
+              ) : banners.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No ad banners published. Create your first announcement on the left!</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {banners.map(b => (
+                    <div key={b.id} style={{ padding: '14px', borderRadius: '12px', background: b.bgColor || '#8b5cf6', color: b.textColor || '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{b.title}</div>
+                        <div style={{ fontSize: '0.82rem', opacity: 0.9 }}>{b.message}</div>
+                        {b.couponCode && <div style={{ fontSize: '0.75rem', marginTop: '4px', fontWeight: 700, fontFamily: 'monospace' }}>CODE: {b.couponCode}</div>}
+                      </div>
+                      <button 
+                        className="btn btn-outline"
+                        onClick={async () => {
+                          if (!window.confirm("Delete this banner?")) return;
+                          try {
+                            await axios.delete(`${API_CONFIG.BASE_URL}/api/admin/banners/${b.id}`, { headers: AuthService.getAuthHeader() });
+                            fetchBanners();
+                          } catch (e) { alert("Failed to delete banner."); }
+                        }}
+                        style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', padding: '4px 10px', fontSize: '0.78rem', background: 'rgba(0,0,0,0.2)' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EMAIL BROADCAST HUB TAB */}
       {activeTab === 'email' && (

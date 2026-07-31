@@ -10,6 +10,14 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess }) 
   const [error, setError] = useState('');
   const [paymentsEnabled, setPaymentsEnabled] = useState(true);
 
+  // Plan Tier & Coupon state
+  const [selectedPlan, setSelectedPlan] = useState('SEASON'); // Default 6-Month Season Pass
+  const [originalPrice, setOriginalPrice] = useState(499);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMsg, setCouponMsg] = useState('');
+
   React.useEffect(() => {
     const checkStatus = async () => {
       try {
@@ -206,26 +214,130 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess }) 
               </div>
             </div>
 
-            {/* Price Box */}
-            <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.04)',
-              borderRadius: '16px',
-              padding: '16px 24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '28px'
-            }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aspirant Plan</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', fontFamily: 'var(--font-title)' }}>
-                  ₹99 <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ month</span>
+            {/* Plan Tier Selection */}
+            <div style={{ marginBottom: '20px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Select Membership Plan</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div 
+                  onClick={() => { setSelectedPlan('MONTHLY'); setOriginalPrice(149); setAppliedCoupon(null); setCouponMsg(''); }}
+                  style={{
+                    padding: '10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
+                    border: selectedPlan === 'MONTHLY' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                    background: selectedPlan === 'MONTHLY' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1 Month</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹149</div>
+                </div>
+
+                <div 
+                  onClick={() => { setSelectedPlan('SEASON'); setOriginalPrice(499); setAppliedCoupon(null); setCouponMsg(''); }}
+                  style={{
+                    padding: '10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', position: 'relative',
+                    border: selectedPlan === 'SEASON' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                    background: selectedPlan === 'SEASON' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
+                  }}
+                >
+                  <span style={{ position: 'absolute', top: '-8px', right: '4px', background: '#10b981', color: '#000', fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px' }}>BEST VALUE</span>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>6 Months</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹499</div>
+                </div>
+
+                <div 
+                  onClick={() => { setSelectedPlan('ANNUAL'); setOriginalPrice(699); setAppliedCoupon(null); setCouponMsg(''); }}
+                  style={{
+                    padding: '10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
+                    border: selectedPlan === 'ANNUAL' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                    background: selectedPlan === 'ANNUAL' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(255,255,255,0.02)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1 Year</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>₹699</div>
                 </div>
               </div>
-              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>100% Refund Guarantee</span>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cancel anytime</div>
+            </div>
+
+            {/* Coupon Code Input */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Enter Coupon Code (e.g. GATE2026)"
+                  value={couponCode}
+                  onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.88rem', textTransform: 'uppercase',
+                    fontFamily: 'monospace', fontWeight: 700
+                  }}
+                />
+                <button 
+                  type="button" 
+                  className="btn btn-outline"
+                  onClick={async () => {
+                    if (!couponCode.trim()) return;
+                    setCouponLoading(true);
+                    setCouponMsg('');
+                    try {
+                      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/coupons/validate`, {
+                        code: couponCode,
+                        planTier: selectedPlan,
+                        originalPrice: originalPrice
+                      }, { headers: AuthService.getAuthHeader() });
+
+                      if (res.data && res.data.valid) {
+                        setAppliedCoupon(res.data);
+                        setCouponMsg({ type: 'success', text: res.data.message });
+                      } else {
+                        setAppliedCoupon(null);
+                        setCouponMsg({ type: 'error', text: res.data?.message || 'Invalid Coupon' });
+                      }
+                    } catch (err) {
+                      setAppliedCoupon(null);
+                      setCouponMsg({ type: 'error', text: err.response?.data?.message || 'Failed to validate coupon' });
+                    } finally {
+                      setCouponLoading(false);
+                    }
+                  }}
+                  disabled={couponLoading || !couponCode.trim()}
+                  style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                >
+                  {couponLoading ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+
+              {couponMsg && (
+                <div style={{ marginTop: '6px', fontSize: '0.8rem', color: couponMsg.type === 'success' ? '#10b981' : '#ef4444', fontWeight: 500 }}>
+                  {couponMsg.text}
+                </div>
+              )}
+            </div>
+
+            {/* Final Price Summary Box */}
+            <div style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '16px',
+              padding: '16px 24px',
+              marginBottom: '28px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: appliedCoupon ? '6px' : '0' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Original Plan Price:</span>
+                <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>₹{originalPrice}</span>
+              </div>
+
+              {appliedCoupon && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
+                  <span>Discount ({appliedCoupon.code}):</span>
+                  <span>-₹{appliedCoupon.discountAmount}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: appliedCoupon ? '1px dashed rgba(255,255,255,0.1)' : 'none', paddingTop: appliedCoupon ? '8px' : '0' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Total Payable:</span>
+                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-title)' }}>
+                  ₹{appliedCoupon ? appliedCoupon.finalPrice : originalPrice}
+                </span>
               </div>
             </div>
 
