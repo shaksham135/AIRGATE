@@ -25,6 +25,7 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final EmailLogRepository emailLogRepository;
     private final UserRepository userRepository;
+    private final com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository;
 
     @Value("${app.email.from:AIRGATE Team <support@airgate.in>}")
     private String fromEmail;
@@ -149,10 +150,15 @@ public class EmailService {
     }
 
     /**
-     * Trigger A: Welcome Email (Triggered upon registration)
+     * Trigger A: Welcome Email (Triggered upon registration if enabled by Admin)
      */
     @Async
     public void sendWelcomeEmail(User user) {
+        com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+        if (settings != null && Boolean.FALSE.equals(settings.getAutoWelcomeEmailEnabled())) {
+            log.info("Auto Welcome Email skipped for {} as autoWelcomeEmailEnabled is disabled by Admin.", user.getEmail());
+            return;
+        }
         String subject = "Welcome to AIRGATE 🎯 - Your Strategic Roadmap for GATE CSE";
         String body = buildWelcomeEmailTemplate(user.getUsername());
         sendHtmlEmail(user.getEmail(), subject, body, "WELCOME_EMAIL");
@@ -166,6 +172,35 @@ public class EmailService {
         String subject = "Mastering GATE CSE: How Double-Verified Qs & AI Tutor Help You Rank Top 100";
         String body = buildGuidanceEmailTemplate(user.getUsername());
         sendHtmlEmail(user.getEmail(), subject, body, "GUIDANCE_NUDGE");
+    }
+
+    /**
+     * Trigger B2: 24-Hour Scheduled Drip Nudge Engine (Runs hourly)
+     * Scans for users registered between 23h and 25h ago who are still FREE tier and haven't received GUIDANCE_NUDGE yet.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 * * * *")
+    public void run24HourDripEmailJob() {
+        com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+        if (settings != null && Boolean.FALSE.equals(settings.getAutoDripOfferEmailEnabled())) {
+            log.debug("Automated 24h Drip Email Job skipped (disabled in Admin Settings).");
+            return;
+        }
+
+        LocalDateTime startWindow = LocalDateTime.now().minusHours(25);
+        LocalDateTime endWindow = LocalDateTime.now().minusHours(23);
+
+        List<User> targetUsers = userRepository.findAll().stream()
+                .filter(u -> u.getCreatedAt() != null && u.getCreatedAt().isAfter(startWindow) && u.getCreatedAt().isBefore(endWindow))
+                .filter(u -> u.getIsPremium() == null || !u.getIsPremium())
+                .filter(u -> !emailLogRepository.existsByRecipientEmailAndEmailType(u.getEmail(), "GUIDANCE_NUDGE"))
+                .toList();
+
+        if (!targetUsers.isEmpty()) {
+            log.info("📧 Automated 24h Drip Job sending Aspirant Pro offer to {} users...", targetUsers.size());
+            for (User u : targetUsers) {
+                sendGuidanceNudgeEmail(u);
+            }
+        }
     }
 
     /**

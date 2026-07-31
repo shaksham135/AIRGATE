@@ -2648,6 +2648,50 @@ export default function AdminPanel() {
               </div>
             </div>
 
+            {/* SECTION 5: Automated Email Workflow Controls */}
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+              padding: '24px 28px',
+              marginBottom: '24px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <h3 style={{ fontSize: '1.1rem', color: 'var(--text-primary)', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                ✉️ Automated Email Lifecycle Controls
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                {/* Welcome Email Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>🎯 Auto Welcome Email on Signup</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Sends instant onboarding email to new users</div>
+                  </div>
+                  <input 
+                    type="checkbox"
+                    checked={settings.autoWelcomeEmailEnabled !== false}
+                    onChange={e => setSettings(prev => ({ ...prev, autoWelcomeEmailEnabled: e.target.checked }))}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#6366f1' }}
+                  />
+                </div>
+
+                {/* 24-Hour Drip Nudge Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>⏰ Auto 24-Hour Aspirant Pro Nudge</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Automated offer email sent 24h after registration</div>
+                  </div>
+                  <input 
+                    type="checkbox"
+                    checked={settings.autoDripOfferEmailEnabled !== false}
+                    onChange={e => setSettings(prev => ({ ...prev, autoDripOfferEmailEnabled: e.target.checked }))}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#6366f1' }}
+                  />
+                </div>
+              </div>
+            </div>
+
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                   Target Keywords (Comma Separated)

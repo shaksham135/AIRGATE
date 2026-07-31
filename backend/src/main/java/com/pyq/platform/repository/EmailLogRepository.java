@@ -11,4 +11,5 @@ public interface EmailLogRepository extends JpaRepository<EmailLog, Long> {
     List<EmailLog> findTop50ByOrderBySentAtDesc();
     long countByEmailType(String emailType);
     long countByEmailTypeContaining(String keyword);
+    boolean existsByRecipientEmailAndEmailType(String recipientEmail, String emailType);
 }

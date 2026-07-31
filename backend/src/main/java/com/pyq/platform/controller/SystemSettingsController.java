@@ -159,6 +159,14 @@ public class SystemSettingsController {
             settings.setSupportPhone(newSettings.getSupportPhone());
         }
 
+        // Map Email Automation Settings
+        if (newSettings.getAutoWelcomeEmailEnabled() != null) {
+            settings.setAutoWelcomeEmailEnabled(newSettings.getAutoWelcomeEmailEnabled());
+        }
+        if (newSettings.getAutoDripOfferEmailEnabled() != null) {
+            settings.setAutoDripOfferEmailEnabled(newSettings.getAutoDripOfferEmailEnabled());
+        }
+
         SystemSettings saved = systemSettingsRepository.save(settings);
         return ResponseEntity.ok(saved);
     }

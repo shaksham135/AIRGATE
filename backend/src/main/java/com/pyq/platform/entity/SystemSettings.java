@@ -86,4 +86,13 @@ public class SystemSettings {
 
     @Column(name = "support_phone")
     private String supportPhone = "+91 (800) AIR-GATE";
+
+    // Dynamic Automated Email Workflow Controls
+    @Builder.Default
+    @Column(name = "auto_welcome_email_enabled", nullable = false)
+    private Boolean autoWelcomeEmailEnabled = true;
+
+    @Builder.Default
+    @Column(name = "auto_drip_offer_email_enabled", nullable = false)
+    private Boolean autoDripOfferEmailEnabled = true;
 }
