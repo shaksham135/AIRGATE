@@ -71,12 +71,12 @@ export const getAssetUrl = (path) => {
 };
 
 /**
-/**
  * Industry-Standard LaTeX Parser & Sanitizer
  * Used by top platforms (LeetCode, ChatGPT, StackExchange)
  * - Safely normalizes JSON string escapes (\\frac -> \frac)
  * - Auto-encloses unwrapped LaTeX blocks (\frac, \begin{bmatrix})
  * - Preserves native KaTeX math formatting & layout without breaking line breaks or causing page overflow
+ */
 const latexSanitizeCache = new Map();
 const MAX_LATEX_CACHE_SIZE = 500;
 
