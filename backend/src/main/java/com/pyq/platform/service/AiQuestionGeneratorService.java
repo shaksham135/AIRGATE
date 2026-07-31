@@ -664,9 +664,10 @@ public class AiQuestionGeneratorService {
 
             // Add AI Analysis record with verified answer and short proof
             List<QuestionAIAnalysis> analyses = new ArrayList<>();
+            String safeAnswer = (genAnswer != null && !genAnswer.isBlank()) ? genAnswer.trim() : "A";
             analyses.add(QuestionAIAnalysis.builder()
                     .question(q)
-                    .suggestedAnswer(genAnswer)
+                    .suggestedAnswer(safeAnswer)
                     .suggestedExplanation(explanation != null && !explanation.isBlank() ? explanation : "Dual-AI Verified Practice Question.")
                     .confidence(1.0)
                     .modelName("Groq-8B-70B-Dual")

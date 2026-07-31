@@ -23,7 +23,7 @@ public class QuestionAIAnalysis {
     @JoinColumn(name = "question_id", nullable = false)
     private Question question;
 
-    @Column(name = "suggested_answer", nullable = false, length = 100)
+    @Column(name = "suggested_answer", columnDefinition = "TEXT")
     private String suggestedAnswer;
 
     @Column(name = "suggested_explanation", columnDefinition = "TEXT")

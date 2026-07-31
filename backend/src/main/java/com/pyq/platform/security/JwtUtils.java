@@ -17,8 +17,8 @@ public class JwtUtils {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${app.jwt.expiration-ms}")
-    private int jwtExpirationMs;
+    @Value("${app.jwt.expiration-ms:2592000000}")
+    private long jwtExpirationMs;
 
     @jakarta.annotation.PostConstruct
     public void validateSecret() {
