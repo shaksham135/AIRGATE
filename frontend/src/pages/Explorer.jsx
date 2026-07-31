@@ -15,6 +15,7 @@ import { getAssetUrl, formatMathText, renderQuestionText, checkAnswerCorrect, re
 import API_CONFIG from '../config/api';
 import PremiumGateModal from '../components/PremiumGateModal';
 import ConfirmModal from '../components/ConfirmModal';
+import AIRGATELoader from '../components/AIRGATELoader';
 
 export default function Explorer() {
   const [subjects, setSubjects] = useState([]);
@@ -1050,7 +1051,7 @@ export default function Explorer() {
         {/* Questions lists */}
         <div id="pyq-questions-start"></div>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>Loading questions...</div>
+          <AIRGATELoader text="Loading GATE PYQs & Step-by-Step Derivations..." />
         ) : questions.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)', borderRadius: '12px' }}>
             No questions found.

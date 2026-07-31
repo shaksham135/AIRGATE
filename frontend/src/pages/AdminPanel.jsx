@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
+import AIRGATELoader from '../components/AIRGATELoader';
 import { FiGrid, FiFolderPlus, FiPlusCircle, FiFileText, FiActivity, FiLayers, FiAlertTriangle, FiCheck, FiExternalLink, FiUsers, FiArrowRight, FiSettings, FiInbox, FiAlertOctagon, FiLock, FiDatabase, FiDownload, FiCpu, FiPlay, FiPause, FiRefreshCw, FiMail, FiSend, FiGift, FiTag } from 'react-icons/fi';
 import {
   Chart as ChartJS,
@@ -902,7 +903,7 @@ export default function AdminPanel() {
               </h3>
 
               {couponsLoading ? (
-                <p style={{ color: 'var(--text-muted)' }}>Loading coupons...</p>
+                <AIRGATELoader text="Loading Active Coupons..." size="small" />
               ) : coupons.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)' }}>No coupons created yet. Generate your first code on the left!</p>
               ) : (
