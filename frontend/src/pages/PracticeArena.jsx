@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
@@ -21,21 +21,46 @@ export default function PracticeArena() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Filter States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeSearchQuery, setActiveSearchQuery] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
-  const [selectedTopicId, setSelectedTopicId] = useState(null);
-  const [selectedDifficulty, setSelectedDifficulty] = useState('ALL');
-  const [selectedType, setSelectedType] = useState('ALL');
-  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState('ALL');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Filter States initialized from URL
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('query') || '');
+  const [activeSearchQuery, setActiveSearchQuery] = useState(() => searchParams.get('query') || '');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => {
+    const s = searchParams.get('subjectId');
+    return s ? parseInt(s, 10) : null;
+  });
+  const [selectedTopicId, setSelectedTopicId] = useState(() => {
+    const t = searchParams.get('topicId');
+    return t ? parseInt(t, 10) : null;
+  });
+  const [selectedDifficulty, setSelectedDifficulty] = useState(() => searchParams.get('difficulty') || 'ALL');
+  const [selectedType, setSelectedType] = useState(() => searchParams.get('type') || 'ALL');
+  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState(() => searchParams.get('solvedStatus') || 'ALL');
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
 
-  // Pagination
-  const [page, setPage] = useState(0);
+  // Pagination initialized from URL
+  const [page, setPage] = useState(() => {
+    const p = searchParams.get('page');
+    return p ? Math.max(0, parseInt(p, 10)) : 0;
+  });
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+
+  const updateUrlParams = (newParams) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      Object.entries(newParams).forEach(([key, val]) => {
+        if (val === null || val === undefined || val === '' || val === 'ALL' || (key === 'page' && val === 0)) {
+          next.delete(key);
+        } else {
+          next.set(key, val.toString());
+        }
+      });
+      return next;
+    }, { replace: true });
+  };
 
   // Daily Quota State
   const [quota, setQuota] = useState({ usedToday: 0, limitToday: 30, isPremium: false, remainingToday: 30 });
@@ -433,9 +458,11 @@ export default function PracticeArena() {
             <select
               value={selectedSubjectId || ''}
               onChange={e => {
-                setSelectedSubjectId(e.target.value ? Number(e.target.value) : null);
+                const sId = e.target.value ? Number(e.target.value) : null;
+                setSelectedSubjectId(sId);
                 setSelectedTopicId(null);
                 setPage(0);
+                updateUrlParams({ subjectId: sId, topicId: null, page: 0 });
               }}
               style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
             >
@@ -445,7 +472,12 @@ export default function PracticeArena() {
 
             <select
               value={selectedTopicId || ''}
-              onChange={e => { setSelectedTopicId(e.target.value ? Number(e.target.value) : null); setPage(0); }}
+              onChange={e => {
+                const tId = e.target.value ? Number(e.target.value) : null;
+                setSelectedTopicId(tId);
+                setPage(0);
+                updateUrlParams({ topicId: tId, page: 0 });
+              }}
               disabled={!selectedSubjectId}
               style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem', opacity: !selectedSubjectId ? 0.5 : 1 }}
             >
@@ -455,7 +487,12 @@ export default function PracticeArena() {
 
             <select
               value={selectedDifficulty}
-              onChange={e => { setSelectedDifficulty(e.target.value); setPage(0); }}
+              onChange={e => {
+                const diff = e.target.value;
+                setSelectedDifficulty(diff);
+                setPage(0);
+                updateUrlParams({ difficulty: diff, page: 0 });
+              }}
               style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
             >
               <option value="ALL">All Difficulties</option>
@@ -466,23 +503,33 @@ export default function PracticeArena() {
 
             <select
               value={selectedType}
-              onChange={e => { setSelectedType(e.target.value); setPage(0); }}
+              onChange={e => {
+                const type = e.target.value;
+                setSelectedType(type);
+                setPage(0);
+                updateUrlParams({ type, page: 0 });
+              }}
               style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
             >
               <option value="ALL">All Question Types</option>
-              <option value="MCQ">MCQ (Single Choice)</option>
-              <option value="MSQ">MSQ (Multiple Select)</option>
-              <option value="NAT">NAT (Numerical)</option>
+              <option value="MCQ">MCQ</option>
+              <option value="MSQ">MSQ</option>
+              <option value="NAT">NAT</option>
             </select>
 
             <select
               value={selectedSolvedStatus}
-              onChange={e => { setSelectedSolvedStatus(e.target.value); setPage(0); }}
+              onChange={e => {
+                const status = e.target.value;
+                setSelectedSolvedStatus(status);
+                setPage(0);
+                updateUrlParams({ solvedStatus: status, page: 0 });
+              }}
               style={{ height: '36px', padding: '6px 10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
             >
-              <option value="ALL">Status: All Questions</option>
-              <option value="UNSOLVED">Status: Unsolved Only</option>
-              <option value="SOLVED">Status: ✅ Solved Only</option>
+              <option value="ALL">All Statuses</option>
+              <option value="SOLVED">Solved</option>
+              <option value="UNSOLVED">Unsolved</option>
             </select>
           </div>
         )}
@@ -712,7 +759,9 @@ export default function PracticeArena() {
         }}>
           <button
             onClick={() => {
-              setPage(p => Math.max(0, p - 1));
+              const newPage = Math.max(0, page - 1);
+              setPage(newPage);
+              updateUrlParams({ page: newPage });
               const feedEl = document.getElementById('practice-questions-start');
               if (feedEl) feedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}
@@ -727,7 +776,9 @@ export default function PracticeArena() {
           </span>
           <button
             onClick={() => {
-              setPage(p => Math.min(totalPages - 1, p + 1));
+              const newPage = Math.min(totalPages - 1, page + 1);
+              setPage(newPage);
+              updateUrlParams({ page: newPage });
               const feedEl = document.getElementById('practice-questions-start');
               if (feedEl) feedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }}

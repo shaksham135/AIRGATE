@@ -73,10 +73,25 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "Access denied: you do not have permission to perform this action.", request);
     }
 
+    // ── Client Abort / Broken Pipe (User closed tab or navigated away mid-response) ──
+    @ExceptionHandler({
+        org.apache.catalina.connector.ClientAbortException.class,
+        org.springframework.web.context.request.async.AsyncRequestNotUsableException.class
+    })
+    public void handleClientAbort(Exception ex, WebRequest request) {
+        log.debug("Client closed connection/aborted request on {}: {}", request.getDescription(false), ex.getMessage());
+    }
+
     // ── Catch-all fallback ────────────────────────────────────────────────────
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleAll(
             Exception ex, WebRequest request) {
+
+        String msg = ex.getMessage() != null ? ex.getMessage() : "";
+        if (msg.contains("Broken pipe") || msg.contains("connection reset") || ex.getClass().getName().contains("ClientAbort")) {
+            log.debug("Client disconnected during request on {}: {}", request.getDescription(false), msg);
+            return null;
+        }
 
         log.error("Unhandled exception on {}: {}", request.getDescription(false), ex.getMessage(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR,

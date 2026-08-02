@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
@@ -38,22 +38,48 @@ export default function Explorer() {
     onConfirm: () => {}
   });
   
-  // Search parameters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
-  const [selectedTopicId, setSelectedTopicId] = useState(null);
-  const [selectedYear, setSelectedYear] = useState('');
-  const [selectedType, setSelectedType] = useState('');
-  const [selectedTag, setSelectedTag] = useState('');
-  const [activeSearchQuery, setActiveSearchQuery] = useState('');
-  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState('');
-  const [selectedBookmarked, setSelectedBookmarked] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Pagination states
-  const [page, setPage] = useState(0);
+  // Search and filter parameters initialized from URL search params (persistent on refresh & back button)
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('query') || '');
+  const [activeSearchQuery, setActiveSearchQuery] = useState(() => searchParams.get('query') || '');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => {
+    const s = searchParams.get('subjectId');
+    return s ? parseInt(s, 10) : null;
+  });
+  const [selectedTopicId, setSelectedTopicId] = useState(() => {
+    const t = searchParams.get('topicId');
+    return t ? parseInt(t, 10) : null;
+  });
+  const [selectedYear, setSelectedYear] = useState(() => searchParams.get('year') || '');
+  const [selectedType, setSelectedType] = useState(() => searchParams.get('type') || '');
+  const [selectedTag, setSelectedTag] = useState(() => searchParams.get('tag') || '');
+  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState(() => searchParams.get('solvedStatus') || '');
+  const [selectedBookmarked, setSelectedBookmarked] = useState(() => searchParams.get('bookmarked') === 'true');
+
+  // Pagination states initialized from URL
+  const [page, setPage] = useState(() => {
+    const p = searchParams.get('page');
+    return p ? Math.max(0, parseInt(p, 10)) : 0;
+  });
   const [pageSize, setPageSize] = useState(15);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+
+  // Helper to sync state changes to URL search params
+  const updateUrlParams = (newParams) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      Object.entries(newParams).forEach(([key, val]) => {
+        if (val === null || val === undefined || val === '' || val === false || (key === 'page' && val === 0)) {
+          next.delete(key);
+        } else {
+          next.set(key, val.toString());
+        }
+      });
+      return next;
+    }, { replace: true });
+  };
 
   // Selected options map for practice mode { questionId: selectedOptionLabel }
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -345,6 +371,7 @@ export default function Explorer() {
 
   const changePage = (newPage) => {
     setPage(newPage);
+    updateUrlParams({ page: newPage });
     const feedEl = document.getElementById('pyq-questions-start');
     if (feedEl) {
       feedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -355,6 +382,7 @@ export default function Explorer() {
     e.preventDefault();
     setPage(0);
     setActiveSearchQuery(searchQuery);
+    updateUrlParams({ query: searchQuery, page: 0 });
   };
 
   const clearFilters = () => {
@@ -368,6 +396,7 @@ export default function Explorer() {
     setSelectedSolvedStatus('');
     setSelectedBookmarked(false);
     setPage(0);
+    setSearchParams({}, { replace: true });
   };
 
   const handleDelete = (id) => {
@@ -906,9 +935,11 @@ export default function Explorer() {
                 value={selectedSubjectId || ''} 
                 onChange={(e) => {
                   const val = e.target.value;
-                  setSelectedSubjectId(val ? parseInt(val) : null);
+                  const sId = val ? parseInt(val) : null;
+                  setSelectedSubjectId(sId);
                   setSelectedTopicId(null);
                   setPage(0);
+                  updateUrlParams({ subjectId: sId, topicId: null, page: 0 });
                 }}
               >
                 <option value="">All Subjects</option>
@@ -925,8 +956,10 @@ export default function Explorer() {
                 value={selectedTopicId || ''} 
                 onChange={(e) => {
                   const val = e.target.value;
-                  setSelectedTopicId(val ? parseInt(val) : null);
+                  const tId = val ? parseInt(val) : null;
+                  setSelectedTopicId(tId);
                   setPage(0);
+                  updateUrlParams({ topicId: tId, page: 0 });
                 }}
                 disabled={!selectedSubjectId}
               >
@@ -940,8 +973,10 @@ export default function Explorer() {
             {/* Type Filter */}
             <div style={{ flex: '1 1 150px', minWidth: '130px' }}>
               <select className="form-select" value={selectedType} onChange={(e) => {
-                setSelectedType(e.target.value);
+                const val = e.target.value;
+                setSelectedType(val);
                 setPage(0);
+                updateUrlParams({ type: val, page: 0 });
               }}>
                 <option value="">All Types</option>
                 <option value="MCQ">MCQ (Multiple Choice)</option>
@@ -953,8 +988,10 @@ export default function Explorer() {
             {/* Year Filter */}
             <div style={{ flex: '1 1 120px', minWidth: '110px' }}>
               <select className="form-select" value={selectedYear} onChange={(e) => {
-                setSelectedYear(e.target.value);
+                const val = e.target.value;
+                setSelectedYear(val);
                 setPage(0);
+                updateUrlParams({ year: val, page: 0 });
               }}>
                 <option value="">All Years</option>
                 {availableYears.map(year => (
@@ -972,8 +1009,10 @@ export default function Explorer() {
                   placeholder="Search tags (e.g. matrix)" 
                   value={selectedTag}
                   onChange={(e) => {
-                    setSelectedTag(e.target.value);
+                    const val = e.target.value;
+                    setSelectedTag(val);
                     setPage(0);
+                    updateUrlParams({ tag: val, page: 0 });
                   }}
                 />
               </div>
@@ -986,8 +1025,10 @@ export default function Explorer() {
                   className="form-select" 
                   value={selectedSolvedStatus} 
                   onChange={(e) => {
-                    setSelectedSolvedStatus(e.target.value);
+                    const val = e.target.value;
+                    setSelectedSolvedStatus(val);
                     setPage(0);
+                    updateUrlParams({ solvedStatus: val, page: 0 });
                   }}
                   style={{ height: '42px' }}
                 >
