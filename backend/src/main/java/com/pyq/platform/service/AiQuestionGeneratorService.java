@@ -57,6 +57,7 @@ public class AiQuestionGeneratorService {
     private final AiGenerationLedgerRepository ledgerRepository;
     private final SystemSettingsRepository systemSettingsRepository;
     private final GroqUsageService groqUsageService;
+    private final GroqKeyManager groqKeyManager;
 
     public AiQuestionGeneratorService(
             SubjectRepository subjectRepository,
@@ -64,21 +65,20 @@ public class AiQuestionGeneratorService {
             QuestionRepository questionRepository,
             AiGenerationLedgerRepository ledgerRepository,
             SystemSettingsRepository systemSettingsRepository,
-            GroqUsageService groqUsageService) {
+            GroqUsageService groqUsageService,
+            GroqKeyManager groqKeyManager) {
         this.subjectRepository = subjectRepository;
         this.topicRepository = topicRepository;
         this.questionRepository = questionRepository;
         this.ledgerRepository = ledgerRepository;
         this.systemSettingsRepository = systemSettingsRepository;
         this.groqUsageService = groqUsageService;
+        this.groqKeyManager = groqKeyManager;
     }
 
     @PostConstruct
     public void init() {
-        if (groqApiKey1 != null && !groqApiKey1.isBlank() && !groqApiKey1.equals("your-groq-api-key")) apiKeys.add(groqApiKey1);
-        if (groqApiKey2 != null && !groqApiKey2.isBlank()) apiKeys.add(groqApiKey2);
-        if (groqApiKey3 != null && !groqApiKey3.isBlank()) apiKeys.add(groqApiKey3);
-        if (apiKeys.isEmpty() && System.getenv("GROQ_API_KEY") != null) apiKeys.add(System.getenv("GROQ_API_KEY"));
+        log.info("🤖 [AiQuestionGeneratorService] Multi-Key Groq Generator ready with {} keys.", groqKeyManager.getKeyCount());
     }
 
     private synchronized String getNextApiKey() {
@@ -358,7 +358,7 @@ public class AiQuestionGeneratorService {
         // ── PRIMARY: Groq Llama 3.3 70B (Heavy Reasoning Model for Precision Generation) ──
         try {
             log.info("🤖 Attempting Question Generation via Groq Llama 3.3 70B (Heavy Generator)...");
-            JsonNode groqRes = executeGroqCall(prompt, true, 600);
+            JsonNode groqRes = executeGroqCall(prompt, true, 2048);
             if (groqRes != null) return groqRes;
         } catch (Exception e) {
             log.warn("⚠️ Groq generator call failed, falling back to Gemini! Error: {}", e.getMessage());
@@ -397,10 +397,10 @@ public class AiQuestionGeneratorService {
                   "   - \"answer\": \"A\" (for MCQ), \"A,C\" (for MSQ), or \"42\" (for NAT)\n" +
                   "   - \"explanation\": \"Concise 2-sentence mathematical proof explaining why the answer is correct.\"\n");
 
-        // ── PRIMARY: Groq Llama 3.3 70B (Heavy Reasoning Model for Blind Verification) ──
+        // ── DUAL DUAL-VERIFIER: Groq Llama 3.3 70B (Heavy Reasoning Model for Blind Verification) ──
         try {
             log.info("🤖 Attempting Answer Verification via Groq Llama 3.3 70B (Heavy Verifier)...");
-            JsonNode res = executeGroqCall(sb.toString(), true, 450);
+            JsonNode res = executeGroqCall(sb.toString(), true, 1200);
             if (res != null) {
                 String ans = res.has("answer") ? res.get("answer").asText() : "";
                 String exp = res.has("explanation") ? res.get("explanation").asText() : "";
@@ -430,9 +430,11 @@ public class AiQuestionGeneratorService {
     }
 
     private JsonNode executeGroqCall(String prompt, boolean isHeavyModel, int maxTokens) {
-        int maxRetries = 3;
+        int maxRetries = Math.max(3, groqKeyManager.getKeyCount() * 2);
+        int currentMaxTokens = maxTokens;
+
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            String apiKey = getNextApiKey();
+            String apiKey = groqKeyManager.getNextKey();
             if (apiKey == null) return null;
 
             try {
@@ -443,7 +445,7 @@ public class AiQuestionGeneratorService {
                 ObjectNode req = objectMapper.createObjectNode();
                 req.put("model", isHeavyModel ? heavyModel : fastModel);
                 req.put("temperature", 0.1);
-                req.put("max_tokens", maxTokens);
+                req.put("max_tokens", currentMaxTokens);
                 req.put("response_format", objectMapper.createObjectNode().put("type", "json_object"));
 
                 ArrayNode messages = objectMapper.createArrayNode();
@@ -458,6 +460,7 @@ public class AiQuestionGeneratorService {
                         if (root.has("usage") && root.get("usage").has("total_tokens")) {
                             long tokensUsed = root.get("usage").get("total_tokens").asLong();
                             totalAiGeneratorTokens.addAndGet(tokensUsed);
+                            groqUsageService.addTokens(tokensUsed);
                             log.info("🤖 [AI Generator Token Ledger] Call consumed {} tokens. Total AI Generator Tokens: {}", tokensUsed, totalAiGeneratorTokens.get());
                         }
                         if (root.has("choices") && root.get("choices").isArray() && root.get("choices").size() > 0) {
@@ -467,13 +470,14 @@ public class AiQuestionGeneratorService {
                     }
                 }
             } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
-                log.warn("⚠️ Groq Rate Limit (429) encountered on attempt {}! Rotating API Key & pausing 3 seconds...", attempt);
-                try {
-                    Thread.sleep(3000);
-                } catch (InterruptedException ignored) {}
+                log.warn("⚠️ Groq Rate Limit (429) on attempt {}! Marking key in 60s cooldown & immediately switching to next API key...", attempt);
+                groqKeyManager.markRateLimited(apiKey);
+            } catch (org.springframework.web.client.HttpClientErrorException.BadRequest e) {
+                log.warn("⚠️ Groq 400 Bad Request on attempt {} (Error: {}). Expanding max_tokens from {} to {} and retrying...", 
+                        attempt, e.getResponseBodyAsString(), currentMaxTokens, currentMaxTokens + 1000);
+                currentMaxTokens += 1000;
             } catch (Exception e) {
-                log.error("Groq API call failed during question generation (attempt {})", attempt, e);
-                break;
+                log.error("Groq API call failed during question generation (attempt {}): {}", attempt, e.getMessage());
             }
         }
         return null;
@@ -608,23 +612,82 @@ public class AiQuestionGeneratorService {
             }
             return false;
         } else {
-            // NAT Numerical match (support fractions like 10/3 => 3.33)
-            try {
-                double gNum = parseNumberOrFraction(g);
-                double vNum = parseNumberOrFraction(v);
-                return Math.abs(gNum - vNum) <= 0.05;
-            } catch (Exception e) {
-                return g.equalsIgnoreCase(v);
-            }
+            // NAT Numerical match with GATE tolerance, range support, fractions, and unit stripping
+            return isNatAnswerMatch(gen, ver);
         }
     }
 
-    private double parseNumberOrFraction(String str) {
-        if (str.contains("/")) {
-            String[] parts = str.split("/");
-            return Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]);
+    private boolean isNatAnswerMatch(String gRaw, String vRaw) {
+        if (gRaw == null || vRaw == null) return false;
+        String g = gRaw.trim().toLowerCase();
+        String v = vRaw.trim().toLowerCase();
+
+        if (g.equalsIgnoreCase(v)) return true;
+
+        List<Double> gNumbers = extractDoubles(g);
+        List<Double> vNumbers = extractDoubles(v);
+
+        if (gNumbers.isEmpty() || vNumbers.isEmpty()) {
+            return g.replaceAll("[^a-z0-9]", "").equalsIgnoreCase(v.replaceAll("[^a-z0-9]", ""));
         }
-        return Double.parseDouble(str);
+
+        // Case A: Single number vs Single number (e.g. 3.33 vs 3.333 or 42 vs 42.0)
+        if (gNumbers.size() == 1 && vNumbers.size() == 1) {
+            double gNum = gNumbers.get(0);
+            double vNum = vNumbers.get(0);
+            double diff = Math.abs(gNum - vNum);
+            if (diff <= 0.1) return true;
+            // Check relative error (within 2%)
+            if (Math.abs(vNum) > 0.0001 && (diff / Math.abs(vNum)) <= 0.02) return true;
+            return false;
+        }
+
+        // Case B: Range vs Single Number (e.g. "10 to 12" vs "11.5" or "3.3 to 3.4" vs "3.33")
+        if (gNumbers.size() == 2 && vNumbers.size() == 1) {
+            double min = Math.min(gNumbers.get(0), gNumbers.get(1));
+            double max = Math.max(gNumbers.get(0), gNumbers.get(1));
+            double val = vNumbers.get(0);
+            return val >= (min - 0.05) && val <= (max + 0.05);
+        }
+        if (vNumbers.size() == 2 && gNumbers.size() == 1) {
+            double min = Math.min(vNumbers.get(0), vNumbers.get(1));
+            double max = Math.max(vNumbers.get(0), vNumbers.get(1));
+            double val = gNumbers.get(0);
+            return val >= (min - 0.05) && val <= (max + 0.05);
+        }
+
+        // Case C: Range vs Range (e.g. "10 to 12" vs "10-12")
+        if (gNumbers.size() >= 2 && vNumbers.size() >= 2) {
+            double gMin = Math.min(gNumbers.get(0), gNumbers.get(1));
+            double gMax = Math.max(gNumbers.get(0), gNumbers.get(1));
+            double vMin = Math.min(vNumbers.get(0), vNumbers.get(1));
+            double vMax = Math.max(vNumbers.get(0), vNumbers.get(1));
+            return Math.abs(gMin - vMin) <= 0.15 && Math.abs(gMax - vMax) <= 0.15;
+        }
+
+        return false;
+    }
+
+    private List<Double> extractDoubles(String str) {
+        List<Double> list = new ArrayList<>();
+        if (str == null) return list;
+        // Handle fraction like 10/3 -> 3.33
+        if (str.contains("/")) {
+            try {
+                String[] parts = str.replaceAll("[^0-9/.-]", "").split("/");
+                if (parts.length == 2 && Double.parseDouble(parts[1]) != 0) {
+                    list.add(Double.parseDouble(parts[0]) / Double.parseDouble(parts[1]));
+                    return list;
+                }
+            } catch (Exception ignored) {}
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("-?\\d+(?:\\.\\d+)?").matcher(str);
+        while (m.find()) {
+            try {
+                list.add(Double.parseDouble(m.group()));
+            } catch (Exception ignored) {}
+        }
+        return list;
     }
 
     public void saveQuestionToDatabase(Subject subject, Topic topic, String difficulty, String qType, JsonNode node, String genAnswer, String explanation, String status, String checksumHash) {

@@ -421,7 +421,22 @@ export default function PremiumPage() {
                 currentOffer = t3.offer;
               }
 
-              const finalPrice = appliedCoupon ? (appliedCoupon.finalPrice !== undefined ? appliedCoupon.finalPrice : appliedCoupon.discountedAmount) : currentPrice;
+              // Dynamic proportional coupon calculation per tier
+              let calculatedFinalPrice = currentPrice;
+              let calculatedDiscountAmount = 0;
+
+              if (appliedCoupon) {
+                if (appliedCoupon.discountType === 'PERCENTAGE' || appliedCoupon.discountPercent || appliedCoupon.discountPercentage) {
+                  const pct = appliedCoupon.discountPercent || appliedCoupon.discountPercentage || appliedCoupon.discountValue || 0;
+                  calculatedDiscountAmount = Math.round((currentPrice * pct) / 100);
+                } else if (appliedCoupon.discountAmount || appliedCoupon.discountValue) {
+                  calculatedDiscountAmount = appliedCoupon.discountAmount || appliedCoupon.discountValue || 0;
+                } else if (appliedCoupon.discountedAmount !== undefined && appliedCoupon.originalPrice) {
+                  const pct = Math.round(((appliedCoupon.originalPrice - appliedCoupon.discountedAmount) / appliedCoupon.originalPrice) * 100);
+                  calculatedDiscountAmount = Math.round((currentPrice * pct) / 100);
+                }
+                calculatedFinalPrice = Math.max(0, currentPrice - calculatedDiscountAmount);
+              }
 
               return (
                 <div style={{ marginBottom: '24px' }}>
@@ -429,7 +444,7 @@ export default function PremiumPage() {
                     {appliedCoupon ? (
                       <>
                         <span style={{ fontSize: '3rem', fontWeight: 800, color: '#10b981' }}>
-                          ₹{finalPrice}
+                          ₹{calculatedFinalPrice}
                         </span>
                         <span style={{ fontSize: '1.4rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
                           ₹{currentPrice}
@@ -457,7 +472,7 @@ export default function PremiumPage() {
                       marginBottom: '8px',
                       display: 'inline-block'
                     }}>
-                      🎟️ {appliedCoupon.code} Applied — Saved ₹{appliedCoupon.discountAmount}!
+                      🎟️ {appliedCoupon.code} Applied — Saved ₹{calculatedDiscountAmount}!
                     </div>
                   )}
 

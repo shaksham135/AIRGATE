@@ -242,7 +242,7 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
                   return (
                     <div 
                       key={idx}
-                      onClick={() => { setSelectedDuration(t.duration); setAppliedCoupon(null); setCouponMsg(''); }}
+                      onClick={() => { setSelectedDuration(t.duration); }}
                       style={{
                         padding: '10px 8px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', position: 'relative',
                         border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
@@ -319,33 +319,56 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
               )}
             </div>
 
-            {/* Final Price Summary Box */}
-            <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: '16px',
-              padding: '16px 24px',
-              marginBottom: '28px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: appliedCoupon ? '6px' : '0' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Original Plan Price:</span>
-                <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>₹{originalPrice}</span>
-              </div>
+            {/* Dynamic Final Price Summary Box */}
+            {(() => {
+              const activeTier = [tiers.tier1, tiers.tier2, tiers.tier3].find(t => t.duration === selectedDuration) || tiers.tier3;
+              const originalPrice = activeTier ? activeTier.price : 449.0;
 
-              {appliedCoupon && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
-                  <span>Discount ({appliedCoupon.code}):</span>
-                  <span>-₹{appliedCoupon.discountAmount}</span>
+              let calculatedDiscountAmount = 0;
+              let calculatedFinalPrice = originalPrice;
+
+              if (appliedCoupon) {
+                if (appliedCoupon.discountType === 'PERCENTAGE' || appliedCoupon.discountPercent || appliedCoupon.discountPercentage) {
+                  const pct = appliedCoupon.discountPercent || appliedCoupon.discountPercentage || appliedCoupon.discountValue || 0;
+                  calculatedDiscountAmount = Math.round((originalPrice * pct) / 100);
+                } else if (appliedCoupon.discountAmount || appliedCoupon.discountValue) {
+                  calculatedDiscountAmount = appliedCoupon.discountAmount || appliedCoupon.discountValue || 0;
+                } else if (appliedCoupon.discountedAmount !== undefined && appliedCoupon.originalPrice) {
+                  const pct = Math.round(((appliedCoupon.originalPrice - appliedCoupon.discountedAmount) / appliedCoupon.originalPrice) * 100);
+                  calculatedDiscountAmount = Math.round((originalPrice * pct) / 100);
+                }
+                calculatedFinalPrice = Math.max(0, originalPrice - calculatedDiscountAmount);
+              }
+
+              return (
+                <div style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '16px',
+                  padding: '16px 24px',
+                  marginBottom: '28px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: appliedCoupon ? '6px' : '0' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Original Plan Price:</span>
+                    <span style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>₹{originalPrice}</span>
+                  </div>
+
+                  {appliedCoupon && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10b981', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
+                      <span>Discount ({appliedCoupon.code}):</span>
+                      <span>-₹{calculatedDiscountAmount}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: appliedCoupon ? '1px dashed rgba(255,255,255,0.1)' : 'none', paddingTop: appliedCoupon ? '8px' : '0' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Total Payable:</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-title)' }}>
+                      ₹{calculatedFinalPrice}
+                    </span>
+                  </div>
                 </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: appliedCoupon ? '1px dashed rgba(255,255,255,0.1)' : 'none', paddingTop: appliedCoupon ? '8px' : '0' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Total Payable:</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-title)' }}>
-                  ₹{appliedCoupon ? appliedCoupon.finalPrice : originalPrice}
-                </span>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: '12px' }}>

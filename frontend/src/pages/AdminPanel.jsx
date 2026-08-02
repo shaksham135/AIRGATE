@@ -143,6 +143,84 @@ export default function AdminPanel() {
   const [bannerTextColor, setBannerTextColor] = useState('#ffffff');
   const [bannerActionMsg, setBannerActionMsg] = useState('');
 
+  // Loader Tips Hub State
+  const [adminTips, setAdminTips] = useState([]);
+  const [tipsLoading, setTipsLoading] = useState(false);
+  const [newTipText, setNewTipText] = useState('');
+  const [newTipCategory, setNewTipCategory] = useState('Motivation');
+  const [tipActionMsg, setTipActionMsg] = useState('');
+
+  const fetchTipsAdmin = async () => {
+    try {
+      setTipsLoading(true);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/tips`, {
+        headers: AuthService.getAuthHeader()
+      });
+      if (Array.isArray(res.data)) {
+        setAdminTips(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load admin tips", err);
+    } finally {
+      setTipsLoading(false);
+    }
+  };
+
+  const handleCreateTip = async (e) => {
+    e.preventDefault();
+    if (!newTipText.trim()) return;
+    try {
+      setTipActionMsg('');
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/tips`, {
+        text: newTipText.trim(),
+        category: newTipCategory,
+        active: true
+      }, { headers: AuthService.getAuthHeader() });
+      if (res.data) {
+        setTipActionMsg('✅ Loader tip created successfully!');
+        setNewTipText('');
+        fetchTipsAdmin();
+      }
+    } catch (err) {
+      alert("Failed to create tip.");
+    }
+  };
+
+  const handleToggleTipActive = async (id, currentActive) => {
+    try {
+      await axios.put(`${API_CONFIG.BASE_URL}/api/admin/tips/${id}`, {
+        active: !currentActive
+      }, { headers: AuthService.getAuthHeader() });
+      setAdminTips(prev => prev.map(t => t.id === id ? { ...t, active: !currentActive } : t));
+    } catch (err) {
+      alert("Failed to update tip status.");
+    }
+  };
+
+  const handleDeleteTip = async (id) => {
+    try {
+      await axios.delete(`${API_CONFIG.BASE_URL}/api/admin/tips/${id}`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setAdminTips(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      alert("Failed to delete tip.");
+    }
+  };
+
+  const handleSeedTips = async () => {
+    try {
+      setTipActionMsg('');
+      await axios.post(`${API_CONFIG.BASE_URL}/api/admin/tips/seed`, {}, {
+        headers: AuthService.getAuthHeader()
+      });
+      setTipActionMsg('✅ Seeded 50 default GATE tips!');
+      fetchTipsAdmin();
+    } catch (err) {
+      alert("Failed to seed tips.");
+    }
+  };
+
   const fetchCoupons = async () => {
     try {
       setCouponsLoading(true);
@@ -709,6 +787,7 @@ export default function AdminPanel() {
         }}>
           {[
             { key: 'metrics',  icon: <FiActivity size={14}/>,      label: 'Metrics',       accent: '#10b981' },
+            { key: 'tips',     icon: <FiBookOpen size={14}/>,      label: 'Loader Tips',   accent: '#f59e0b', onClick: fetchTipsAdmin },
             { key: 'coupons',  icon: <FiGift size={14}/>,          label: 'Coupons',       accent: '#ec4899', onClick: fetchCoupons },
             { key: 'banners',  icon: <FiSend size={14}/>,          label: 'Ad Banners',     accent: '#8b5cf6', onClick: fetchBanners },
             { key: 'backups',  icon: <FiDatabase size={14}/>,      label: 'DB Vault',      accent: '#6366f1', suffix: '🔒' },
@@ -2960,6 +3039,149 @@ export default function AdminPanel() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* DYNAMIC LOADER TIPS MANAGEMENT TAB */}
+      {activeTab === 'tips' && (
+        <div style={{ width: '100%', maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '20px',
+            padding: '32px',
+            marginBottom: '32px',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.4rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
+                  💡 Dynamic Loader Tips & Motivation Hub ({adminTips.length})
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
+                  Manage short 1-line GATE tips & motivation displayed on loading screens across the website.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  onClick={handleSeedTips} 
+                  className="btn btn-outline"
+                  style={{ padding: '8px 16px', borderRadius: '10px', fontSize: '0.85rem' }}
+                >
+                  ⚡ Reset / Seed Default 50 Tips
+                </button>
+              </div>
+            </div>
+
+            {tipActionMsg && (
+              <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--color-success)', color: 'var(--color-success)', padding: '12px 16px', borderRadius: '10px', fontSize: '0.88rem', marginBottom: '20px', fontWeight: 600 }}>
+                {tipActionMsg}
+              </div>
+            )}
+
+            {/* Create New Tip Form */}
+            <form onSubmit={handleCreateTip} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px', backgroundColor: 'var(--bg-main)', padding: '16px', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+              <div style={{ flex: '1 1 180px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 700 }}>Category</label>
+                <select 
+                  value={newTipCategory} 
+                  onChange={e => setNewTipCategory(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem' }}
+                >
+                  <option value="Motivation">Motivation</option>
+                  <option value="Exam Strategy">Exam Strategy</option>
+                  <option value="Algorithms">Algorithms</option>
+                  <option value="Operating Systems">Operating Systems</option>
+                  <option value="DBMS">DBMS</option>
+                  <option value="Networks">Networks</option>
+                  <option value="Compiler">Compiler</option>
+                  <option value="Digital Logic">Digital Logic</option>
+                  <option value="CoA">CoA</option>
+                  <option value="Data Structures">Data Structures</option>
+                  <option value="ToC">ToC</option>
+                </select>
+              </div>
+
+              <div style={{ flex: '3 1 300px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 700 }}>Short Tip / Motivation Line (Max 1 short line)</label>
+                <input 
+                  type="text" 
+                  value={newTipText}
+                  onChange={e => setNewTipText(e.target.value)}
+                  placeholder="e.g. 🎯 Target Top 100 in GATE 2027!"
+                  style={{ width: '100%', padding: '10px 14px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem' }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', borderRadius: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FiPlusCircle /> Add Tip
+                </button>
+              </div>
+            </form>
+
+            {/* Tips List Table */}
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                    <th style={{ padding: '12px' }}>ID</th>
+                    <th style={{ padding: '12px' }}>Category</th>
+                    <th style={{ padding: '12px', width: '50%' }}>Tip Text</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Status</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tipsLoading ? (
+                    <tr>
+                      <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading tips...</td>
+                    </tr>
+                  ) : adminTips.length > 0 ? (
+                    adminTips.map(t => (
+                      <tr key={t.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '12px', fontWeight: 600 }}>#{t.id}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span style={{ backgroundColor: 'rgba(245,158,11,0.12)', color: '#f59e0b', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                            {t.category || 'General'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: '#fff', fontWeight: 600 }}>{t.text}</td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          <button 
+                            onClick={() => handleToggleTipActive(t.id, t.active)}
+                            style={{
+                              border: 'none', background: t.active ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: t.active ? '#10b981' : '#ef4444', padding: '4px 10px', borderRadius: '12px',
+                              cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700
+                            }}
+                          >
+                            {t.active ? 'Active' : 'Disabled'}
+                          </button>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <button 
+                            onClick={() => handleDeleteTip(t.id)}
+                            style={{ border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem' }}
+                          >
+                            <FiTrash2 /> Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No loader tips in database. Click "Reset / Seed Default 50 Tips" above!
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 

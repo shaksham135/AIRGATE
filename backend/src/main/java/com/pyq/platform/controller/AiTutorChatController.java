@@ -8,16 +8,22 @@ import com.pyq.platform.security.UserDetailsImpl;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -29,20 +35,23 @@ public class AiTutorChatController {
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
 
+    @Value("${ai.tutor.provider:AUTO}")
+    private String tutorProvider; // AUTO, DEEPSEEK, GROQ, GEMINI, OPENAI
+
+    @Value("${ai.tutor.api.url:https://api.deepseek.com/v1/chat/completions}")
+    private String tutorApiUrl;
+
+    @Value("${ai.tutor.api.key:}")
+    private String tutorApiKey;
+
+    @Value("${ai.tutor.model:deepseek-chat}")
+    private String tutorModel;
+
     @Value("${gemini.api.key.tutor:}")
-    private String geminiTutorKey;  // PAID Gemini key — dedicated for AI Tutor only
+    private String geminiTutorKey; // Dedicated Gemini key
 
     @Value("${gemini.model:gemini-2.5-flash}")
-    private String geminiModel;     // Model to use for AI Tutor (same free-tier model)
-
-    @Value("${groq.api.key:}")
-    private String primaryKey;
-
-    @Value("${groq.api.key.2:}")
-    private String groqKey2;
-
-    @Value("${groq.api.key.3:}")
-    private String groqKey3;
+    private String geminiModel;
 
     @Value("${groq.model.fast:llama-3.1-8b-instant}")
     private String fastModel;
@@ -52,54 +61,44 @@ public class AiTutorChatController {
     private final com.pyq.platform.repository.AiRequestRepository aiRequestRepository;
     private final com.pyq.platform.repository.UserRepository userRepository;
     private final com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository;
+    private final com.pyq.platform.service.GroqKeyManager groqKeyManager;
 
     public AiTutorChatController(com.pyq.platform.repository.AiRequestRepository aiRequestRepository,
                                  com.pyq.platform.repository.UserRepository userRepository,
-                                 com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository) {
+                                 com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository,
+                                 com.pyq.platform.service.GroqKeyManager groqKeyManager) {
         this.aiRequestRepository = aiRequestRepository;
         this.userRepository = userRepository;
         this.systemSettingsRepository = systemSettingsRepository;
+        this.groqKeyManager = groqKeyManager;
     }
 
     @PostConstruct
     public void init() {
-        // Resolve Gemini tutor key from env if not set in properties
+        // Resolve DeepSeek / Custom Key from env if not set in application properties
+        if (tutorApiKey == null || tutorApiKey.isBlank()) {
+            tutorApiKey = System.getenv("AI_TUTOR_API_KEY");
+            if (tutorApiKey == null || tutorApiKey.isBlank()) {
+                tutorApiKey = System.getenv("DEEPSEEK_API_KEY");
+            }
+        }
+
+        // Resolve Gemini tutor key from env if not set
         if (geminiTutorKey == null || geminiTutorKey.isBlank()) {
             geminiTutorKey = System.getenv("GEMINI_API_KEY_TUTOR");
         }
-        // Resolve Groq fallback key
-        if (primaryKey == null || primaryKey.isBlank()) {
-            primaryKey = System.getenv("GROQ_API_KEY");
-        }
-        if (groqKey2 == null || groqKey2.isBlank()) {
-            groqKey2 = System.getenv("GROQ_API_KEY_2");
-        }
-        if (groqKey3 == null || groqKey3.isBlank()) {
-            groqKey3 = System.getenv("GROQ_API_KEY_3");
-        }
 
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
-                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10000);
         factory.setReadTimeout(40000);
         this.restTemplate = new RestTemplate(factory);
+
+        log.info("🤖 [AiTutorChatController] Initialized with Provider Mode: {}, Target Model: {}", tutorProvider, tutorModel);
     }
 
     /**
      * POST /api/chat/tutor
-     * Premium-only endpoint. Sends a user message along with question context
-     * to Groq and returns the AI tutor's reply.
-     *
-     * Request body:
-     * {
-     *   "message": "explain step 2",
-     *   "questionText": "...",
-     *   "questionType": "MCQ",
-     *   "subjectName": "Operating Systems",
-     *   "topicName": "CPU Scheduling",
-     *   "suggestedAnswer": "B",
-     *   "history": [ { "role": "user", "text": "..." }, { "role": "assistant", "text": "..." } ]
-     * }
+     * Authenticated endpoint. Sends user message + question context to AI Tutor.
      */
     @PostMapping("/tutor")
     @PreAuthorize("isAuthenticated()")
@@ -107,8 +106,17 @@ public class AiTutorChatController {
             @RequestBody Map<String, Object> body,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
-        // Check user status and determine daily limit
-        boolean isPremium = userDetails != null && userDetails.isPremium();
+        if (userDetails == null || userDetails.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized access."));
+        }
+
+        // Fetch live user status & check subscription expiry
+        com.pyq.platform.entity.User dbUser = userRepository.findById(userDetails.getId()).orElse(null);
+        boolean isPremium = dbUser != null && Boolean.TRUE.equals(dbUser.getIsPremium());
+        if (isPremium && dbUser.getPremiumExpiresAt() != null && dbUser.getPremiumExpiresAt().isBefore(LocalDateTime.now())) {
+            isPremium = false;
+        }
+
         int dailyLimit = isPremium ? 50 : 3;
 
         // Load settings to fetch dynamically configured AI limit for premium users
@@ -119,11 +127,11 @@ public class AiTutorChatController {
                     dailyLimit = settings.getAiDailyLimitPremium();
                 }
             } catch (Exception e) {
-                // fallback to default premium limit
+                // fallback to default limit
             }
         }
 
-        // DB-backed daily rate limit — survives server restarts unlike in-memory buckets
+        // DB-backed daily rate limit — survives server restarts
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
         long usedToday = aiRequestRepository.countByUserIdAndRequestedAtAfter(userDetails.getId(), startOfToday);
         if (usedToday >= dailyLimit) {
@@ -179,20 +187,63 @@ public class AiTutorChatController {
             int promptTokens = 0;
             int completionTokens = 0;
 
-            // ── PRIMARY: Google Gemini 1.5 Flash (PAID tutor key) ────────────
+            // ── 1. PRIMARY: DeepSeek / Custom OpenAI-Compatible Gateway ─────────
+            if (tutorApiKey != null && !tutorApiKey.isBlank()) {
+                try {
+                    log.info("🚀 [AI Tutor] Using DeepSeek / Custom AI Provider ({}) as primary model...", tutorModel);
+                    ObjectNode payload = objectMapper.createObjectNode();
+                    payload.put("model", tutorModel);
+                    payload.put("temperature", 0.3);
+                    payload.put("max_tokens", 1000);
+
+                    ArrayNode messages = payload.putArray("messages");
+                    messages.addObject().put("role", "system").put("content", systemPrompt);
+
+                    int start = Math.max(0, history.size() - 6);
+                    for (int i = start; i < history.size(); i++) {
+                        Map<String, String> turn = history.get(i);
+                        String role = "assistant".equals(turn.get("role")) ? "assistant" : "user";
+                        messages.addObject().put("role", role).put("content", turn.getOrDefault("text", ""));
+                    }
+                    messages.addObject().put("role", "user").put("content", userMessage);
+
+                    HttpHeaders dsHeaders = new HttpHeaders();
+                    dsHeaders.setContentType(MediaType.APPLICATION_JSON);
+                    dsHeaders.setBearerAuth(tutorApiKey.trim());
+
+                    HttpEntity<String> entity = new HttpEntity<>(payload.toString(), dsHeaders);
+                    ResponseEntity<String> res = restTemplate.exchange(tutorApiUrl, HttpMethod.POST, entity, String.class);
+
+                    if (res.getStatusCode().is2xxSuccessful() && res.getBody() != null) {
+                        JsonNode json = objectMapper.readTree(res.getBody());
+                        reply = json.path("choices").get(0).path("message").path("content").asText("");
+                        model = json.path("model").asText(tutorModel);
+                        promptTokens = json.path("usage").path("prompt_tokens").asInt(0);
+                        completionTokens = json.path("usage").path("completion_tokens").asInt(0);
+
+                        if (!reply.isBlank()) {
+                            log.info("✅ [AI Tutor] DeepSeek / Custom Provider response delivered successfully!");
+                            logAiRequest(userDetails.getId(), model, promptTokens, completionTokens, topicName);
+                            return ResponseEntity.ok(Map.of("reply", reply));
+                        }
+                    }
+                } catch (Exception dsEx) {
+                    log.warn("⚠️ [AI Tutor] DeepSeek / Custom Provider call failed ({}). Falling back...", dsEx.getMessage());
+                }
+            }
+
+            // ── 2. SECONDARY: Google Gemini 1.5/2.5 Flash ───────────────────────
             if (geminiTutorKey != null && !geminiTutorKey.isBlank()) {
                 try {
-                    log.info("🌟 [AI Tutor] Using Google Gemini (paid tutor key) as primary...");
+                    log.info("🌟 [AI Tutor] Using Google Gemini as secondary provider...");
                     ObjectNode geminiBody = objectMapper.createObjectNode();
 
-                    // System instruction
                     ObjectNode sysInstruction = objectMapper.createObjectNode();
                     ArrayNode sysParts = objectMapper.createArrayNode();
                     sysParts.add(objectMapper.createObjectNode().put("text", systemPrompt));
                     sysInstruction.set("parts", sysParts);
                     geminiBody.set("systemInstruction", sysInstruction);
 
-                    // Build contents from history + current message
                     ArrayNode contents = objectMapper.createArrayNode();
                     int start = Math.max(0, history.size() - 6);
                     for (int i = start; i < history.size(); i++) {
@@ -205,7 +256,6 @@ public class AiTutorChatController {
                         msgObj.set("parts", msgParts);
                         contents.add(msgObj);
                     }
-                    // Current user message
                     ObjectNode curMsg = objectMapper.createObjectNode();
                     curMsg.put("role", "user");
                     ArrayNode curParts = objectMapper.createArrayNode();
@@ -223,8 +273,8 @@ public class AiTutorChatController {
                     geminiHeaders.setContentType(MediaType.APPLICATION_JSON);
                     String geminiUrl = GEMINI_BASE_URL + geminiModel + ":generateContent?key=" + geminiTutorKey;
                     ResponseEntity<String> geminiResp = restTemplate.exchange(
-                        geminiUrl, HttpMethod.POST,
-                        new HttpEntity<>(geminiBody.toString(), geminiHeaders), String.class);
+                            geminiUrl, HttpMethod.POST,
+                            new HttpEntity<>(geminiBody.toString(), geminiHeaders), String.class);
 
                     JsonNode geminiJson = objectMapper.readTree(geminiResp.getBody());
                     reply = geminiJson.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText("");
@@ -233,15 +283,7 @@ public class AiTutorChatController {
                     completionTokens = geminiJson.path("usageMetadata").path("candidatesTokenCount").asInt(0);
 
                     if (!reply.isBlank()) {
-                        // Log AI request
-                        try {
-                            com.pyq.platform.entity.User user = userRepository.findById(userDetails.getId()).orElse(null);
-                            if (user != null) {
-                                aiRequestRepository.save(com.pyq.platform.entity.AiRequest.builder()
-                                        .user(user).modelName(model).promptTokens(promptTokens)
-                                        .completionTokens(completionTokens).topicName(topicName).build());
-                            }
-                        } catch (Exception ex) { log.error("Failed to log AI request: {}", ex.getMessage()); }
+                        logAiRequest(userDetails.getId(), model, promptTokens, completionTokens, topicName);
                         return ResponseEntity.ok(Map.of("reply", reply));
                     }
                 } catch (Exception gemEx) {
@@ -249,92 +291,103 @@ public class AiTutorChatController {
                 }
             }
 
-            // ── FALLBACK: Groq ────────────────────────────────────────────────
-            log.info("🔌 [AI Tutor] Falling back to Groq...");
+            // ── 3. TERTIARY / FALLBACK: Groq Multi-Key Load Balancer ───────────
+            log.info("🔌 [AI Tutor] Executing Groq Multi-Key Fallback...");
             ObjectNode payload = objectMapper.createObjectNode();
             payload.put("model", fastModel);
             payload.put("temperature", 0.3);
             payload.put("max_tokens", 800);
 
             ArrayNode messages = payload.putArray("messages");
-            ObjectNode sysMsg = messages.addObject();
-            sysMsg.put("role", "system");
-            sysMsg.put("content", systemPrompt);
+            messages.addObject().put("role", "system").put("content", systemPrompt);
 
-            // Inject conversation history (last 6 turns max to save tokens)
             int start = Math.max(0, history.size() - 6);
             for (int i = start; i < history.size(); i++) {
                 Map<String, String> turn = history.get(i);
                 String role = "assistant".equals(turn.get("role")) ? "assistant" : "user";
-                ObjectNode histMsg = messages.addObject();
-                histMsg.put("role", role);
-                histMsg.put("content", turn.getOrDefault("text", ""));
+                messages.addObject().put("role", role).put("content", turn.getOrDefault("text", ""));
             }
 
-            // Build Current User message with Multimodal Vision support (if Cloudinary image is attached)
             ObjectNode userMsg = messages.addObject();
             userMsg.put("role", "user");
 
             if (imagePath != null && !imagePath.isBlank()) {
                 ArrayNode contentArray = userMsg.putArray("content");
-                ObjectNode textBlock = contentArray.addObject();
-                textBlock.put("type", "text");
-                textBlock.put("text", userMessage);
+                contentArray.addObject().put("type", "text").put("text", userMessage);
                 String fullImageUrl = imagePath;
                 if (!imagePath.startsWith("http://") && !imagePath.startsWith("https://")) {
                     fullImageUrl = "https://airgate.in" + (imagePath.startsWith("/") ? "" : "/") + imagePath;
                 }
                 ObjectNode imageBlock = contentArray.addObject();
                 imageBlock.put("type", "image_url");
-                ObjectNode urlObj = imageBlock.putObject("image_url");
-                urlObj.put("url", fullImageUrl);
-                urlObj.put("detail", "low");
+                imageBlock.putObject("image_url").put("url", fullImageUrl).put("detail", "low");
             } else {
                 userMsg.put("content", userMessage);
             }
 
-            // Rotate through all 3 Groq keys for fallback
-            String groqFallbackKey = (primaryKey != null && !primaryKey.isBlank()) ? primaryKey
-                    : (groqKey2 != null && !groqKey2.isBlank()) ? groqKey2
-                    : groqKey3;
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + groqFallbackKey);
-            HttpEntity<String> entity = new HttpEntity<>(payload.toString(), headers);
-            ResponseEntity<String> groqResp = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+            int maxRetries = Math.max(3, groqKeyManager.getKeyCount() * 2);
+            ResponseEntity<String> groqResp = null;
 
-            JsonNode json = objectMapper.readTree(groqResp.getBody());
-            reply = json.path("choices").get(0).path("message").path("content").asText("I couldn't generate a reply. Please try again.");
-            promptTokens = json.path("usage").path("prompt_tokens").asInt(0);
-            completionTokens = json.path("usage").path("completion_tokens").asInt(0);
-            model = json.path("model").asText(fastModel);
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                String keyToUse = groqKeyManager.getNextKey();
+                if (keyToUse == null) break;
 
-            // Log AI request for dashboard analytics
-            try {
-                com.pyq.platform.entity.User user = userRepository.findById(userDetails.getId()).orElse(null);
-                if (user != null) {
-                    aiRequestRepository.save(com.pyq.platform.entity.AiRequest.builder()
-                            .user(user)
-                            .modelName(model)
-                            .promptTokens(promptTokens)
-                            .completionTokens(completionTokens)
-                            .topicName(topicName)
-                            .build());
+                try {
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                    headers.setBearerAuth(keyToUse);
+                    HttpEntity<String> entity = new HttpEntity<>(payload.toString(), headers);
+                    groqResp = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+                    if (groqResp.getStatusCode().is2xxSuccessful() && groqResp.getBody() != null) {
+                        break;
+                    }
+                } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                    log.warn("⚠️ [AI Tutor] Groq Rate Limit (429) on attempt {}! Marking key in 60s cooldown...", attempt);
+                    groqKeyManager.markRateLimited(keyToUse);
+                } catch (Exception ex) {
+                    log.error("⚠️ [AI Tutor] Groq call failed on attempt {}: {}", attempt, ex.getMessage());
                 }
-            } catch (Exception ex) {
-                log.error("Failed to log AI request: {}", ex.getMessage());
             }
 
-            return ResponseEntity.ok(Map.of("reply", reply));
+            if (groqResp != null && groqResp.getStatusCode().is2xxSuccessful() && groqResp.getBody() != null) {
+                JsonNode json = objectMapper.readTree(groqResp.getBody());
+                reply = json.path("choices").get(0).path("message").path("content").asText("I couldn't generate a reply. Please try again.");
+                promptTokens = json.path("usage").path("prompt_tokens").asInt(0);
+                completionTokens = json.path("usage").path("completion_tokens").asInt(0);
+                model = json.path("model").asText(fastModel);
+
+                logAiRequest(userDetails.getId(), model, promptTokens, completionTokens, topicName);
+                return ResponseEntity.ok(Map.of("reply", reply));
+            }
+
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", "AI Tutor is temporarily busy. All AI provider attempts failed. Please try again shortly."));
 
         } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
-            log.warn("AI Tutor: Groq rate limit hit for user {}", userDetails.getUsername());
+            log.warn("AI Tutor rate limit hit for user {}", userDetails.getUsername());
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "AI Tutor is busy right now (rate limited). Please wait a moment and try again."));
         } catch (Exception e) {
             log.error("AI Tutor chat error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "AI Tutor encountered an error. Please try again shortly."));
+        }
+    }
+
+    private void logAiRequest(Long userId, String modelName, int promptTokens, int completionTokens, String topicName) {
+        try {
+            com.pyq.platform.entity.User user = userRepository.findById(userId).orElse(null);
+            if (user != null) {
+                aiRequestRepository.save(com.pyq.platform.entity.AiRequest.builder()
+                        .user(user)
+                        .modelName(modelName)
+                        .promptTokens(promptTokens)
+                        .completionTokens(completionTokens)
+                        .topicName(topicName)
+                        .build());
+            }
+        } catch (Exception ex) {
+            log.error("Failed to log AI request: {}", ex.getMessage());
         }
     }
 }

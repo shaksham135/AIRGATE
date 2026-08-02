@@ -58,6 +58,34 @@ export default function AiGeneratorHub() {
   const [reportHistory, setReportHistory] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
 
+  // Ledger History Pagination state
+  const [ledgerPage, setLedgerPage] = useState(0);
+  const [ledgerPageSize, setLedgerPageSize] = useState(10);
+  const [ledgerTotalPages, setLedgerTotalPages] = useState(1);
+  const [ledgerTotalElements, setLedgerTotalElements] = useState(0);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerList, setLedgerList] = useState([]);
+
+  const fetchLedgerHistory = async (p = 0) => {
+    try {
+      setLedgerLoading(true);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/generator/ledger`, {
+        params: { page: p, size: ledgerPageSize },
+        headers: AuthService.getAuthHeader()
+      });
+      if (res.data) {
+        setLedgerList(res.data.content || []);
+        setLedgerPage(res.data.pageNo || 0);
+        setLedgerTotalPages(res.data.totalPages || 1);
+        setLedgerTotalElements(res.data.totalElements || 0);
+      }
+    } catch (err) {
+      console.error("Failed to load ledger history", err);
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
   const fetchReportHistory = async () => {
     try {
       setReportsLoading(true);
@@ -313,15 +341,17 @@ export default function AiGeneratorHub() {
       return;
     }
     fetchAiGenStatus();
+    fetchLedgerHistory(0);
     fetchSubjects();
     fetchReportHistory();
 
     const interval = setInterval(() => {
       fetchAiGenStatus();
+      fetchLedgerHistory(ledgerPage);
       fetchReportHistory();
     }, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [ledgerPage]);
 
   const handleResolveReport = async (reportId) => {
     try {
@@ -834,11 +864,16 @@ export default function AiGeneratorHub() {
         </div>
 
         {/* Dynamic Subject & Topic Question Distribution Ledger */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              📊 Dynamic Balancing Ledger (Subject & Topic Distribution)
-            </h3>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📊 Dynamic Balancing Ledger ({ledgerTotalElements} Topics Tracked)
+              </h3>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Paginated ledger history sorted by last generated date
+              </span>
+            </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 onClick={handleClearLedgerHistory}
@@ -847,7 +882,7 @@ export default function AiGeneratorHub() {
                 <FiTrash2 size={14} /> Reset Ledger History
               </button>
               <button 
-                onClick={fetchAiGenStatus}
+                onClick={() => { fetchAiGenStatus(); fetchLedgerHistory(ledgerPage); }}
                 style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <FiRefreshCw size={14} /> Refresh Table
@@ -870,8 +905,12 @@ export default function AiGeneratorHub() {
                 </tr>
               </thead>
               <tbody>
-                {aiGenStatus.ledger && aiGenStatus.ledger.length > 0 ? (
-                  aiGenStatus.ledger.map((item, idx) => (
+                {ledgerLoading ? (
+                  <tr>
+                    <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading ledger history...</td>
+                  </tr>
+                ) : ledgerList && ledgerList.length > 0 ? (
+                  ledgerList.map((item, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                       <td style={{ padding: '12px', fontWeight: 600, color: '#fff' }}>{item.subject?.name}</td>
                       <td style={{ padding: '12px' }}>{item.topic?.name}</td>
@@ -907,6 +946,45 @@ export default function AiGeneratorHub() {
               </tbody>
             </table>
           </div>
+
+          {/* Ledger Pagination Bar */}
+          {ledgerTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Page <strong style={{ color: '#fff' }}>{ledgerPage + 1}</strong> of <strong style={{ color: '#fff' }}>{ledgerTotalPages}</strong> ({ledgerTotalElements} items)
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button 
+                  disabled={ledgerPage === 0}
+                  onClick={() => fetchLedgerHistory(0)}
+                  style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: ledgerPage === 0 ? 'not-allowed' : 'pointer', opacity: ledgerPage === 0 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  « First
+                </button>
+                <button 
+                  disabled={ledgerPage === 0}
+                  onClick={() => fetchLedgerHistory(ledgerPage - 1)}
+                  style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: ledgerPage === 0 ? 'not-allowed' : 'pointer', opacity: ledgerPage === 0 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  ◀ Prev
+                </button>
+                <button 
+                  disabled={ledgerPage >= ledgerTotalPages - 1}
+                  onClick={() => fetchLedgerHistory(ledgerPage + 1)}
+                  style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: ledgerPage >= ledgerTotalPages - 1 ? 'not-allowed' : 'pointer', opacity: ledgerPage >= ledgerTotalPages - 1 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  Next ▶
+                </button>
+                <button 
+                  disabled={ledgerPage >= ledgerTotalPages - 1}
+                  onClick={() => fetchLedgerHistory(ledgerTotalPages - 1)}
+                  style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: ledgerPage >= ledgerTotalPages - 1 ? 'not-allowed' : 'pointer', opacity: ledgerPage >= ledgerTotalPages - 1 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  Last »
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── USER REPORTED QUESTIONS AUDIT & HISTORY PANEL ──────────────────── */}

@@ -1,6 +1,8 @@
 package com.pyq.platform.repository;
 
 import com.pyq.platform.entity.AiGenerationLedger;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,10 @@ public interface AiGenerationLedgerRepository extends JpaRepository<AiGeneration
 
     @Query("SELECT l FROM AiGenerationLedger l LEFT JOIN FETCH l.subject LEFT JOIN FETCH l.topic ORDER BY l.totalAccepted ASC, l.lastGeneratedAt ASC")
     List<AiGenerationLedger> findAllBalancedPriority();
+
+    @Query(value = "SELECT l FROM AiGenerationLedger l LEFT JOIN FETCH l.subject LEFT JOIN FETCH l.topic ORDER BY l.lastGeneratedAt DESC",
+           countQuery = "SELECT count(l) FROM AiGenerationLedger l")
+    Page<AiGenerationLedger> findAllOrderedByLastGeneratedAtDesc(Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(l.totalAccepted), 0) FROM AiGenerationLedger l")
     Long countTotalAcceptedQuestions();

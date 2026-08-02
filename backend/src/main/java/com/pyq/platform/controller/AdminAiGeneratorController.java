@@ -148,7 +148,44 @@ public class AdminAiGeneratorController {
         response.put("totalAccepted", totalAccepted != null ? totalAccepted : 0);
         response.put("totalRejected", totalRejected != null ? totalRejected : 0);
         response.put("totalTokensUsed", generatorService.getTotalAiGeneratorTokens());
-        response.put("ledger", ledgerDtos);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/ledger")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<Map<String, Object>> getPaginatedLedger(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        org.springframework.data.domain.Page<AiGenerationLedger> ledgerPage = ledgerRepository.findAllOrderedByLastGeneratedAtDesc(pageable);
+
+        List<Map<String, Object>> dtos = ledgerPage.getContent().stream().map(item -> {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("id", item.getId());
+            dto.put("difficulty", item.getDifficulty());
+            dto.put("questionType", item.getQuestionType());
+            dto.put("totalGenerated", item.getTotalGenerated());
+            dto.put("totalAccepted", item.getTotalAccepted());
+            dto.put("totalRejected", item.getTotalRejected());
+            dto.put("lastGeneratedAt", item.getLastGeneratedAt());
+            if (item.getSubject() != null) {
+                dto.put("subject", Map.of("id", item.getSubject().getId(), "name", item.getSubject().getName()));
+            }
+            if (item.getTopic() != null) {
+                dto.put("topic", Map.of("id", item.getTopic().getId(), "name", item.getTopic().getName()));
+            }
+            return dto;
+        }).collect(java.util.stream.Collectors.toList());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", dtos);
+        response.put("pageNo", ledgerPage.getNumber());
+        response.put("pageSize", ledgerPage.getSize());
+        response.put("totalElements", ledgerPage.getTotalElements());
+        response.put("totalPages", ledgerPage.getTotalPages());
+        response.put("last", ledgerPage.isLast());
 
         return ResponseEntity.ok(response);
     }

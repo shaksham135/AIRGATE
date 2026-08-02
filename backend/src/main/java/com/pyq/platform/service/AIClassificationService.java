@@ -44,45 +44,29 @@ public class AIClassificationService {
 
     @Value("${groq.model.fast:gemma-2-9b-it}")
     private String fastModel;
-
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private RestTemplate restTemplate;
     private final GroqUsageService groqUsageService;
+    private final GroqKeyManager groqKeyManager;
 
-    public AIClassificationService(GroqUsageService groqUsageService) {
+    public AIClassificationService(GroqUsageService groqUsageService, GroqKeyManager groqKeyManager) {
         this.groqUsageService = groqUsageService;
+        this.groqKeyManager = groqKeyManager;
     }
 
     @PostConstruct
     public void init() {
-        if (groqApiKey1 != null && !groqApiKey1.isBlank() && !groqApiKey1.equals("your-groq-api-key")) {
-            apiKeys.add(groqApiKey1);
-        } else if (System.getenv("GROQ_API_KEY") != null) {
-            apiKeys.add(System.getenv("GROQ_API_KEY"));
-        }
-        
-        if (groqApiKey2 != null && !groqApiKey2.isBlank()) {
-            apiKeys.add(groqApiKey2);
-        } else if (System.getenv("GROQ_API_KEY_2") != null) {
-            apiKeys.add(System.getenv("GROQ_API_KEY_2"));
-        }
-
-        if (groqApiKey3 != null && !groqApiKey3.isBlank()) {
-            apiKeys.add(groqApiKey3);
-        } else if (System.getenv("GROQ_API_KEY_3") != null) {
-            apiKeys.add(System.getenv("GROQ_API_KEY_3"));
-        }
-
-        if (apiKeys.isEmpty()) {
-            log.warn("No Groq API keys found. AI classification will fallback to mock parsing.");
-        }
-
         org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10000); // 10s
         factory.setReadTimeout(30000); // 30s
         this.restTemplate = new RestTemplate(factory);
+        log.info("🤖 [AIClassificationService] Multi-Key Groq Classifier ready with {} keys.", groqKeyManager.getKeyCount());
+    }
+
+    private synchronized String getNextApiKey() {
+        return groqKeyManager.getNextKey();
     }
 
     public static class AIAnalysisResult {
@@ -105,14 +89,6 @@ public class AIClassificationService {
         public String[] tags;
         public List<String> options;
         public boolean isFallback;
-    }
-
-
-    private synchronized String getNextApiKey() {
-        if (apiKeys.isEmpty()) return null;
-        String key = apiKeys.get(currentKeyIndex);
-        currentKeyIndex = (currentKeyIndex + 1) % apiKeys.size();
-        return key;
     }
 
     private String buildClassifySystemPrompt() {
@@ -180,12 +156,10 @@ public class AIClassificationService {
                     return parseClassifyJson(jsonText, rawText);
 
                 } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
-                    if (apiKeys.size() > 1) {
-                        currentApiKey = getNextApiKey();
-                        log.info("Switched to next Groq API key: {}", currentApiKey.substring(0, Math.min(8, currentApiKey.length())) + "...");
-                        continue;
-                    }
-                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    groqKeyManager.markRateLimited(currentApiKey);
+                    currentApiKey = getNextApiKey();
+                    log.info("Rate limit hit. Switched to next Groq API key via GroqKeyManager...");
+                    continue;
                 } catch (Exception e) {
                     log.warn("Groq query attempt {} failed ({}), trying fallback...", attempt, e.getMessage());
                 }
