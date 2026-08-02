@@ -4,7 +4,7 @@ import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import AIRGATELoader from '../components/AIRGATELoader';
-import { FiGrid, FiFolderPlus, FiPlusCircle, FiFileText, FiActivity, FiLayers, FiAlertTriangle, FiCheck, FiExternalLink, FiUsers, FiArrowRight, FiSettings, FiInbox, FiAlertOctagon, FiLock, FiDatabase, FiDownload, FiCpu, FiPlay, FiPause, FiRefreshCw, FiMail, FiSend, FiGift, FiTag } from 'react-icons/fi';
+import { FiGrid, FiFolderPlus, FiPlusCircle, FiFileText, FiActivity, FiLayers, FiAlertTriangle, FiCheck, FiExternalLink, FiUsers, FiArrowRight, FiSettings, FiInbox, FiAlertOctagon, FiLock, FiDatabase, FiDownload, FiCpu, FiPlay, FiPause, FiRefreshCw, FiMail, FiSend, FiGift, FiTag, FiBookOpen, FiTrash2 } from 'react-icons/fi';
 import {
   Chart as ChartJS,
   CategoryScale,
