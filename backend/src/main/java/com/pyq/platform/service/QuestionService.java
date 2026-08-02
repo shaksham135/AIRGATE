@@ -116,22 +116,25 @@ public class QuestionService {
                     }
                 }
 
-                List<Order> orders = new ArrayList<>();
-                if (userId != null && ("APPROVED".equalsIgnoreCase(status) || "PUBLISHED".equalsIgnoreCase(status))) {
-                    Join<Question, UserQuestionSolve> solveJoin = root.join("userQuestionSolves", JoinType.LEFT);
-                    solveJoin.on(cb.equal(solveJoin.get("user").get("id"), userId));
+                if (!Long.class.equals(criteriaQuery.getResultType()) && !long.class.equals(criteriaQuery.getResultType())) {
+                    List<Order> orders = new ArrayList<>();
+                    if (userId != null && ("APPROVED".equalsIgnoreCase(status) || "PUBLISHED".equalsIgnoreCase(status))) {
+                        Subquery<Long> solveSub = criteriaQuery.subquery(Long.class);
+                        Root<UserQuestionSolve> solveRoot = solveSub.from(UserQuestionSolve.class);
+                        solveSub.select(solveRoot.get("question").get("id"));
+                        solveSub.where(cb.equal(solveRoot.get("user").get("id"), userId));
 
-                    Expression<Integer> isSolved = cb.selectCase()
-                            .when(cb.isNull(solveJoin.get("id")), 0)
-                            .otherwise(1)
-                            .as(Integer.class);
+                        Expression<Integer> isSolvedOrder = cb.<Integer>selectCase()
+                                .when(root.get("id").in(solveSub), 1)
+                                .otherwise(0);
 
-                    orders.add(cb.asc(isSolved)); // Unsolved first, solved last
+                        orders.add(cb.asc(isSolvedOrder)); // Unsolved first, solved last
+                    }
+
+                    orders.add(cb.desc(root.get("year")));
+                    orders.add(cb.asc(root.get("id")));
+                    criteriaQuery.orderBy(orders);
                 }
-
-                orders.add(cb.desc(root.get("year")));
-                orders.add(cb.asc(root.get("id")));
-                criteriaQuery.orderBy(orders);
 
                 return cb.and(predicates.toArray(new Predicate[0]));
             }

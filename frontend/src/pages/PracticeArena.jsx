@@ -146,12 +146,42 @@ export default function PracticeArena() {
 
   useEffect(() => {
     fetchSubjects();
+    fetchSolvedHistory();
     if (currentUser) {
       setTimeout(() => {
         fetchDailyQuota();
       }, 50);
     }
   }, []);
+
+  const fetchSolvedHistory = async () => {
+    if (!currentUser) return;
+    const cacheKey = `user_solved_${currentUser.id || currentUser.username}`;
+    const cached = CacheService.get(cacheKey);
+    if (cached) {
+      setSelectedOptions(cached.solvedMap || {});
+      setTempMsqSelections(cached.msqMap || {});
+    }
+
+    try {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved/map`, {
+        headers: AuthService.getAuthHeader()
+      });
+      const solvedMap = response.data || {};
+      const msqMap = {};
+      Object.entries(solvedMap).forEach(([qId, selectedOpt]) => {
+        if (selectedOpt) {
+          const letters = selectedOpt.toUpperCase().replace(/[^A-D]/g, '').split('');
+          if (letters.length > 0) msqMap[qId] = letters;
+        }
+      });
+      setSelectedOptions(solvedMap);
+      setTempMsqSelections(msqMap);
+      CacheService.set(cacheKey, { solvedMap, msqMap }, 120000);
+    } catch (e) {
+      console.error('Failed to load solved history in practice arena', e);
+    }
+  };
 
   useEffect(() => {
     if (selectedSubjectId) {
@@ -324,6 +354,13 @@ export default function PracticeArena() {
 
       if (response.data) {
         setRevealedAnswers(prev => ({ ...prev, [question.id]: true }));
+        setSelectedOptions(prev => {
+          const updated = { ...prev, [question.id]: finalSelection };
+          if (currentUser) {
+            CacheService.set(`user_solved_${currentUser.id || currentUser.username}`, { solvedMap: updated, msqMap: tempMsqSelections }, 120000);
+          }
+          return updated;
+        });
         fetchDailyQuota(); // Update remaining count live
       }
     } catch (err) {
@@ -342,6 +379,14 @@ export default function PracticeArena() {
     if (currentCount >= 3) return;
     setResetCounts(prev => ({ ...prev, [questionId]: currentCount + 1 }));
     setRevealedAnswers(prev => ({ ...prev, [questionId]: false }));
+    setSelectedOptions(prev => {
+      const updated = { ...prev };
+      delete updated[questionId];
+      if (currentUser) {
+        CacheService.set(`user_solved_${currentUser.id || currentUser.username}`, { solvedMap: updated, msqMap: tempMsqSelections }, 120000);
+      }
+      return updated;
+    });
   };
 
   return (
@@ -547,7 +592,8 @@ export default function PracticeArena() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {questions.map((q, index) => {
-            const isRevealed = revealedAnswers[q.id];
+            const isSolved = !!selectedOptions[q.id];
+            const isRevealed = revealedAnswers[q.id] || isSolved;
             const retryCount = resetCounts[q.id] || 0;
 
             return (
@@ -571,6 +617,11 @@ export default function PracticeArena() {
                       <span className="practice-badge-type">
                         {q.questionType}
                       </span>
+                      {isSolved && (
+                        <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                          ✓ Solved
+                        </span>
+                      )}
                     </div>
 
                     <div className="practice-header-actions">
@@ -630,6 +681,30 @@ export default function PracticeArena() {
                         ? (tempMsqSelections[q.id] || []).includes(opt.optionLabel)
                         : selectedOptions[q.id] === opt.optionLabel;
 
+                      let bg = 'var(--bg-main)';
+                      let borderColor = 'var(--border-color)';
+                      let badgeBg = 'rgba(255,255,255,0.06)';
+                      let badgeColor = 'var(--text-secondary)';
+
+                      if (isRevealed) {
+                        if (opt.isCorrect) {
+                          bg = 'rgba(16, 185, 129, 0.15)';
+                          borderColor = '#10b981';
+                          badgeBg = '#10b981';
+                          badgeColor = '#fff';
+                        } else if (isSelected && !opt.isCorrect) {
+                          bg = 'rgba(239, 68, 68, 0.15)';
+                          borderColor = '#ef4444';
+                          badgeBg = '#ef4444';
+                          badgeColor = '#fff';
+                        }
+                      } else if (isSelected) {
+                        bg = 'rgba(99, 102, 241, 0.15)';
+                        borderColor = '#6366f1';
+                        badgeBg = '#6366f1';
+                        badgeColor = '#fff';
+                      }
+
                       return (
                         <div
                           key={opt.id}
@@ -637,8 +712,8 @@ export default function PracticeArena() {
                           style={{
                             padding: '14px 18px',
                             borderRadius: '10px',
-                            background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-main)',
-                            border: `1px solid ${isSelected ? '#6366f1' : 'var(--border-color)'}`,
+                            background: bg,
+                            border: `1px solid ${borderColor}`,
                             cursor: isRevealed ? 'default' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -650,8 +725,8 @@ export default function PracticeArena() {
                             width: '26px',
                             height: '26px',
                             borderRadius: '6px',
-                            background: isSelected ? '#6366f1' : 'rgba(255,255,255,0.06)',
-                            color: isSelected ? '#fff' : 'var(--text-secondary)',
+                            background: badgeBg,
+                            color: badgeColor,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

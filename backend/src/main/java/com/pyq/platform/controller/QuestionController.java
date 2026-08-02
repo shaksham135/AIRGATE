@@ -76,7 +76,7 @@ public class QuestionController {
     // Public search with filters (anonymous access mapped in SecurityConfig)
     @GetMapping
     @Transactional(readOnly = true)
-    @org.springframework.cache.annotation.Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #solvedStatus, #bookmarked, #status, #page, #size)")
+    @org.springframework.cache.annotation.Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #solvedStatus, #bookmarked, #status, #page, #size, #userDetails != null ? #userDetails.getId() : 0)")
     public ResponseEntity<PageDTO<QuestionDTO>> searchQuestions(
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "subjectId", required = false) Long subjectId,

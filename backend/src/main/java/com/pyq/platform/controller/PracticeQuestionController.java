@@ -74,7 +74,12 @@ public class PracticeQuestionController {
             @RequestParam(name = "size", defaultValue = "10") int size,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        boolean sortUnsolvedFirst = userDetails != null && userDetails.getId() != null
+                && (solvedStatus == null || "ALL".equalsIgnoreCase(solvedStatus));
+
+        Pageable pageable = sortUnsolvedFirst
+                ? PageRequest.of(page, size)
+                : PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
 
         Page<Question> questionsPage = questionRepository.findAll(new Specification<Question>() {
             @Override
@@ -125,6 +130,20 @@ public class PracticeQuestionController {
                 if (query != null && !query.trim().isEmpty()) {
                     String pattern = "%" + query.trim().toLowerCase() + "%";
                     predicates.add(cb.like(cb.lower(root.get("text")), pattern));
+                }
+
+                // Default ordering when logged in (data query only, skip count query): UNSOLVED first (0), then SOLVED (1), then newest id DESC
+                if (sortUnsolvedFirst && !Long.class.equals(criteriaQuery.getResultType()) && !long.class.equals(criteriaQuery.getResultType())) {
+                    Subquery<Long> solveSub = criteriaQuery.subquery(Long.class);
+                    Root<UserQuestionSolve> solveRoot = solveSub.from(UserQuestionSolve.class);
+                    solveSub.select(solveRoot.get("question").get("id"));
+                    solveSub.where(cb.equal(solveRoot.get("user").get("id"), userDetails.getId()));
+
+                    Expression<Integer> isSolvedOrder = cb.<Integer>selectCase()
+                            .when(root.get("id").in(solveSub), 1)
+                            .otherwise(0);
+
+                    criteriaQuery.orderBy(cb.asc(isSolvedOrder), cb.desc(root.get("id")));
                 }
 
                 return cb.and(predicates.toArray(new Predicate[0]));
