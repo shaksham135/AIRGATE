@@ -4,6 +4,8 @@ import { FiZap, FiBookOpen } from 'react-icons/fi';
 import { formatMathText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
 
+import CacheService from '../services/CacheService';
+
 const DYNAMIC_GATE_MESSAGES = [
   { category: "Motivation", text: "⚡ AIR 1 is built one question at a time." },
   { category: "Exam Strategy", text: "🎯 Target Top 100 in GATE 2026!" },
@@ -69,12 +71,17 @@ export default function AIRGATELoader({ text, size = "normal" }) {
   useEffect(() => {
     let isMounted = true;
     const fetchLiveTips = async () => {
+      const cached = CacheService.get('active_gate_tips');
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        setTipsList(cached);
+        return;
+      }
       try {
         const res = await axios.get(`${API_CONFIG.BASE_URL}/api/tips/active`);
         if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
           const formatted = res.data.map(t => ({ category: t.category || "Tip", text: t.text }));
           setTipsList(formatted);
-          setCurrentMsgIndex(Math.floor(Math.random() * formatted.length));
+          CacheService.set('active_gate_tips', formatted, 3600000); // 1 hour TTL
         }
       } catch (e) {
         // Fallback to static tips
@@ -84,19 +91,7 @@ export default function AIRGATELoader({ text, size = "normal" }) {
     return () => { isMounted = false; };
   }, []);
 
-  useEffect(() => {
-    if (!tipsList || tipsList.length <= 1) return;
-    const interval = setInterval(() => {
-      setFade(false);
-      setTimeout(() => {
-        setCurrentMsgIndex(prev => (prev + 1) % tipsList.length);
-        setFade(true);
-      }, 200);
-    }, 3500);
-
-    return () => clearInterval(interval);
-  }, [tipsList]);
-
+  // Lock 1 single random message per loading screen (no auto-rotating loop)
   const activeMsg = tipsList[currentMsgIndex] || DYNAMIC_GATE_MESSAGES[0];
 
   return (

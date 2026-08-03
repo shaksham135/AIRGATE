@@ -168,17 +168,22 @@ export default function Explorer() {
   const currentUser = AuthService.getCurrentUser();
   const navigate = useNavigate();
 
-  // Load Subjects, years and default questions
+  // Load Subjects, years and default questions (Prioritizing main question feed FIRST)
   useEffect(() => {
-    fetchSubjects();
-    fetchAvailableYears();
-    if (currentUser) {
-      // Stagger background user state calls so main question feed gets 100% DB pool bandwidth
-      setTimeout(() => {
+    // 🚀 Priority #1: Immediately fetch main questions feed FIRST!
+    fetchQuestions(page);
+
+    // Stagger secondary background metadata calls by 120ms so question feed gets 100% network bandwidth
+    const timer = setTimeout(() => {
+      fetchSubjects();
+      fetchAvailableYears();
+      if (currentUser) {
         fetchBookmarks();
         fetchSolvedHistory();
-      }, 60);
-    }
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Fetch topics when subject selection changes

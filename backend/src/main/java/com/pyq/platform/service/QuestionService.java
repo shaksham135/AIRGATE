@@ -232,14 +232,18 @@ public class QuestionService {
         Question existing = questionRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Question not found with ID: " + id));
 
-        // Save audit revision log
+        // Save audit revision log safely
         if (existing.getText() != null && updatedData.getText() != null && !existing.getText().equals(updatedData.getText())) {
-            revisionRepository.save(QuestionRevision.builder()
-                    .question(existing)
-                    .oldText(existing.getText())
-                    .newText(updatedData.getText())
-                    .editedBy(editor)
-                    .build());
+            try {
+                revisionRepository.save(QuestionRevision.builder()
+                        .question(existing)
+                        .oldText(existing.getText())
+                        .newText(updatedData.getText())
+                        .editedBy(editor)
+                        .build());
+            } catch (Exception e) {
+                log.warn("Non-fatal: Failed to save question revision log for question ID {}: {}", id, e.getMessage());
+            }
         }
 
         // Update fields

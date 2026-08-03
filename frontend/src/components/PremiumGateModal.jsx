@@ -30,6 +30,7 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
   }, [initialCoupon]);
 
   React.useEffect(() => {
+    if (!isOpen) return;
     const fetchTiers = async () => {
       try {
         const res = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/pricing`);
@@ -47,7 +48,7 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
       } catch (e) {}
     };
     fetchTiers();
-  }, []);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

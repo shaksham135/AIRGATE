@@ -4,6 +4,8 @@ import axios from 'axios';
 import API_CONFIG from '../config/api';
 import { FiGift, FiX, FiArrowRight } from 'react-icons/fi';
 
+import CacheService from '../services/CacheService';
+
 export default function PromoBannerHeader({ onApplyCoupon }) {
   const navigate = useNavigate();
   const [banner, setBanner] = useState(null);
@@ -11,18 +13,44 @@ export default function PromoBannerHeader({ onApplyCoupon }) {
 
   useEffect(() => {
     const fetchActiveBanners = async () => {
-      try {
-        const response = await axios.get(`${API_CONFIG.BASE_URL}/api/banners/active`);
-        if (Array.isArray(response.data) && response.data.length > 0) {
-          // Select highest priority banner
-          setBanner(response.data[0]);
+      const cached = CacheService.get('active_banners');
+      let bannerData = null;
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        bannerData = cached[0];
+      } else {
+        try {
+          const response = await axios.get(`${API_CONFIG.BASE_URL}/api/banners/active`);
+          const data = Array.isArray(response.data) ? response.data : [];
+          if (data.length > 0) bannerData = data[0];
+          CacheService.set('active_banners', data, 600000); // 10 mins TTL
+        } catch (err) {
+          // Silent catch
         }
-      } catch (err) {
-        // Silent catch for banner fetch
+      }
+
+      if (bannerData) {
+        // Frequency Capping: Check if dismissed within the last 24 hours
+        const dismissedKey = `banner_dismissed_${bannerData.id || 'default'}`;
+        const lastDismissed = localStorage.getItem(dismissedKey);
+        if (lastDismissed) {
+          const hoursSinceDismissed = (Date.now() - parseInt(lastDismissed, 10)) / (1000 * 60 * 60);
+          if (hoursSinceDismissed < 24) {
+            setDismissed(true);
+          }
+        }
+        setBanner(bannerData);
       }
     };
     fetchActiveBanners();
   }, []);
+
+  const handleDismiss = () => {
+    if (banner) {
+      const dismissedKey = `banner_dismissed_${banner.id || 'default'}`;
+      localStorage.setItem(dismissedKey, Date.now().toString());
+    }
+    setDismissed(true);
+  };
 
   if (!banner || dismissed) return null;
 
@@ -99,7 +127,7 @@ export default function PromoBannerHeader({ onApplyCoupon }) {
       )}
 
       <button
-        onClick={() => setDismissed(true)}
+        onClick={handleDismiss}
         style={{
           position: 'absolute',
           right: '12px',

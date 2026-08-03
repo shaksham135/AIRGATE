@@ -114,45 +114,45 @@ export default function QuestionDetail() {
       setQuestion(qRes.data);
       CacheService.set(`qd_${id}`, qRes.data, 300000); // 5 minutes TTL
       document.title = `GATE CSE ${qRes.data.year || ''} - ${qRes.data.topicName || ''} | AIRGATE`;
+      
+      // 🚀 Priority #1: Render question stem, options, and KaTeX math immediately!
+      setLoading(false);
 
-      try {
-        const similarRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/similar`);
-        if (similarRes.data && similarRes.data.length > 0) {
-          setSuggestedNextQuestion(similarRes.data[0]);
-          CacheService.set(`similar_${id}`, similarRes.data[0], 300000);
-        } else {
-          setSuggestedNextQuestion(null);
-        }
-      } catch (e) {
-        console.error('Failed to load similar suggestions', e);
-      }
-
+      // Async Background Calls (user-status, similar recommendations, comments)
       if (currentUser) {
         const headers = AuthService.getAuthHeader();
-        try {
-          const statusRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/user-status`, { headers });
-          const { isBookmarked: bm, isSolved: sol, selectedOption: opt } = statusRes.data || {};
-          setIsBookmarked(!!bm);
-          if (sol && opt) {
-            setSelectedOption(opt);
-            setNatInput(opt);
-            if (qRes.data.questionType === 'MSQ') {
-              const letters = opt.toUpperCase().replace(/[^A-D]/g, '').split('');
-              setTempSelectedMsq(letters);
+        axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/user-status`, { headers })
+          .then(statusRes => {
+            const { isBookmarked: bm, isSolved: sol, selectedOption: opt } = statusRes.data || {};
+            setIsBookmarked(!!bm);
+            if (sol && opt) {
+              setSelectedOption(opt);
+              setNatInput(opt);
+              if (qRes.data.questionType === 'MSQ') {
+                const letters = opt.toUpperCase().replace(/[^A-D]/g, '').split('');
+                setTempSelectedMsq(letters);
+              }
             }
-          }
-        } catch (e) {
-          console.error('Failed to load user question status', e);
-        }
+          })
+          .catch(e => console.error('Failed to load user question status', e));
       }
 
+      if (!cachedSimilar) {
+        axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/similar`)
+          .then(similarRes => {
+            if (similarRes.data && similarRes.data.length > 0) {
+              setSuggestedNextQuestion(similarRes.data[0]);
+              CacheService.set(`similar_${id}`, similarRes.data[0], 300000);
+            }
+          })
+          .catch(e => console.error('Failed to load similar suggestions', e));
+      }
 
-      // Load comments
+      // Load comments in background
       loadComments();
     } catch (e) {
       console.error('Failed to load question details', e);
       setError('Question not found or server is unreachable.');
-    } finally {
       setLoading(false);
     }
   };

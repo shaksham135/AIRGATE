@@ -65,16 +65,22 @@ export default function ReviewQueue() {
   const [undoTimer, setUndoTimer] = useState(10);
   const undoIntervalRef = useRef(null);
 
-  // Load baseline values
+  // Load baseline values (Prioritizing main pending review queue FIRST)
   useEffect(() => {
     if (!AuthService.isAdminOrEditor()) {
       navigate('/explore');
       return;
     }
 
-    fetchSubjects();
+    // 🚀 Priority #1: Fetch pending questions feed FIRST!
     fetchPendingQuestions();
-    fetchAnalyticsDashboard();
+
+    const timer = setTimeout(() => {
+      fetchSubjects();
+      fetchAnalyticsDashboard();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Sync state with current question in queue

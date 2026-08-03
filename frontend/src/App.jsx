@@ -74,13 +74,17 @@ function DashboardLayout({ children }) {
       applyPublicMeta(publicMetaCache);
       return;
     }
-    fetch(`${API_CONFIG.BASE_URL}/api/admin/settings/public-meta`)
-      .then(res => res.json())
-      .then(meta => {
-        publicMetaCache = meta;
-        applyPublicMeta(meta);
-      })
-      .catch(() => {});
+    const timer = setTimeout(() => {
+      fetch(`${API_CONFIG.BASE_URL}/api/admin/settings/public-meta`)
+        .then(res => res.json())
+        .then(meta => {
+          publicMetaCache = meta;
+          applyPublicMeta(meta);
+        })
+        .catch(() => {});
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const applyPublicMeta = (meta) => {

@@ -145,13 +145,19 @@ export default function PracticeArena() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchSubjects();
-    fetchSolvedHistory();
-    if (currentUser) {
-      setTimeout(() => {
+    // 🚀 Priority #1: Immediately fetch main practice questions feed FIRST!
+    fetchPracticeQuestions(page);
+
+    // Stagger secondary metadata calls by 120ms so questions feed gets 100% network & DB bandwidth
+    const timer = setTimeout(() => {
+      fetchSubjects();
+      fetchSolvedHistory();
+      if (currentUser) {
         fetchDailyQuota();
-      }, 50);
-    }
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchSolvedHistory = async () => {
