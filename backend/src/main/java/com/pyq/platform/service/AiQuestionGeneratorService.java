@@ -96,14 +96,24 @@ public class AiQuestionGeneratorService {
     public static class VerificationResult {
         private final String answer;
         private final String explanation;
+        private final String rephrasedQuestionText;
+        private final JsonNode rephrasedOptions;
 
         public VerificationResult(String answer, String explanation) {
+            this(answer, explanation, null, null);
+        }
+
+        public VerificationResult(String answer, String explanation, String rephrasedQuestionText, JsonNode rephrasedOptions) {
             this.answer = answer != null ? answer.trim() : "";
             this.explanation = explanation != null ? explanation.trim() : "Dual-AI Verified Practice Question.";
+            this.rephrasedQuestionText = rephrasedQuestionText != null && !rephrasedQuestionText.isBlank() ? rephrasedQuestionText.trim() : null;
+            this.rephrasedOptions = rephrasedOptions;
         }
 
         public String getAnswer() { return answer; }
         public String getExplanation() { return explanation; }
+        public String getRephrasedQuestionText() { return rephrasedQuestionText; }
+        public JsonNode getRephrasedOptions() { return rephrasedOptions; }
     }
 
     /**
@@ -119,6 +129,11 @@ public class AiQuestionGeneratorService {
      */
     @Transactional
     public boolean generateAndVerifySingleQuestion() {
+        return generateAndVerifySingleQuestion(null, null, null, null);
+    }
+
+    @Transactional
+    public boolean generateAndVerifySingleQuestion(String reqDifficulty, String reqType, Long reqSubjectId, Long reqTopicId) {
         try {
             // ── 1. Load all subjects and topics (2 queries total) ────────────
             List<Subject> allSubjects = subjectRepository.findAll();
@@ -166,8 +181,13 @@ public class AiQuestionGeneratorService {
                 Subject s = subjectMap.get(t.getSubject() != null ? t.getSubject().getId() : null);
                 if (s == null) continue; // orphan topic guard
 
+                if (reqSubjectId != null && !s.getId().equals(reqSubjectId)) continue;
+                if (reqTopicId != null && !t.getId().equals(reqTopicId)) continue;
+
                 for (String diff : difficulties) {
+                    if (reqDifficulty != null && !"MIXED".equalsIgnoreCase(reqDifficulty) && !diff.equalsIgnoreCase(reqDifficulty)) continue;
                     for (String type : types) {
+                        if (reqType != null && !"MIXED".equalsIgnoreCase(reqType) && !type.equalsIgnoreCase(reqType)) continue;
                         String key = s.getId() + ":" + t.getId() + ":" + diff + ":" + type;
                         long count = slotCountMap.getOrDefault(key, 0L);
                         slots.add(new Slot(s, t, diff, type, count));
@@ -280,8 +300,16 @@ public class AiQuestionGeneratorService {
             if (isAccepted) {
                 ledger.setTotalAccepted(ledger.getTotalAccepted() + 1);
                 ledgerRepository.save(ledger);
-                // Save directly as APPROVED — dual-AI verification (8B generator + 70B verifier)
-                // already acts as the quality gate.
+
+                // 🚀 Dual-AI Quality Polish: Apply 70B Verifier's rephrased GATE-standard text if provided
+                if (vResult != null && vResult.getRephrasedQuestionText() != null && !vResult.getRephrasedQuestionText().isBlank()) {
+                    ((ObjectNode) generatedNode).put("questionText", vResult.getRephrasedQuestionText());
+                    log.info("✨ [AI Generator] Applied 70B Verifier GATE-Quality Text Polish!");
+                }
+                if (vResult != null && vResult.getRephrasedOptions() != null && vResult.getRephrasedOptions().isArray() && vResult.getRephrasedOptions().size() >= 4) {
+                    ((ObjectNode) generatedNode).set("options", vResult.getRephrasedOptions());
+                }
+
                 String explanationToSave = (vResult != null && !vResult.getExplanation().isBlank() && !"Dual-AI Verified Practice Question.".equals(vResult.getExplanation()))
                         ? vResult.getExplanation()
                         : "Verified step-by-step mathematical proof for option (" + genAnswer + ").";
@@ -379,8 +407,10 @@ public class AiQuestionGeneratorService {
 
     private VerificationResult callGroqVerifier(String qText, JsonNode optionsNode, String qType) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Role: Senior GATE CSE Evaluator.\n" +
-                  "Solve this question independently step-by-step and determine the exact correct answer.\n\n" +
+        sb.append("Role: Senior GATE CSE Chief Examiner & Verification AI.\n" +
+                  "Tasks:\n" +
+                  "1. Solve this question independently step-by-step and determine the exact correct answer.\n" +
+                  "2. REPHRASE & POLISH TO AUTHENTIC GATE CSE STANDARD: If the question statement or option text can be written more cleanly, rephrase it to match authentic IIT/IISc GATE CSE exam terminology with clean KaTeX math (dollar signs ONLY around individual variables e.g. $t_1$, $\\mathcal{O}(n)$). DO NOT change the mathematical values, NAT numbers, or correct option letter.\n\n" +
                   "Type: ").append(qType).append("\n" +
                   "Question: ").append(qText).append("\n");
         if (optionsNode != null && optionsNode.isArray() && optionsNode.size() > 0) {
@@ -395,17 +425,20 @@ public class AiQuestionGeneratorService {
                   "1. Work out the solution mathematically.\n" +
                   "2. Output STRICT JSON in a SINGLE response:\n" +
                   "   - \"answer\": \"A\" (for MCQ), \"A,C\" (for MSQ), or \"42\" (for NAT)\n" +
-                  "   - \"explanation\": \"Concise 2-sentence mathematical proof explaining why the answer is correct.\"\n");
+                  "   - \"explanation\": \"Concise 2-sentence mathematical proof explaining why the answer is correct.\"\n" +
+                  "   - \"rephrasedQuestionText\": \"Polished GATE-level question text with clean KaTeX math.\"\n");
 
         // ── DUAL DUAL-VERIFIER: Groq Llama 3.3 70B (Heavy Reasoning Model for Blind Verification) ──
         try {
-            log.info("🤖 Attempting Answer Verification via Groq Llama 3.3 70B (Heavy Verifier)...");
-            JsonNode res = executeGroqCall(sb.toString(), true, 1200);
+            log.info("🤖 Attempting Answer Verification & Quality Polish via Groq Llama 3.3 70B (Heavy Verifier)...");
+            JsonNode res = executeGroqCall(sb.toString(), true, 1600);
             if (res != null) {
                 String ans = res.has("answer") ? res.get("answer").asText() : "";
                 String exp = res.has("explanation") ? res.get("explanation").asText() : "";
+                String rephrasedQ = res.has("rephrasedQuestionText") ? res.get("rephrasedQuestionText").asText() : null;
+                JsonNode rephrasedOpts = res.has("rephrasedOptions") ? res.get("rephrasedOptions") : null;
                 if (!ans.isBlank()) {
-                    return new VerificationResult(ans, exp);
+                    return new VerificationResult(ans, exp, rephrasedQ, rephrasedOpts);
                 }
             }
         } catch (Exception e) {
@@ -415,12 +448,14 @@ public class AiQuestionGeneratorService {
         // ── FALLBACK: Google Gemini ──
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
-                log.info("🚀 Falling back to Google Gemini for Answer Verification...");
+                log.info("🚀 Falling back to Google Gemini for Answer Verification & Polish...");
                 JsonNode geminiRes = executeGeminiCall(sb.toString(), 2048);
                 if (geminiRes != null && geminiRes.has("answer")) {
                     String ans = geminiRes.get("answer").asText();
                     String exp = geminiRes.has("explanation") ? geminiRes.get("explanation").asText() : "";
-                    return new VerificationResult(ans, exp);
+                    String rephrasedQ = geminiRes.has("rephrasedQuestionText") ? geminiRes.get("rephrasedQuestionText").asText() : null;
+                    JsonNode rephrasedOpts = geminiRes.has("rephrasedOptions") ? geminiRes.get("rephrasedOptions") : null;
+                    return new VerificationResult(ans, exp, rephrasedQ, rephrasedOpts);
                 }
             } catch (Exception e) {
                 log.warn("⚠️ Gemini verifier call failed! Error: {}", e.getMessage());
@@ -469,18 +504,41 @@ public class AiQuestionGeneratorService {
                         }
                     }
                 }
-            } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
-                log.warn("⚠️ Groq Rate Limit (429) on attempt {}! Marking key in 60s cooldown & immediately switching to next API key...", attempt);
-                groqKeyManager.markRateLimited(apiKey);
-            } catch (org.springframework.web.client.HttpClientErrorException.BadRequest e) {
-                log.warn("⚠️ Groq 400 Bad Request on attempt {} (Error: {}). Expanding max_tokens from {} to {} and retrying...", 
-                        attempt, e.getResponseBodyAsString(), currentMaxTokens, currentMaxTokens + 1000);
-                currentMaxTokens += 1000;
             } catch (Exception e) {
-                log.error("Groq API call failed during question generation (attempt {}): {}", attempt, e.getMessage());
+                String errMsg = e.getMessage() != null ? e.getMessage() : "";
+                boolean is429 = is429RateLimitError(e, errMsg);
+
+                if (is429) {
+                    log.warn("⚠️ Groq HTTP 429 Rate Limit on attempt {} for key [...{}]! Marking 60s cooldown & switching key...", 
+                            attempt, maskKey(apiKey));
+                    groqKeyManager.markRateLimited(apiKey);
+                    // Safe 3.5s pacing pause so we don't exceed per-minute token rate limits on key switch
+                    try { Thread.sleep(3500); } catch (InterruptedException ignored) {}
+                } else if (errMsg.contains("400") || errMsg.toLowerCase().contains("bad request")) {
+                    log.warn("⚠️ Groq 400 Bad Request on attempt {} (Error: {}). Expanding max_tokens to {}...", 
+                            attempt, errMsg, currentMaxTokens + 1000);
+                    currentMaxTokens += 1000;
+                } else {
+                    log.error("Groq API call failed during question generation (attempt {}): {}", attempt, errMsg);
+                }
             }
         }
         return null;
+    }
+
+    private boolean is429RateLimitError(Exception e, String errMsg) {
+        if (e instanceof org.springframework.web.client.HttpClientErrorException.TooManyRequests) return true;
+        if (e instanceof org.springframework.web.client.HttpStatusCodeException) {
+            org.springframework.web.client.HttpStatusCodeException se = (org.springframework.web.client.HttpStatusCodeException) e;
+            if (se.getStatusCode().value() == 429) return true;
+            if (se.getResponseBodyAsString() != null && se.getResponseBodyAsString().contains("rate_limit_exceeded")) return true;
+        }
+        return errMsg.contains("429") || errMsg.toLowerCase().contains("rate limit") || errMsg.toLowerCase().contains("too many requests");
+    }
+
+    private String maskKey(String key) {
+        if (key == null || key.length() < 6) return "***";
+        return key.substring(key.length() - 6);
     }
 
     public long getTotalAiGeneratorTokens() {

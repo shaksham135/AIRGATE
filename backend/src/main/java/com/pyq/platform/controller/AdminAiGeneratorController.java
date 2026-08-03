@@ -6,6 +6,7 @@ import com.pyq.platform.repository.AiGenerationLedgerRepository;
 import com.pyq.platform.repository.SystemSettingsRepository;
 import com.pyq.platform.scheduler.NightlyAiQuestionScheduler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/admin/generator")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
+@Slf4j
 public class AdminAiGeneratorController {
 
     private final NightlyAiQuestionScheduler scheduler;
@@ -204,7 +206,12 @@ public class AdminAiGeneratorController {
     }
 
     @PostMapping("/test-run")
-    public ResponseEntity<Map<String, Object>> triggerTestRun() {
+    public ResponseEntity<Map<String, Object>> triggerTestRun(
+            @RequestParam(defaultValue = "MIXED") String difficulty,
+            @RequestParam(defaultValue = "MIXED") String type,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Long topicId,
+            @RequestParam(defaultValue = "5") int count) {
         if (scheduler.isBatchRunning()) {
             Map<String, Object> err = new HashMap<>();
             err.put("success", false);
@@ -212,12 +219,23 @@ public class AdminAiGeneratorController {
             return ResponseEntity.badRequest().body(err);
         }
 
-        // Run sample 5 questions in background thread
-        new Thread(() -> scheduler.runBatchLoop(true)).start();
+        final int targetCount = Math.max(1, Math.min(count, 25));
+        new Thread(() -> {
+            log.info("🚀 [Admin Generator Trigger] Starting manual batch run. Count: {}, Diff: {}, Type: {}, SubjectId: {}, TopicId: {}",
+                    targetCount, difficulty, type, subjectId, topicId);
+            for (int i = 0; i < targetCount; i++) {
+                try {
+                    generatorService.generateAndVerifySingleQuestion(difficulty, type, subjectId, topicId);
+                    Thread.sleep(3000); // 3s pacing delay
+                } catch (Exception e) {
+                    log.error("Error during manual trigger generation", e);
+                }
+            }
+        }).start();
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("message", "Triggered sample test batch (5 questions). Check ledger in a few seconds!");
+        response.put("message", String.format("Triggered AI Generator batch (%d questions, Diff: %s, Type: %s). Check ledger in a few seconds!", targetCount, difficulty, type));
         return ResponseEntity.ok(response);
     }
 

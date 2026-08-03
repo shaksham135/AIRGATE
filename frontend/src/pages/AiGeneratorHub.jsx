@@ -54,6 +54,12 @@ export default function AiGeneratorHub() {
   const [endHourInput, setEndHourInput] = useState(4);
   const [timingMsg, setTimingMsg] = useState('');
 
+  // Custom Generator Trigger state
+  const [genDifficulty, setGenDifficulty] = useState('MIXED');
+  const [genType, setGenType] = useState('MIXED');
+  const [genSubjectId, setGenSubjectId] = useState('');
+  const [genCount, setGenCount] = useState(5);
+
   // Report History state
   const [reportHistory, setReportHistory] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
@@ -136,6 +142,29 @@ export default function AiGeneratorHub() {
       }
     } catch (err) {
       alert("Failed to update execution timing window.");
+    }
+  };
+
+  const handleTriggerCustomBatch = async () => {
+    try {
+      setActionMsg("🚀 Triggering AI Generator batch...");
+      const params = {
+        difficulty: genDifficulty,
+        type: genType,
+        count: genCount
+      };
+      if (genSubjectId) params.subjectId = genSubjectId;
+
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/generator/test-run`, null, {
+        params,
+        headers: AuthService.getAuthHeader()
+      });
+      if (res.data && res.data.message) {
+        setActionMsg(`⚡ ${res.data.message}`);
+        setTimeout(() => fetchAiGenStatus(), 2000);
+      }
+    } catch (err) {
+      alert("Failed to trigger batch: " + (err.response?.data?.message || err.message));
     }
   };
 
@@ -498,54 +527,114 @@ export default function AiGeneratorHub() {
               </form>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              {/* Emergency Pause / Resume Switch */}
-              <button
-                onClick={() => handleToggleAiGen(!aiGenStatus.enabled)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: aiGenStatus.enabled 
-                    ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: '#fff',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {aiGenStatus.enabled ? <><FiPause size={18} /> PAUSE Nightly Generator</> : <><FiPlay size={18} /> RESUME Nightly Generator</>}
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.25)', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {/* Difficulty Selector */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>DIFFICULTY</label>
+                  <select 
+                    value={genDifficulty}
+                    onChange={e => setGenDifficulty(e.target.value)}
+                    style={{ padding: '6px 10px', background: '#111726', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    <option value="MIXED">🎯 MIXED (GATE Standard)</option>
+                    <option value="EASY">🟢 EASY (1-Mark Concept)</option>
+                    <option value="MEDIUM">🟡 MEDIUM (1-Mark/2-Mark)</option>
+                    <option value="HARD">🔥 HARD (Tricky 2-Mark)</option>
+                  </select>
+                </div>
 
-              {/* Manual Sample Test Trigger Button */}
-              <button
-                onClick={handleTriggerTestBatch}
-                disabled={aiGenStatus.running}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#fff',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-              >
-                <FiRefreshCw className={aiGenStatus.running ? "spin" : ""} size={16} /> Test Sample Batch (5 Qs)
-              </button>
+                {/* Question Type Selector */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>QUESTION TYPE</label>
+                  <select 
+                    value={genType}
+                    onChange={e => setGenType(e.target.value)}
+                    style={{ padding: '6px 10px', background: '#111726', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    <option value="MIXED">⚡ MIXED (MCQ/MSQ/NAT)</option>
+                    <option value="MCQ">📝 MCQ (Single Correct)</option>
+                    <option value="MSQ">☑️ MSQ (Multiple Select)</option>
+                    <option value="NAT">🔢 NAT (Numerical Answer)</option>
+                  </select>
+                </div>
+
+                {/* Subject Filter */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>TARGET SUBJECT</label>
+                  <select 
+                    value={genSubjectId}
+                    onChange={e => setGenSubjectId(e.target.value)}
+                    style={{ padding: '6px 10px', background: '#111726', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    <option value="">🌐 ALL Subjects (Balanced)</option>
+                    {subjectsList.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Batch Count */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>BATCH SIZE</label>
+                  <select 
+                    value={genCount}
+                    onChange={e => setGenCount(Number(e.target.value))}
+                    style={{ padding: '6px 10px', background: '#111726', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    <option value={5}>5 Questions</option>
+                    <option value={10}>10 Questions</option>
+                    <option value={15}>15 Questions</option>
+                    <option value={20}>20 Questions</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
+                {/* Emergency Pause / Resume Switch */}
+                <button
+                  onClick={() => handleToggleAiGen(!aiGenStatus.enabled)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: aiGenStatus.enabled 
+                      ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#fff'
+                  }}
+                >
+                  {aiGenStatus.enabled ? <><FiPause size={14} /> PAUSE Generator</> : <><FiPlay size={14} /> RESUME Generator</>}
+                </button>
+
+                {/* Custom Batch Trigger Button */}
+                <button
+                  onClick={handleTriggerCustomBatch}
+                  disabled={aiGenStatus.running}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-primary)',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                    color: '#fff',
+                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                  }}
+                >
+                  <FiRefreshCw className={aiGenStatus.running ? "spin" : ""} size={14} /> Generate Custom Batch
+                </button>
+              </div>
             </div>
           </div>
 

@@ -311,11 +311,11 @@ function BookmarksContent() {
     setError('');
     try {
       const headers = AuthService.getAuthHeader();
-          // 🚀 Parallel Request Pipeline (3x Speedup)
+      // 🚀 Parallel Request Pipeline (3x Speedup)
       const [statsRes, bookmarksRes, solvedRes] = await Promise.all([
         axios.get(`${API_CONFIG.BASE_URL}/api/questions/solve/stats`, { headers }),
         axios.get(`${API_CONFIG.BASE_URL}/api/bookmarks`, { headers }),
-        axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved/history`, { headers })
+        axios.get(`${API_CONFIG.BASE_URL}/api/questions/solved`, { headers })
       ]);
       setStats(statsRes.data);
       setBookmarks(Array.isArray(bookmarksRes.data) ? bookmarksRes.data : []);

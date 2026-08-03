@@ -78,6 +78,7 @@ public class GateTipController {
      * if table is empty)
      */
     @GetMapping("/tips/active")
+    @org.springframework.cache.annotation.Cacheable(value = "gateTips")
     public ResponseEntity<List<GateTip>> getActiveTips() {
         List<GateTip> tips = tipRepository.findByActiveTrueOrderByCreatedAtDesc();
         if (tips.isEmpty()) {
@@ -108,6 +109,7 @@ public class GateTipController {
      */
     @PostMapping("/admin/tips")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = "gateTips", allEntries = true)
     public ResponseEntity<?> createTip(@RequestBody GateTip tip) {
         if (tip.getText() == null || tip.getText().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Tip text cannot be empty."));
@@ -125,6 +127,7 @@ public class GateTipController {
      */
     @PutMapping("/admin/tips/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = "gateTips", allEntries = true)
     public ResponseEntity<?> updateTip(@PathVariable Long id, @RequestBody GateTip updated) {
         GateTip tip = tipRepository.findById(id).orElse(null);
         if (tip == null) {
@@ -149,6 +152,7 @@ public class GateTipController {
      */
     @DeleteMapping("/admin/tips/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = "gateTips", allEntries = true)
     public ResponseEntity<?> deleteTip(@PathVariable Long id) {
         if (!tipRepository.existsById(id)) {
             return ResponseEntity.notFound().build();

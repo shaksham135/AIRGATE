@@ -103,6 +103,7 @@ public class Question {
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
+    @org.hibernate.annotations.BatchSize(size = 30)
     @OrderBy("optionLabel ASC")
     @Builder.Default
     private List<QuestionOption> options = new ArrayList<>();
