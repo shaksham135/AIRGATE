@@ -36,7 +36,7 @@ export default function PracticeArena() {
   });
   const [selectedDifficulty, setSelectedDifficulty] = useState(() => searchParams.get('difficulty') || 'ALL');
   const [selectedType, setSelectedType] = useState(() => searchParams.get('type') || 'ALL');
-  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState(() => searchParams.get('solvedStatus') || 'ALL');
+  const [selectedSolvedStatus, setSelectedSolvedStatus] = useState(() => searchParams.get('solvedStatus') || 'UNSOLVED');
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
 
   // Pagination initialized from URL
@@ -690,18 +690,22 @@ export default function PracticeArena() {
                         ? (tempMsqSelections[q.id] || []).includes(opt.optionLabel)
                         : selectedOptions[q.id] === opt.optionLabel;
 
+                      const isCorrectOption = isMsq
+                        ? (q.aiSuggestedAnswer && q.aiSuggestedAnswer.toUpperCase().replace(/[^A-D]/g, '').includes(opt.optionLabel.toUpperCase()))
+                        : (q.aiSuggestedAnswer && q.aiSuggestedAnswer.trim().toUpperCase() === opt.optionLabel.toUpperCase());
+
                       let bg = 'var(--bg-main)';
                       let borderColor = 'var(--border-color)';
                       let badgeBg = 'rgba(255,255,255,0.06)';
                       let badgeColor = 'var(--text-secondary)';
 
                       if (isRevealed) {
-                        if (opt.isCorrect) {
+                        if (isCorrectOption) {
                           bg = 'rgba(16, 185, 129, 0.15)';
                           borderColor = '#10b981';
                           badgeBg = '#10b981';
                           badgeColor = '#fff';
-                        } else if (isSelected && !opt.isCorrect) {
+                        } else if (isSelected && !isCorrectOption) {
                           bg = 'rgba(239, 68, 68, 0.15)';
                           borderColor = '#ef4444';
                           badgeBg = '#ef4444';
