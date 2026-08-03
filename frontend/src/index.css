@@ -36,7 +36,13 @@
   padding: 0;
 }
 
-html, body, #root {
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+body, #root {
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -47,7 +53,15 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   overflow-x: hidden;
+}
+
+/* GPU Hardware Acceleration Utilities for 60 FPS Micro-Interactions */
+.smooth-gpu, .btn, .card, .question-card, .sidebar-nav-item {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
