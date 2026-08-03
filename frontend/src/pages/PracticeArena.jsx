@@ -215,7 +215,10 @@ export default function PracticeArena() {
 
   const fetchSubjects = async () => {
     const cached = CacheService.get('subjects');
-    if (cached) setSubjects(cached);
+    if (cached) {
+      setSubjects(cached);
+      return;
+    }
     try {
       const response = await axios.get(`${API_CONFIG.BASE_URL}/api/subjects`);
       const data = Array.isArray(response.data) ? response.data : [];
