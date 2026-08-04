@@ -453,24 +453,13 @@ public class AiQuestionGeneratorService {
                 topicContext, subject, diagramInstruction
         );
 
-        // ── PRIMARY: Groq Llama 3.1 8B Instant (Fast Generator for Initial Draft) ──
+        // ── Direct Groq Call: Llama 3.1 8B Instant (Fast Generator for Initial Draft) ──
         try {
-            log.info("🤖 Attempting Question Generation via Groq Llama 3.1 8B (Fast Generator)...");
+            log.info("🤖 Generating Question Draft via Groq (Round-Robin Load Balancing)...");
             JsonNode groqRes = executeGroqCall(prompt, false, 2048);
             if (groqRes != null) return groqRes;
         } catch (Exception e) {
-            log.warn("⚠️ Groq generator call failed, falling back to Gemini! Error: {}", e.getMessage());
-        }
-
-        // ── FALLBACK: Google Gemini ──
-        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-            try {
-                log.info("🚀 Falling back to Google Gemini for Question Generation...");
-                JsonNode geminiRes = executeGeminiCall(prompt, 2048);
-                if (geminiRes != null) return geminiRes;
-            } catch (Exception e) {
-                log.warn("⚠️ Gemini generator call failed! Error: {}", e.getMessage());
-            }
+            log.error("❌ Groq generator call failed: {}", e.getMessage());
         }
         return null;
     }
@@ -498,9 +487,9 @@ public class AiQuestionGeneratorService {
                   "   - \"explanation\": \"Concise 2-sentence mathematical proof explaining why the answer is correct.\"\n" +
                   "   - \"rephrasedQuestionText\": \"Polished GATE-level question text with clean KaTeX math.\"\n");
 
-        // ── DUAL DUAL-VERIFIER: Groq Llama 3.3 70B (Heavy Reasoning Model for Blind Verification) ──
+        // ── Direct Groq Call: Llama 3.3 70B (Heavy Reasoning Model for Verification) ──
         try {
-            log.info("🤖 Attempting Answer Verification & Quality Polish via Groq Llama 3.3 70B (Heavy Verifier)...");
+            log.info("🤖 Answer Verification & Quality Polish via Groq 70B...");
             JsonNode res = executeGroqCall(sb.toString(), true, 1600);
             if (res != null) {
                 String ans = res.has("answer") ? res.get("answer").asText() : "";
@@ -512,24 +501,7 @@ public class AiQuestionGeneratorService {
                 }
             }
         } catch (Exception e) {
-            log.warn("⚠️ Groq verifier call failed, falling back to Gemini! Error: {}", e.getMessage());
-        }
-
-        // ── FALLBACK: Google Gemini ──
-        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-            try {
-                log.info("🚀 Falling back to Google Gemini for Answer Verification & Polish...");
-                JsonNode geminiRes = executeGeminiCall(sb.toString(), 2048);
-                if (geminiRes != null && geminiRes.has("answer")) {
-                    String ans = geminiRes.get("answer").asText();
-                    String exp = geminiRes.has("explanation") ? geminiRes.get("explanation").asText() : "";
-                    String rephrasedQ = geminiRes.has("rephrasedQuestionText") ? geminiRes.get("rephrasedQuestionText").asText() : null;
-                    JsonNode rephrasedOpts = geminiRes.has("rephrasedOptions") ? geminiRes.get("rephrasedOptions") : null;
-                    return new VerificationResult(ans, exp, rephrasedQ, rephrasedOpts);
-                }
-            } catch (Exception e) {
-                log.warn("⚠️ Gemini verifier call failed! Error: {}", e.getMessage());
-            }
+            log.error("❌ Groq verifier call failed: {}", e.getMessage());
         }
         return new VerificationResult("", "");
     }

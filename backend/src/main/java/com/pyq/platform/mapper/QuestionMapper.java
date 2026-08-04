@@ -64,7 +64,7 @@ public class QuestionMapper {
             optionsConfidence = ai.getOptionsConfidence();
             answerConfidence = ai.getAnswerConfidence();
             rawAiJson = ai.getRawAiJson();
-        } else {
+        } else if (fetchSubQueries) {
             Optional<QuestionAIAnalysis> aiOpt = aiAnalysisRepository
                     .findFirstByQuestionIdOrderByCreatedAtDesc(question.getId());
             if (aiOpt.isPresent()) {

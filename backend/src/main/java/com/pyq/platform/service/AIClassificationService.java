@@ -655,63 +655,8 @@ public class AIClassificationService {
         String systemInstruction = "You are an expert GATE CSE professor. Follow the format exactly. "
                 + "Short section must be brief (1-4 lines). Detailed section must be thorough and never truncated.";
 
-        // ── PRIMARY: Google Gemini Flash ────────────────────────────────────
-        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-            try {
-                log.info("🌟 [Solution Generator] Using Google Gemini ({}) as primary...", geminiModel);
-                String url = GEMINI_BASE_URL + geminiModel + ":generateContent?key=" + geminiApiKey;
-                HttpHeaders gemHeaders = new HttpHeaders();
-                gemHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-                ObjectNode gemBody = objectMapper.createObjectNode();
-
-                ObjectNode sysInstr = objectMapper.createObjectNode();
-                ArrayNode sysParts = objectMapper.createArrayNode();
-                sysParts.add(objectMapper.createObjectNode().put("text", systemInstruction));
-                sysInstr.set("parts", sysParts);
-                gemBody.set("systemInstruction", sysInstr);
-
-                ArrayNode contents = objectMapper.createArrayNode();
-                ObjectNode contentObj = objectMapper.createObjectNode();
-                contentObj.put("role", "user");
-                ArrayNode parts = objectMapper.createArrayNode();
-                parts.add(objectMapper.createObjectNode().put("text", userPrompt));
-                contentObj.set("parts", parts);
-                contents.add(contentObj);
-                gemBody.set("contents", contents);
-
-                ObjectNode genConfig = objectMapper.createObjectNode();
-                genConfig.put("temperature", 0.15);
-                genConfig.put("maxOutputTokens", 1600);
-                gemBody.set("generationConfig", genConfig);
-
-                ResponseEntity<String> gemResp = restTemplate.exchange(url, HttpMethod.POST,
-                        new HttpEntity<>(gemBody.toString(), gemHeaders), String.class);
-
-                if (gemResp.getStatusCode().is2xxSuccessful() && gemResp.getBody() != null) {
-                    JsonNode root = objectMapper.readTree(gemResp.getBody());
-                    if (root.has("usageMetadata")) {
-                        groqUsageService.addTokens(root.get("usageMetadata").path("totalTokenCount").asLong(0));
-                    }
-                    JsonNode candidates = root.path("candidates");
-                    if (candidates.isArray() && candidates.size() > 0) {
-                        String content = candidates.get(0).path("content").path("parts").get(0).path("text").asText("").trim();
-                        if (!content.isBlank()) {
-                            String[] sparts = content.split(SECTION_DELIMITER, 2);
-                            String shortPart = sparts[0].trim().replaceAll("(?i)^SHORT_SOLUTION\\s*\\n?", "").trim();
-                            String detailedPart = sparts.length > 1 ? sparts[1].trim()
-                                    .replaceAll("(?i)^DETAILED_SOLUTION\\s*\\n?", "").trim()
-                                    : "### Detailed Solution\nSee short solution above.";
-                            return new SolutionResult(shortPart, detailedPart);
-                        }
-                    }
-                }
-            } catch (Exception gemEx) {
-                log.warn("⚠️ [Solution Generator] Gemini failed ({}), falling back to Groq...", gemEx.getMessage());
-            }
-        }
-
-        // ── FALLBACK: Groq ────────────────────────────────────────────────
+        // ── Direct Groq API Call (Round-Robin Multi-Key) ──────────────────
+        log.info("🚀 [Solution Generator] Using Groq API with Round-Robin Multi-Key Load Balancing...");
         String currentApiKey = getNextApiKey();
         if (currentApiKey == null) {
             String fallback = "Correct answer: " + correctOption;
