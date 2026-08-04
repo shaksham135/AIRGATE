@@ -278,13 +278,14 @@ public class AiQuestionGeneratorService {
                 return false;
             }
 
-            // ── 8. Duplicate detection (scoped to topic + subject) ────────────
+            // ── 8. Multi-Layer Duplicate detection (Exact Hash + Jaccard Near-Duplicate Semantic Match) ────────────
             String normalizedHash = generateNormalizedHash(qText);
-            boolean isDuplicate = questionRepository.existsByChecksumHashAndTopicId(normalizedHash, targetTopic.getId())
+            boolean isExactDuplicate = questionRepository.existsByChecksumHashAndTopicId(normalizedHash, targetTopic.getId())
                     || questionRepository.existsByChecksumHashAndSubjectId(normalizedHash, targetSubject.getId());
+            boolean isNearDup = isNearDuplicate(qText, targetTopic.getId());
 
-            if (isDuplicate) {
-                log.warn("⚠️ [AI Generator] Duplicate detected in Subject/Topic. Discarding.");
+            if (isExactDuplicate || isNearDup) {
+                log.warn("⚠️ [AI Generator] {} duplicate detected in Subject/Topic. Discarding.", isExactDuplicate ? "Exact" : "Semantic near-");
                 ledger.setTotalRejected(ledger.getTotalRejected() + 1);
                 ledgerRepository.save(ledger);
                 return false;
@@ -332,6 +333,60 @@ public class AiQuestionGeneratorService {
         }
     }
 
+
+    public boolean isNearDuplicate(String newText, Long topicId) {
+        if (newText == null || newText.isBlank() || topicId == null) return false;
+
+        try {
+            List<Question> recent = questionRepository.findTop50ByTopicIdOrderByIdDesc(topicId);
+            Set<String> newWords = extractStemKeywords(newText);
+            if (newWords.size() < 3) return false;
+
+            for (Question existing : recent) {
+                Set<String> existingWords = extractStemKeywords(existing.getText());
+                double similarity = calculateJaccardSimilarity(newWords, existingWords);
+                if (similarity >= 0.60) {
+                    log.warn("⚠️ [AI Generator] Near-duplicate detected! {}% word-overlap match with existing Question ID #{}", 
+                            Math.round(similarity * 100), existing.getId());
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed near-duplicate check: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    private Set<String> extractStemKeywords(String text) {
+        if (text == null) return Set.of();
+        String clean = text.toLowerCase()
+                .replaceAll("```[a-z]*[\\s\\S]*?```", "")
+                .replaceAll("\\\\[a-zA-Z]+", "")
+                .replaceAll("[^a-z0-9\\s]", " ");
+
+        Set<String> stopWords = Set.of(
+            "the", "is", "a", "an", "and", "or", "in", "of", "to", "for", "with", "on", "at", "by", "from", 
+            "that", "which", "this", "be", "are", "were", "was", "have", "has", "had", "consider", "find", 
+            "what", "calculate", "following", "given", "value", "let", "show", "determine", "option", "correct"
+        );
+
+        Set<String> words = new HashSet<>();
+        for (String w : clean.split("\\s+")) {
+            if (w.length() > 2 && !stopWords.contains(w)) {
+                words.add(w);
+            }
+        }
+        return words;
+    }
+
+    private double calculateJaccardSimilarity(Set<String> s1, Set<String> s2) {
+        if (s1.isEmpty() || s2.isEmpty()) return 0.0;
+        Set<String> intersection = new HashSet<>(s1);
+        intersection.retainAll(s2);
+        Set<String> union = new HashSet<>(s1);
+        union.addAll(s2);
+        return (double) intersection.size() / union.size();
+    }
 
     public String generateNormalizedHash(String text) {
         if (text == null) return "";

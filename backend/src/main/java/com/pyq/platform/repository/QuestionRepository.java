@@ -63,6 +63,8 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findTop5ByTopicIdAndStatusAndIdNot(Long topicId, String status, Long excludeId);
 
+    List<Question> findTop50ByTopicIdOrderByIdDesc(Long topicId);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findByYearAndStatus(Integer year, String status);
 
