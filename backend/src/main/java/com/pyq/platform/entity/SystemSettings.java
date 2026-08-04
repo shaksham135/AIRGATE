@@ -71,19 +71,24 @@ public class SystemSettings {
     private String umamiWebsiteId;
 
     // Automated AI Practice Generator Control Settings
+    @Builder.Default
     @Column(name = "ai_generator_enabled", nullable = false)
     private Boolean aiGeneratorEnabled = true;
 
+    @Builder.Default
     @Column(name = "ai_generator_start_hour", nullable = false)
     private Integer aiGeneratorStartHour = 0; // 00:00 AM IST
 
+    @Builder.Default
     @Column(name = "ai_generator_end_hour", nullable = false)
     private Integer aiGeneratorEndHour = 4; // 04:00 AM IST
 
     // Dynamic Contact & Customer Support Settings
+    @Builder.Default
     @Column(name = "support_email")
     private String supportEmail = "support@airgate.in";
 
+    @Builder.Default
     @Column(name = "support_phone")
     private String supportPhone = "+91 (800) AIR-GATE";
 

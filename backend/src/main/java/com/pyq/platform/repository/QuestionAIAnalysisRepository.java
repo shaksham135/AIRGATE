@@ -2,6 +2,7 @@ package com.pyq.platform.repository;
 
 import com.pyq.platform.entity.QuestionAIAnalysis;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,12 +16,16 @@ import java.util.Optional;
 @Repository
 public interface QuestionAIAnalysisRepository extends JpaRepository<QuestionAIAnalysis, Long> {
     Optional<QuestionAIAnalysis> findFirstByQuestionIdOrderByCreatedAtDesc(Long questionId);
+
     List<QuestionAIAnalysis> findByQuestionId(Long questionId);
+
     List<QuestionAIAnalysis> findByModelNameIn(List<String> modelNames);
+
     long countByModelName(String modelName);
+
     Optional<QuestionAIAnalysis> findFirstByModelNameOrderByIdAsc(String modelName);
 
-    @EntityGraph(attributePaths = {"question", "question.options"})
+    @EntityGraph(attributePaths = { "question", "question.options" })
     @Query("SELECT qaa FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED' ORDER BY qaa.id ASC")
     List<QuestionAIAnalysis> findPendingApprovedByModelName(String modelName, Pageable pageable);
 

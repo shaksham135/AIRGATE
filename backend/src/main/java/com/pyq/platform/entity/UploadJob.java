@@ -26,15 +26,19 @@ public class UploadJob {
     @Column(name = "error_message", length = 255)
     private String errorMessage;
 
+    @Builder.Default
     @Column(name = "total_questions_found")
     private Integer totalQuestionsFound = 0;
 
+    @Builder.Default
     @Column(name = "processed_questions")
     private Integer processedQuestions = 0;
 
+    @Builder.Default
     @Column(name = "duplicate_questions")
     private Integer duplicateQuestions = 0;
 
+    @Builder.Default
     @Column(name = "failed_questions")
     private Integer failedQuestions = 0;
 

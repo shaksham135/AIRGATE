@@ -32,12 +32,15 @@ public class AiGenerationLedger {
     @Column(name = "question_type", nullable = false, length = 10)
     private String questionType; // MCQ, MSQ, NAT
 
+    @Builder.Default
     @Column(name = "total_generated", nullable = false)
     private Integer totalGenerated = 0;
 
+    @Builder.Default
     @Column(name = "total_accepted", nullable = false)
     private Integer totalAccepted = 0;
 
+    @Builder.Default
     @Column(name = "total_rejected", nullable = false)
     private Integer totalRejected = 0;
 

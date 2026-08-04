@@ -34,6 +34,7 @@ public class Question {
     @Column(name = "question_type", nullable = false, length = 10)
     private String questionType; // MCQ, MSQ, NAT
 
+    @Builder.Default
     @Column(nullable = false, length = 20)
     private String difficulty = "MEDIUM"; // EASY, MEDIUM, HARD, GATE_SUPER
 
@@ -54,6 +55,7 @@ public class Question {
     @JoinColumn(name = "topic_id", nullable = false)
     private Topic topic;
 
+    @Builder.Default
     @Column(name = "is_community_verified", nullable = false)
     private Boolean isCommunityVerified = false;
 
