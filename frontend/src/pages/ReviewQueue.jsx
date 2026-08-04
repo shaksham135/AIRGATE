@@ -217,6 +217,16 @@ export default function ReviewQueue() {
     }
   };
 
+  const handleSubjectChange = (newSubjectId) => {
+    setSubjectId(newSubjectId);
+    setTopicId('');
+    if (newSubjectId) {
+      fetchTopics(newSubjectId);
+    } else {
+      setTopics([]);
+    }
+  };
+
   const fetchPendingQuestions = async () => {
     setLoading(true);
     try {
@@ -965,7 +975,7 @@ export default function ReviewQueue() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div className="form-group">
                 <label className="form-label" style={{ color: '#9ca3af' }}>Subject</label>
-                <select className="form-select" value={subjectId} onChange={(e) => setSubjectId(e.target.value)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }} required>
+                <select className="form-select" value={subjectId} onChange={(e) => handleSubjectChange(e.target.value)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }} required>
                   <option value="">Select Subject</option>
                   {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
