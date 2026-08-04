@@ -90,6 +90,19 @@ export const sanitizeLatexString = (str) => {
 
   let s = key;
 
+  // 0. Auto-decode escaped Unicode sequences from OCR output (e.g. \u2212 -> -, \u221a2 -> \sqrt{2}, \u00d7 -> \times)
+  s = s.replace(/\\u2212/gi, '-')
+       .replace(/\\u221a([0-9a-zA-Z]+|\{[^{}]+\})/gi, '\\sqrt{$1}')
+       .replace(/\\u221a/gi, '\\sqrt{}')
+       .replace(/\\u00d7/gi, '\\times ')
+       .replace(/\\u([0-9a-fA-F]{4})/g, (m, hex) => {
+         try {
+           return String.fromCharCode(parseInt(hex, 16));
+         } catch (e) {
+           return m;
+         }
+       });
+
   // 1. Repair matrix environments where backslashes were stripped by JSON parsing
   // e.g. \begin{bmatrix}2&0&0\0&3&0\0&0&4\end{bmatrix} -> \begin{bmatrix}2&0&0 \\ 0&3&0 \\ 0&0&4 \end{bmatrix}
   s = s.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, (match, env, content) => {
