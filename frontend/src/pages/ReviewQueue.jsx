@@ -587,35 +587,26 @@ export default function ReviewQueue() {
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100vh', backgroundColor: '#0b0f19' }}>
       
       {/* Productivity Stats Dashboard Bar */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '12px 40px',
-        backgroundColor: '#111827',
-        borderBottom: '1px solid #1f2937',
-        color: '#9ca3af',
-        fontSize: '0.85rem'
-      }}>
-        <div style={{ display: 'flex', gap: '24px' }}>
+      <div className="review-top-stats-bar">
+        <div className="stats-badges-group">
           <span>Pending in Queue: <strong style={{ color: '#f3f4f6' }}>{pendingTotal - sessionReviewedCount > 0 ? pendingTotal - sessionReviewedCount : questions.length - currentIndex}</strong></span>
           <span>Reviewed Today: <strong style={{ color: '#10b981' }}>{sessionReviewedCount}</strong></span>
           <span>Average Speed: <strong style={{ color: '#38bdf8' }}>{avgTimePerQuestion ? `${avgTimePerQuestion} sec/q` : '--'}</strong></span>
         </div>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <div className="desktop-shortcuts-hint">
           <span style={{ fontSize: '0.75rem', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
             Shortcuts: <kbd style={{ color: '#38bdf8' }}>A</kbd> Approve | <kbd style={{ color: '#ef4444' }}>R</kbd> Reject | <kbd style={{ color: '#a855f7' }}>←/→</kbd> Navigate
           </span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="review-split-layout">
         
         {/* Left Panel: Raw Source View with tabs */}
-        <div style={{ width: '45%', borderRight: '1px solid #1f2937', padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="review-left-panel">
           
           {/* Custom Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #1f2937' }}>
+          <div className="review-tabs-header">
             <button 
               onClick={() => setActiveTab('form')}
               style={{ padding: '8px 16px', border: 'none', borderBottom: activeTab === 'form' ? '2px solid #38bdf8' : 'none', backgroundColor: 'transparent', color: activeTab === 'form' ? '#38bdf8' : '#9ca3af', cursor: 'pointer', fontWeight: 600 }}
@@ -701,7 +692,7 @@ export default function ReviewQueue() {
 
               {/* Diagrams adjust sliders */}
               {imagePath && (
-                <div style={{ display: 'flex', gap: '20px', border: '1px solid #1f2937', borderRadius: '12px', padding: '20px', backgroundColor: '#111827' }}>
+                <div className="review-diagram-container">
                   <div style={{ flex: 1, minWidth: 0, border: '1px solid #374151', borderRadius: '8px', padding: '10px', backgroundColor: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '160px', overflow: 'hidden' }}>
                     <img 
                       src={getAssetUrl(imagePath)} 
@@ -717,7 +708,7 @@ export default function ReviewQueue() {
                   </div>
                   
                   {/* Adjustment Controls */}
-                  <div style={{ width: '180px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem', color: '#9ca3af' }}>
+                  <div className="review-diagram-controls">
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <label style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Zoom</span> <span>{zoom.toFixed(1)}x</span>
@@ -754,7 +745,7 @@ export default function ReviewQueue() {
         </div>
 
         {/* Right Panel: Editor Form */}
-        <div style={{ width: '55%', padding: '32px 40px', overflowY: 'auto', backgroundColor: '#0f172a' }}>
+        <div className="review-right-panel">
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f3f4f6' }}>Metadata Editor</h3>
@@ -778,7 +769,7 @@ export default function ReviewQueue() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <label className="form-label" style={{ color: '#9ca3af', margin: 0 }}>Question Text (Markdown/Code support)</label>
                 {/* Math Toolbar Helper */}
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                <div className="review-math-toolbar" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                   {[
                     { label: 'xʸ (Power)', code: '^{}' },
                     { label: 'xᵧ (Sub)', code: '_{}' },
@@ -1044,7 +1035,7 @@ export default function ReviewQueue() {
             </div>
 
             {/* Control buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
+            <div className="review-control-buttons">
               <button 
                 type="submit" 
                 className="btn btn-primary" 

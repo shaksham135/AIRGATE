@@ -159,9 +159,12 @@ public class QuestionController {
     @GetMapping("/stats")
     @org.springframework.cache.annotation.Cacheable(value = "stats")
     public ResponseEntity<?> getStats() {
-        long approved = questionRepository.countByStatus("APPROVED");
-        long pending = questionRepository.countByStatus("PENDING");
-        long total = questionRepository.count();
+        long approved = questionRepository.countOfficialPyqsByStatus("APPROVED");
+        long pending = questionRepository.countOfficialPyqsByStatus("PENDING");
+        if (pending == 0) {
+            pending = questionRepository.countOfficialPyqsByStatus("PENDING_REVIEW");
+        }
+        long total = questionRepository.countOfficialPyqsTotal();
 
         java.util.Map<String, Long> stats = new java.util.HashMap<>();
         stats.put("totalApproved", approved);

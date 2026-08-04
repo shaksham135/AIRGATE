@@ -81,6 +81,12 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findByStatusAndPublishAtBefore(String status, java.time.LocalDateTime time);
 
+    @Query("SELECT COUNT(q) FROM Question q WHERE q.status = :status AND (q.pdfSourceName IS NULL OR (q.pdfSourceName NOT LIKE 'AI_GENERATED%' AND q.pdfSourceName NOT LIKE '%AI Generator%' AND q.pdfSourceName NOT LIKE '%PRACTICE%'))")
+    long countOfficialPyqsByStatus(@Param("status") String status);
+
+    @Query("SELECT COUNT(q) FROM Question q WHERE q.pdfSourceName IS NULL OR (q.pdfSourceName NOT LIKE 'AI_GENERATED%' AND q.pdfSourceName NOT LIKE '%AI Generator%' AND q.pdfSourceName NOT LIKE '%PRACTICE%')")
+    long countOfficialPyqsTotal();
+
     @Query("SELECT DISTINCT q.year FROM Question q WHERE q.status = 'APPROVED' ORDER BY q.year DESC")
     List<Integer> findDistinctYearsOfApprovedQuestions();
 
