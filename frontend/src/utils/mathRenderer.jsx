@@ -91,19 +91,16 @@ export const sanitizeLatexString = (str) => {
   let s = key;
 
   // 1. Repair matrix environments where backslashes were stripped by JSON parsing
-  // Fix: Do NOT inject extra $$ if \begin{...} is ALREADY inside a math block ($ or $$)
-  s = s.replace(/(\\?\$*\s*)?\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\2\}(\s*\\?\$*)?/gi, (match, leadingDollar, env, content, trailingDollar) => {
+  // e.g. \begin{bmatrix}2&0&0\0&3&0\0&0&4\end{bmatrix} -> \begin{bmatrix}2&0&0 \\ 0&3&0 \\ 0&0&4 \end{bmatrix}
+  s = s.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, (match, env, content) => {
     let clean = content;
     clean = clean.replace(/([0-9a-zA-Z\)\}])\s*\\(?=[0-9a-zA-Z\-\+\(\{])/g, '$1 \\\\ ');
     clean = clean.replace(/&\s*\\(?=[0-9a-zA-Z])/g, '& ');
-    if (leadingDollar || trailingDollar) {
-      return ` \\begin{${env}}${clean}\\end{${env}} `;
-    }
-    return ` $$ \\begin{${env}}${clean}\\end{${env}} $$ `;
+    return `\\begin{${env}}${clean}\\end{${env}}`;
   });
 
-  // 1b. Clean up any empty or duplicated $$ $$ markers
-  s = s.replace(/\$\$\s*\$\$/g, '');
+  // 1b. Auto-wrap unwrapped \begin{matrix}... if NOT inside $ or $$
+  s = s.replace(/(?<!\$)\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}(?!\$)/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
 
   // 2. Convert \[ ... \] to $$ ... $$ and \( ... \) to $ ... $
   s = s.replace(/\\\[([\s\S]*?)\\\]/g, ' $$ $1 $$ ');
