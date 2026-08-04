@@ -58,6 +58,8 @@ public class AiQuestionGeneratorService {
     private final SystemSettingsRepository systemSettingsRepository;
     private final GroqUsageService groqUsageService;
     private final GroqKeyManager groqKeyManager;
+    private final TopicSeedRegistry topicSeedRegistry;
+    private final TagRepository tagRepository;
 
     public AiQuestionGeneratorService(
             SubjectRepository subjectRepository,
@@ -66,7 +68,9 @@ public class AiQuestionGeneratorService {
             AiGenerationLedgerRepository ledgerRepository,
             SystemSettingsRepository systemSettingsRepository,
             GroqUsageService groqUsageService,
-            GroqKeyManager groqKeyManager) {
+            GroqKeyManager groqKeyManager,
+            TopicSeedRegistry topicSeedRegistry,
+            TagRepository tagRepository) {
         this.subjectRepository = subjectRepository;
         this.topicRepository = topicRepository;
         this.questionRepository = questionRepository;
@@ -74,6 +78,8 @@ public class AiQuestionGeneratorService {
         this.systemSettingsRepository = systemSettingsRepository;
         this.groqUsageService = groqUsageService;
         this.groqKeyManager = groqKeyManager;
+        this.topicSeedRegistry = topicSeedRegistry;
+        this.tagRepository = tagRepository;
     }
 
     @PostConstruct
@@ -411,16 +417,23 @@ public class AiQuestionGeneratorService {
         };
         String selectedStyle = startingStyles[new Random().nextInt(startingStyles.length)];
 
+        // Fetch Dynamic Scenario Seed Matrix to guarantee 100% novel problem statements every call
+        TopicSeedRegistry.SeedMatrix seed = topicSeedRegistry.getRandomSeed(subject, topic);
+
         String prompt = String.format(
                 "Role: Senior GATE CSE Examiner.\n" +
                 "Target Subject: %s | Target Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
+                "DYNAMIC SCENARIO & MATHEMATICAL BLUEPRINT (MANDATORY):\n" +
+                "- SCENARIO DOMAIN: %s\n" +
+                "- CONCEPTUAL SUB-ASPECT: %s\n" +
+                "- PARAMETER SEED: %s\n\n" +
                 "STRICT QUALITY, KATEX & MATHEMATICAL BOUNDARY RULES:\n" +
                 "1. SUBJECT BOUNDARY: The question MUST be 100%% strictly about '%s' within '%s'. DO NOT mix topics or concepts from other subjects (e.g. Operating System questions belong ONLY to Operating System, Discrete Mathematics questions belong ONLY to Discrete Mathematics).\n" +
                 "2. KATEX / LATEX FORMATTING (MANDATORY & CRITICAL):\n" +
                 "   - DOLLAR SIGNS MUST ONLY WRAP INDIVIDUAL VARIABLES OR ISOLATED FORMULAS (e.g. Write: 'arrive at times $0$, $t_1$, $t_2$ and require $p_1$, $p_2$ units of processing time').\n" +
                 "   - NEVER wrap plain English words, sentences, or phrases ('and require', 'units of processing time', 'given that', 'where', 'respectively') INSIDE dollar signs!\n" +
                 "   - Double-escape backslashes in JSON (\\\\frac, \\\\cdot, \\\\oplus, \\\\in, \\\\forall, \\\\exists).\n" +
-                "3. NATURAL TEXTBOOK QUESTION STYLE: Write a crisp, authentic, textbook-grade GATE CS problem statement. DO NOT use artificial or awkward intros like 'During the execution of a predicate logic statement...'.\n" +
+                "3. NATURAL TEXTBOOK QUESTION STYLE: Write a crisp, authentic, textbook-grade GATE CS problem statement formulated strictly within the provided Scenario Domain and Sub-Aspect. DO NOT use artificial or awkward intros.\n" +
                 "4. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText. Use strict Mermaid syntax for edge labels (e.g. -->|Label| B). Never append extra '>' after pipe.\n" +
                 "5. CRITICAL MCQ RULE: Calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
                 "6. For MCQ/MSQ: Provide exactly 4 distinct options (A,B,C,D). For NAT: omit options array entirely.\n" +
@@ -435,7 +448,9 @@ public class AiQuestionGeneratorService {
                 "  \"options\": [{\"label\": \"A\", \"text\": \"...\"}, {\"label\": \"B\", \"text\": \"...\"}, {\"label\": \"C\", \"text\": \"...\"}, {\"label\": \"D\", \"text\": \"...\"}],\n" +
                 "  \"correctAnswer\": \"A\"\n" +
                 "}",
-                subject, topicContext, difficulty, qType, topicContext, subject, diagramInstruction
+                subject, topicContext, difficulty, qType,
+                seed.getDomainScenario(), seed.getSubAspect(), seed.getParameterConstraints(),
+                topicContext, subject, diagramInstruction
         );
 
         // ── PRIMARY: Groq Llama 3.1 8B Instant (Fast Generator for Initial Draft) ──
@@ -849,6 +864,19 @@ public class AiQuestionGeneratorService {
                     .modelName("Groq-8B-70B-Dual")
                     .build());
             q.setAiAnalyses(analyses);
+
+            // Auto-tag question for indexing & searchability
+            Set<Tag> tags = new HashSet<>();
+            String[] tagNames = { "AI_GENERATED", "GATE_PRACTICE", subject.getName(), topic.getName() };
+            for (String tagName : tagNames) {
+                if (tagName != null && !tagName.isBlank()) {
+                    String cleanTag = tagName.trim();
+                    Tag tag = tagRepository.findByName(cleanTag)
+                            .orElseGet(() -> tagRepository.save(Tag.builder().name(cleanTag).build()));
+                    tags.add(tag);
+                }
+            }
+            q.setTags(tags);
 
             questionRepository.save(q);
         } catch (Exception e) {
