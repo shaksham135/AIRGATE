@@ -153,7 +153,7 @@ export default function AdminQuestionEditor() {
       text,
       questionType,
       marks: parseInt(marks) || 1,
-      negativeMarks: parseFloat(negativeMarks) || 0,
+      negativeMarks: Math.abs(parseFloat(negativeMarks)) || 0,
       year: parseInt(year) || 2026,
       subjectId: parseInt(subjectId),
       topicId: parseInt(topicId),

@@ -239,7 +239,7 @@ public class UploadService {
                                 .text(aiRes.questionText)
                                 .questionType(aiRes.questionType)
                                 .marks(aiRes.marks)
-                                .negativeMarks(aiRes.negativeMarks)
+                                .negativeMarks(Math.abs(aiRes.negativeMarks))
                                 .difficulty(aiRes.difficulty != null ? aiRes.difficulty : "MEDIUM")
                                 .year(year)
                                 .subject(subject)

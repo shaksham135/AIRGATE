@@ -22,8 +22,8 @@ public class CreateQuestionRequest {
     private Integer marks;
 
     @NotNull(message = "Negative marks is required")
-    @DecimalMin(value = "0.0", message = "Negative marks must be non-negative")
-    @DecimalMax(value = "2.0", message = "Negative marks must not exceed 2.0")
+    @DecimalMin(value = "-2.0", message = "Negative marks magnitude must not exceed 2.0")
+    @DecimalMax(value = "2.0", message = "Negative marks magnitude must not exceed 2.0")
     private Double negativeMarks;
 
     private Integer year = 2026;
