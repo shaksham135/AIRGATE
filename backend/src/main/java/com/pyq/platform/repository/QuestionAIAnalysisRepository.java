@@ -1,31 +1,38 @@
 package com.pyq.platform.repository;
 
 import com.pyq.platform.entity.QuestionAIAnalysis;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface QuestionAIAnalysisRepository extends JpaRepository<QuestionAIAnalysis, Long> {
     Optional<QuestionAIAnalysis> findFirstByQuestionIdOrderByCreatedAtDesc(Long questionId);
-    java.util.List<QuestionAIAnalysis> findByQuestionId(Long questionId);
-    java.util.List<QuestionAIAnalysis> findByModelNameIn(java.util.List<String> modelNames);
+    List<QuestionAIAnalysis> findByQuestionId(Long questionId);
+    List<QuestionAIAnalysis> findByModelNameIn(List<String> modelNames);
     long countByModelName(String modelName);
     Optional<QuestionAIAnalysis> findFirstByModelNameOrderByIdAsc(String modelName);
 
-    @org.springframework.data.jpa.repository.Query("SELECT qaa FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED' ORDER BY qaa.id ASC")
-    java.util.List<QuestionAIAnalysis> findPendingApprovedByModelName(String modelName, org.springframework.data.domain.Pageable pageable);
+    @Query("SELECT qaa FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED' ORDER BY qaa.id ASC")
+    List<QuestionAIAnalysis> findPendingApprovedByModelName(String modelName, Pageable pageable);
 
-    @org.springframework.data.jpa.repository.Query("SELECT COUNT(qaa) FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED'")
+    @Query("SELECT COUNT(qaa) FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED'")
     long countPendingApprovedByModelName(String modelName);
 
-    @org.springframework.data.jpa.repository.Modifying
-    @org.springframework.transaction.annotation.Transactional
-    @org.springframework.data.jpa.repository.Query("DELETE FROM QuestionAIAnalysis qaa WHERE qaa.question.id = :questionId")
-    void deleteByQuestionId(@org.springframework.data.repository.query.Param("questionId") Long questionId);
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM QuestionAIAnalysis qaa WHERE qaa.question.id = :questionId")
+    void deleteByQuestionId(@Param("questionId") Long questionId);
 
-    @org.springframework.data.jpa.repository.Modifying
-    @org.springframework.transaction.annotation.Transactional
-    @org.springframework.data.jpa.repository.Query("DELETE FROM QuestionAIAnalysis qaa WHERE qaa.question.id IN :questionIds")
-    void deleteByQuestionIdIn(@org.springframework.data.repository.query.Param("questionIds") java.util.List<Long> questionIds);
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM QuestionAIAnalysis qaa WHERE qaa.question.id IN :questionIds")
+    void deleteByQuestionIdIn(@Param("questionIds") List<Long> questionIds);
 }

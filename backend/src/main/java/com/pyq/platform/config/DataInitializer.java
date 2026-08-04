@@ -207,10 +207,10 @@ public class DataInitializer implements CommandLineRunner {
                     List<Topic> topicsToFix = topicRepository.findByName(topicName);
                     for (Topic t : topicsToFix) {
                         if (t.getSubject() != null && !t.getSubject().getId().equals(targetSub.getId())) {
-                            Long parentId = t.getParentTopic() != null ? t.getParentTopic().getId() : null;
-                            Optional<Topic> existingCanonical = parentId != null
-                                    ? topicRepository.findByNameAndSubjectIdAndParentTopicId(t.getName(), targetSub.getId(), parentId)
-                                    : topicRepository.findByNameAndSubjectIdAndParentTopicIsNull(t.getName(), targetSub.getId());
+                            List<Topic> existingInTarget = topicRepository.findByName(t.getName());
+                            Optional<Topic> existingCanonical = existingInTarget.stream()
+                                    .filter(existing -> existing.getSubject() != null && existing.getSubject().getId().equals(targetSub.getId()))
+                                    .findFirst();
 
                             if (existingCanonical.isPresent()) {
                                 Topic canonicalTopic = existingCanonical.get();

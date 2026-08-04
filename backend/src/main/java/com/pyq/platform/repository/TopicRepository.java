@@ -1,18 +1,20 @@
 package com.pyq.platform.repository;
 
 import com.pyq.platform.entity.Topic;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface TopicRepository extends JpaRepository<Topic, Long> {
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"subject", "parentTopic"})
+    @EntityGraph(attributePaths = {"subject", "parentTopic"})
     List<Topic> findBySubjectId(Long subjectId);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"subject", "parentTopic"})
+    @EntityGraph(attributePaths = {"subject", "parentTopic"})
     List<Topic> findBySubjectIdAndParentTopicIsNull(Long subjectId);
 
     List<Topic> findByParentTopicId(Long parentTopicId);
