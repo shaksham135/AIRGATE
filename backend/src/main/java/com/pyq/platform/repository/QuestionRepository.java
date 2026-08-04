@@ -24,7 +24,7 @@ import java.util.Optional;
 public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSpecificationExecutor<Question> {
 
     @Override
-    @EntityGraph(attributePaths = {"subject", "topic", "options", "aiAnalyses"})
+    @EntityGraph(attributePaths = {"subject", "topic", "options"})
     @NonNull
     Page<Question> findAll(
         @Nullable Specification<Question> spec,

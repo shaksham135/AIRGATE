@@ -54,8 +54,7 @@ public class QuestionMapper {
         long helpful = 0;
         long notHelpful = 0;
 
-        boolean isAiInitialized = org.hibernate.Hibernate.isInitialized(question.getAiAnalyses());
-        if (isAiInitialized && question.getAiAnalyses() != null && !question.getAiAnalyses().isEmpty()) {
+        if (question.getAiAnalyses() != null && !question.getAiAnalyses().isEmpty()) {
             QuestionAIAnalysis ai = question.getAiAnalyses().get(question.getAiAnalyses().size() - 1);
             aiSuggestedAnswer = ai.getSuggestedAnswer();
             aiSuggestedExplanation = ai.getSuggestedExplanation();
