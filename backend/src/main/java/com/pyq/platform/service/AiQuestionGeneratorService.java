@@ -635,14 +635,14 @@ public class AiQuestionGeneratorService {
             String vLetter = v.replaceAll("[^A-D]", "");
             if (!gLetter.isEmpty() && gLetter.equals(vLetter)) return true;
 
-            // 2. Dynamic Option Content Match: If verifier returned option text instead of label "A"
+            // 2. Dynamic Option Content Match: If verifier returned full option text instead of label "A"
             if (optionsNode != null && optionsNode.isArray()) {
                 for (JsonNode opt : optionsNode) {
                     String optLabel = opt.has("label") ? opt.get("label").asText().toUpperCase() : "";
                     String optText = opt.has("text") ? opt.get("text").asText().replaceAll("\\s+", "").toUpperCase() : "";
-                    if (!optText.isEmpty() && (v.contains(optText) || optText.contains(v))) {
+                    if (!optText.isEmpty() && optText.length() >= 5 && (v.contains(optText) || optText.contains(v))) {
                         if (gLetter.equalsIgnoreCase(optLabel)) {
-                            log.info("🎯 Dynamic Option Match Success! Verifier returned option text '{}' matching option {}", ver, optLabel);
+                            log.info("🎯 Dynamic Option Match Success! Verifier returned option text matching option {}", optLabel);
                             return true;
                         }
                     }
@@ -662,7 +662,7 @@ public class AiQuestionGeneratorService {
                 optionsNode.forEach(opt -> {
                     String label = opt.has("label") ? opt.get("label").asText().toUpperCase() : "";
                     String optText = opt.has("text") ? opt.get("text").asText().replaceAll("\\s+", "").toUpperCase() : "";
-                    if (!optText.isEmpty() && (v.contains(optText) || optText.contains(v))) {
+                    if (!optText.isEmpty() && optText.length() >= 5 && (v.contains(optText) || optText.contains(v))) {
                         matchedVerLabels.add(label);
                     }
                 });
