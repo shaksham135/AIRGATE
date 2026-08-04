@@ -65,18 +65,16 @@ public class BackgroundSolutionGenerator {
             return;
         }
 
-        // ── QUEUE CHECK: Find the oldest APPROVED question still needing detailed solution ──
-        List<QuestionAIAnalysis> analyses = aiAnalysisRepository.findPendingApprovedByModelName(
-                "fast-parse", org.springframework.data.domain.PageRequest.of(0, 1)
-        );
-        if (analyses.isEmpty()) {
-            log.debug("BackgroundSolutionGenerator: No pending approved questions — all solutions up to date.");
-            return;
-        }
-        QuestionAIAnalysis target = analyses.get(0);
-
-        // Load data inside transaction template without re-querying by ID
+        // Load data inside transaction template
         QuestionData data = transactionTemplate.execute(status -> {
+            List<QuestionAIAnalysis> analyses = aiAnalysisRepository.findPendingApprovedByModelName(
+                    "fast-parse", org.springframework.data.domain.PageRequest.of(0, 1)
+            );
+            if (analyses.isEmpty()) {
+                return null;
+            }
+            QuestionAIAnalysis target = analyses.get(0);
+
             QuestionData qd = new QuestionData();
             qd.text = target.getQuestion().getText();
             qd.answer = target.getSuggestedAnswer();
@@ -99,6 +97,11 @@ public class BackgroundSolutionGenerator {
             }
             return qd;
         });
+
+        if (data == null) {
+            log.debug("BackgroundSolutionGenerator: No pending approved questions — all solutions up to date.");
+            return;
+        }
 
         long pending = aiAnalysisRepository.countPendingApprovedByModelName("fast-parse");
         log.info("BackgroundSolutionGenerator: Generating solution for approved question ID {} ({} questions remaining in queue)...",

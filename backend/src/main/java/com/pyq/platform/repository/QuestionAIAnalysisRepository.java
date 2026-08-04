@@ -20,6 +20,7 @@ public interface QuestionAIAnalysisRepository extends JpaRepository<QuestionAIAn
     long countByModelName(String modelName);
     Optional<QuestionAIAnalysis> findFirstByModelNameOrderByIdAsc(String modelName);
 
+    @EntityGraph(attributePaths = {"question", "question.options"})
     @Query("SELECT qaa FROM QuestionAIAnalysis qaa WHERE qaa.modelName = :modelName AND qaa.question.status = 'APPROVED' ORDER BY qaa.id ASC")
     List<QuestionAIAnalysis> findPendingApprovedByModelName(String modelName, Pageable pageable);
 
