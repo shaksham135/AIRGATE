@@ -217,9 +217,12 @@ public class DataInitializer implements CommandLineRunner {
                                 log.info("🔧 Self-Healing DB: Merging duplicate Topic '{}' (ID {}) into Canonical Topic (ID {}) under Subject '{}'",
                                         t.getName(), t.getId(), canonicalTopic.getId(), targetSub.getName());
                                 questionRepository.relinkQuestionsToTopic(t.getId(), canonicalTopic, targetSub);
+                                topicRepository.relinkChildTopics(t.getId(), canonicalTopic);
                                 try {
-                                    topicRepository.delete(t);
-                                } catch (Exception ignored) {}
+                                    topicRepository.deleteById(t.getId());
+                                } catch (Exception e) {
+                                    log.warn("🔧 Self-Healing DB: Could not delete merged Topic ID {} due to foreign key constraints: {}", t.getId(), e.getMessage());
+                                }
                             } else {
                                 log.info("🔧 Self-Healing DB: Re-assigning Topic '{}' from Subject '{}' -> '{}'",
                                         t.getName(), t.getSubject().getName(), targetSub.getName());
