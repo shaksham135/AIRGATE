@@ -383,10 +383,10 @@ public class AiQuestionGeneratorService {
                 subject, topicContext, difficulty, qType, topicContext, subject, diagramInstruction
         );
 
-        // ── PRIMARY: Groq Llama 3.3 70B (Heavy Reasoning Model for Precision Generation) ──
+        // ── PRIMARY: Groq Llama 3.1 8B Instant (Fast Generator for Initial Draft) ──
         try {
-            log.info("🤖 Attempting Question Generation via Groq Llama 3.3 70B (Heavy Generator)...");
-            JsonNode groqRes = executeGroqCall(prompt, true, 2048);
+            log.info("🤖 Attempting Question Generation via Groq Llama 3.1 8B (Fast Generator)...");
+            JsonNode groqRes = executeGroqCall(prompt, false, 2048);
             if (groqRes != null) return groqRes;
         } catch (Exception e) {
             log.warn("⚠️ Groq generator call failed, falling back to Gemini! Error: {}", e.getMessage());
