@@ -46,10 +46,6 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @org.springframework.data.jpa.repository.Query("DELETE FROM Question q WHERE q.id IN :questionIds")
     void deleteQuestionsBulk(@org.springframework.data.repository.query.Param("questionIds") List<Long> questionIds);
 
-    @org.springframework.data.jpa.repository.Modifying
-    @org.springframework.transaction.annotation.Transactional
-    @org.springframework.data.jpa.repository.Query(value = "UPDATE questions q JOIN topics t ON q.topic_id = t.id SET q.subject_id = t.subject_id WHERE q.topic_id IS NOT NULL AND q.subject_id <> t.subject_id", nativeQuery = true)
-    int alignQuestionSubjectsWithTopics();
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findBySubjectIdAndStatus(Long subjectId, String status);
@@ -122,4 +118,19 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
         "FROM Question q WHERE q.status = 'APPROVED' " +
         "GROUP BY q.subject.id, q.topic.id, q.difficulty, q.questionType")
     List<Object[]> countApprovedGroupedBySlot();
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE Question q SET q.topic = :newTopic, q.subject = :newSubject WHERE q.topic.id = :oldTopicId")
+    int relinkQuestionsToTopic(
+        @org.springframework.data.repository.query.Param("oldTopicId") Long oldTopicId,
+        @org.springframework.data.repository.query.Param("newTopic") com.pyq.platform.entity.Topic newTopic,
+        @org.springframework.data.repository.query.Param("newSubject") com.pyq.platform.entity.Subject newSubject);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Query(
+        value = "UPDATE questions q JOIN topics t ON q.topic_id = t.id SET q.subject_id = t.subject_id WHERE q.subject_id <> t.subject_id",
+        nativeQuery = true)
+    int alignQuestionSubjectsWithTopics();
 }
