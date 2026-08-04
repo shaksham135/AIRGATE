@@ -77,6 +77,9 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT q.year FROM Question q WHERE q.status = 'APPROVED' ORDER BY q.year DESC")
     List<Integer> findDistinctYearsOfApprovedQuestions();
 
+    @org.springframework.data.jpa.repository.Query("SELECT q.id FROM Question q WHERE q.status = 'APPROVED' ORDER BY q.id DESC")
+    List<Long> findApprovedQuestionIds();
+
     // ── Simulator-specific efficient random sampling (DB-side, no heap load) ──
 
     @org.springframework.data.jpa.repository.Query(

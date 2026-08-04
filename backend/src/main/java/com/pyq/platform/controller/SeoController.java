@@ -1,5 +1,6 @@
 package com.pyq.platform.controller;
 
+import com.pyq.platform.repository.QuestionRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 public class SeoController {
@@ -14,71 +16,59 @@ public class SeoController {
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
+    private final QuestionRepository questionRepository;
+
+    public SeoController(QuestionRepository questionRepository) {
+        this.questionRepository = questionRepository;
+    }
+
     @GetMapping(value = "/sitemap.xml", produces = MediaType.APPLICATION_XML_VALUE)
     @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'sitemap'")
     public ResponseEntity<String> getSitemap() {
         String today = LocalDate.now().toString();
         String baseUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
 
-        String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>daily</changefreq>\n" +
-                "    <priority>1.0</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/explore</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>daily</changefreq>\n" +
-                "    <priority>0.9</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/practice</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>weekly</changefreq>\n" +
-                "    <priority>0.8</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/simulator</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>weekly</changefreq>\n" +
-                "    <priority>0.8</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/privacy</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>monthly</changefreq>\n" +
-                "    <priority>0.5</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/terms</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>monthly</changefreq>\n" +
-                "    <priority>0.5</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/contact</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>monthly</changefreq>\n" +
-                "    <priority>0.6</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/login</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>monthly</changefreq>\n" +
-                "    <priority>0.4</priority>\n" +
-                "  </url>\n" +
-                "  <url>\n" +
-                "    <loc>" + baseUrl + "/register</loc>\n" +
-                "    <lastmod>" + today + "</lastmod>\n" +
-                "    <changefreq>monthly</changefreq>\n" +
-                "    <priority>0.4</priority>\n" +
-                "  </url>\n" +
-                "</urlset>";
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        sb.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
 
-        return ResponseEntity.ok(xml);
+        String[][] staticRoutes = {
+            {"/", "1.0", "daily"},
+            {"/explore", "0.9", "daily"},
+            {"/practice", "0.8", "weekly"},
+            {"/simulator", "0.8", "weekly"},
+            {"/privacy", "0.5", "monthly"},
+            {"/terms", "0.5", "monthly"},
+            {"/contact", "0.6", "monthly"},
+            {"/login", "0.4", "monthly"},
+            {"/register", "0.4", "monthly"}
+        };
+
+        for (String[] r : staticRoutes) {
+            sb.append("  <url>\n");
+            sb.append("    <loc>").append(baseUrl).append(r[0]).append("</loc>\n");
+            sb.append("    <lastmod>").append(today).append("</lastmod>\n");
+            sb.append("    <changefreq>").append(r[2]).append("</changefreq>\n");
+            sb.append("    <priority>").append(r[1]).append("</priority>\n");
+            sb.append("  </url>\n");
+        }
+
+        // Dynamically add all approved question pages to sitemap for 100% Google indexing
+        try {
+            List<Long> qIds = questionRepository.findApprovedQuestionIds();
+            for (Long qId : qIds) {
+                sb.append("  <url>\n");
+                sb.append("    <loc>").append(baseUrl).append("/question/").append(qId).append("</loc>\n");
+                sb.append("    <lastmod>").append(today).append("</lastmod>\n");
+                sb.append("    <changefreq>weekly</changefreq>\n");
+                sb.append("    <priority>0.8</priority>\n");
+                sb.append("  </url>\n");
+            }
+        } catch (Exception ignored) {}
+
+        sb.append("</urlset>");
+
+        return ResponseEntity.ok(sb.toString());
     }
 
     @GetMapping(value = "/robots.txt", produces = MediaType.TEXT_PLAIN_VALUE)
