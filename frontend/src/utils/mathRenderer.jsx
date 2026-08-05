@@ -250,8 +250,8 @@ export const formatMathText = (text) => {
   
   const normalized = sanitizeLatexString(text);
 
-  // Match $$...$$ (display math) and $...$ (inline math)
-  const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,400}?\$)/g;
+  // Match $$...$$ (display math) and $...$ (inline math, single-line only)
+  const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\\n]|\\.){1,400}?\$)/g;
 
   const parts = [];
   let lastIndex = 0;
