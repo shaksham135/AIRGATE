@@ -87,6 +87,10 @@ export default function ReviewQueue() {
 
   // Sync state with current question in queue
   useEffect(() => {
+    if (questions.length > 0 && currentIndex < questions.length) {
+      const q = questions[currentIndex];
+      setText(q.text);
+
       // 🚀 Smart Auto-Detect Question Type (MCQ vs MSQ vs NAT)
       let detectedType = q.questionType || 'MCQ';
       const ans = (q.aiSuggestedAnswer || '').trim();
