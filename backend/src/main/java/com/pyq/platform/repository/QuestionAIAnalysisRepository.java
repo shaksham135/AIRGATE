@@ -41,4 +41,9 @@ public interface QuestionAIAnalysisRepository extends JpaRepository<QuestionAIAn
     @Transactional
     @Query("DELETE FROM QuestionAIAnalysis qaa WHERE qaa.question.id IN :questionIds")
     void deleteByQuestionIdIn(@Param("questionIds") List<Long> questionIds);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE QuestionAIAnalysis qaa SET qaa.modelName = 'fast-parse' WHERE qaa.suggestedExplanation LIKE '%Generation failed%' OR qaa.suggestedExplanation LIKE '%Generation Error%' OR qaa.suggestedExplanation IS NULL")
+    int resetFailedSolutionsToPending();
 }

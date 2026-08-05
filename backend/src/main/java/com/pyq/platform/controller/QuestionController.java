@@ -679,9 +679,7 @@ public class QuestionController {
     @GetMapping("/admin/ai-batches")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getAiGenerationBatches() {
-        List<Question> aiQuestions = questionRepository.findAll().stream()
-                .filter(q -> q.getPdfSourceName() != null && (q.getPdfSourceName().startsWith("AI_NIGHTLY") || q.getPdfSourceName().startsWith("AI_GENERATED")))
-                .collect(Collectors.toList());
+        List<Question> aiQuestions = questionRepository.findAllAiGeneratedQuestions();
 
         Map<String, List<Question>> grouped = aiQuestions.stream()
                 .collect(Collectors.groupingBy(this::resolveBatchKey));
@@ -704,8 +702,7 @@ public class QuestionController {
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<Map<String, Object>> deleteAiBatch(@PathVariable String batchName) {
-        List<Question> aiQuestions = questionRepository.findAll().stream()
-                .filter(q -> q.getPdfSourceName() != null && (q.getPdfSourceName().startsWith("AI_NIGHTLY") || q.getPdfSourceName().startsWith("AI_GENERATED")))
+        List<Question> aiQuestions = questionRepository.findAllAiGeneratedQuestions().stream()
                 .filter(q -> resolveBatchKey(q).equalsIgnoreCase(batchName))
                 .collect(Collectors.toList());
 

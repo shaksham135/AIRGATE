@@ -65,6 +65,14 @@ public class BackgroundSolutionGenerator {
             return;
         }
 
+        // Auto-recover any failed/stuck solution records back to pending queue
+        try {
+            int resetCount = aiAnalysisRepository.resetFailedSolutionsToPending();
+            if (resetCount > 0) {
+                log.info("🔄 [BackgroundSolutionGenerator] Re-queued {} failed/stuck solution(s) for generation.", resetCount);
+            }
+        } catch (Exception ignored) {}
+
         // Load data inside transaction template
         QuestionData data = transactionTemplate.execute(status -> {
             List<QuestionAIAnalysis> analyses = aiAnalysisRepository.findPendingApprovedByModelName(

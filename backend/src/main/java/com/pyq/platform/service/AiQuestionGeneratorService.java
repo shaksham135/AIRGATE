@@ -420,19 +420,14 @@ public class AiQuestionGeneratorService {
         // Fetch Dynamic Scenario Seed Matrix to guarantee 100% novel problem statements every call
         TopicSeedRegistry.SeedMatrix seed = topicSeedRegistry.getRandomSeed(subject, topic);
 
-        String prompt = String.format(
-                "Role: Senior GATE CSE Examiner.\n" +
-                "Target Subject: %s | Target Topic: %s | Difficulty: %s | Question Type: %s.\n\n" +
-                "DYNAMIC SCENARIO & MATHEMATICAL BLUEPRINT (MANDATORY):\n" +
-                "- SCENARIO DOMAIN: %s\n" +
-                "- CONCEPTUAL SUB-ASPECT: %s\n" +
-                "- PARAMETER SEED: %s\n\n" +
-                "STRICT QUALITY, KATEX & MATHEMATICAL BOUNDARY RULES:\n" +
+        String prompt = "STRICT QUALITY, KATEX & MATHEMATICAL BOUNDARY RULES:\n" +
                 "1. SUBJECT BOUNDARY: The question MUST be 100%% strictly about '%s' within '%s'. DO NOT mix topics or concepts from other subjects (e.g. Operating System questions belong ONLY to Operating System, Discrete Mathematics questions belong ONLY to Discrete Mathematics).\n" +
                 "2. KATEX / LATEX FORMATTING (MANDATORY & CRITICAL):\n" +
-                "   - DOLLAR SIGNS MUST ONLY WRAP INDIVIDUAL VARIABLES OR ISOLATED FORMULAS (e.g. Write: 'arrive at times $0$, $t_1$, $t_2$ and require $p_1$, $p_2$ units of processing time').\n" +
-                "   - NEVER wrap plain English words, sentences, or phrases ('and require', 'units of processing time', 'given that', 'where', 'respectively') INSIDE dollar signs!\n" +
-                "   - Double-escape backslashes in JSON (\\\\frac, \\\\cdot, \\\\oplus, \\\\in, \\\\forall, \\\\exists).\n" +
+                "   - INLINE MATH ($...$): Wrap single variables, subscripts, and short formulas in single dollars (e.g. $b_3$, $t_1$, $2 \\\\times 2$, $\\\\mathcal{O}(n \\\\log n)$). Inline math MUST stay on a single line.\n" +
+                "   - DISPLAY MATH ($$...$$): Wrap matrices, large equations, and summations in double dollars on a separate line (e.g. $$A = \\\\begin{pmatrix} 1 & 1 \\\\\\\\ 1 & -1 \\\\end{pmatrix}$$).\n" +
+                "   - BOOLEAN ALGEBRA: Use \\\\overline{variable} for complements (e.g. $\\\\overline{b_1}\\\\overline{b_0} + b_1 \\\\overline{b_2} b_3$). DO NOT use A', !A, or NOT A.\n" +
+                "   - DOUBLE-ESCAPE BACKSLASHES IN JSON: Output \\\\frac, \\\\sqrt, \\\\sum, \\\\begin, \\\\end, \\\\overline, \\\\times, \\\\cdot, \\\\pmatrix.\n" +
+                "   - NEVER wrap plain English words or phrases ('and require', 'units of processing time', 'given that', 'where', 'respectively') inside dollar signs!\n" +
                 "3. NATURAL TEXTBOOK QUESTION STYLE: Write a crisp, authentic, textbook-grade GATE CS problem statement formulated strictly within the provided Scenario Domain and Sub-Aspect. DO NOT use artificial or awkward intros.\n" +
                 "4. MERMAID DIAGRAMS: If a diagram helps explain a circuit, pipeline, tree, state machine, or ER model, include valid ```mermaid ... ``` block inside questionText. Use strict Mermaid syntax for edge labels (e.g. -->|Label| B). Never append extra '>' after pipe.\n" +
                 "5. CRITICAL MCQ RULE: Calculate the mathematical solution step-by-step FIRST, and place the EXACT calculated answer in one of the 4 options (A,B,C,D). The options array MUST contain the exact correct answer!\n" +
@@ -447,11 +442,10 @@ public class AiQuestionGeneratorService {
                 "  \"questionText\": \"Text with isolated $math$\",\n" +
                 "  \"options\": [{\"label\": \"A\", \"text\": \"...\"}, {\"label\": \"B\", \"text\": \"...\"}, {\"label\": \"C\", \"text\": \"...\"}, {\"label\": \"D\", \"text\": \"...\"}],\n" +
                 "  \"correctAnswer\": \"A\"\n" +
-                "}",
-                subject, topicContext, difficulty, qType,
-                seed.getDomainScenario(), seed.getSubAspect(), seed.getParameterConstraints(),
-                topicContext, subject, diagramInstruction
-        );
+                "}";
+
+        prompt = String.format(prompt,
+                topicContext, subject, diagramInstruction);
 
         // ── Direct Groq Call: Llama 3.1 8B Instant (Fast Generator for Initial Draft) ──
         try {
@@ -469,7 +463,7 @@ public class AiQuestionGeneratorService {
         sb.append("Role: Senior GATE CSE Chief Examiner & Verification AI.\n" +
                   "Tasks:\n" +
                   "1. Solve this question independently step-by-step and determine the exact correct answer.\n" +
-                  "2. REPHRASE & POLISH TO AUTHENTIC GATE CSE STANDARD: If the question statement or option text can be written more cleanly, rephrase it to match authentic IIT/IISc GATE CSE exam terminology with clean KaTeX math (dollar signs ONLY around individual variables e.g. $t_1$, $\\mathcal{O}(n)$). DO NOT change the mathematical values, NAT numbers, or correct option letter.\n\n" +
+                  "2. REPHRASE & POLISH TO AUTHENTIC GATE CSE STANDARD: If the question statement or option text can be written more cleanly, rephrase it to match authentic IIT/IISc GATE CSE exam terminology with clean KaTeX math (single dollar $...$ ONLY around individual variables e.g. $t_1$, $\\\\mathcal{O}(n)$, and $\\\\overline{b_1}$ for complements). DO NOT change the mathematical values, NAT numbers, or correct option letter.\n\n" +
                   "Type: ").append(qType).append("\n" +
                   "Question: ").append(qText).append("\n");
         if (optionsNode != null && optionsNode.isArray() && optionsNode.size() > 0) {
@@ -526,7 +520,7 @@ public class AiQuestionGeneratorService {
                 req.put("response_format", objectMapper.createObjectNode().put("type", "json_object"));
 
                 ArrayNode messages = objectMapper.createArrayNode();
-                messages.add(objectMapper.createObjectNode().put("role", "system").put("content", "You respond strictly in raw JSON object format."));
+                messages.add(objectMapper.createObjectNode().put("role", "system").put("content", "You respond strictly in raw JSON object format with valid double-escaped LaTeX."));
                 messages.add(objectMapper.createObjectNode().put("role", "user").put("content", prompt));
                 req.set("messages", messages);
 
@@ -549,14 +543,10 @@ public class AiQuestionGeneratorService {
                 }
             } catch (Exception e) {
                 String errMsg = e.getMessage() != null ? e.getMessage() : "";
-                boolean is429 = is429RateLimitError(e, errMsg);
-
-                if (is429) {
-                    log.warn("⚠️ Groq HTTP 429 Rate Limit on attempt {} for key [...{}]! Marking 60s cooldown & switching key...", 
-                            attempt, maskKey(apiKey));
+                if (is429RateLimitError(e, errMsg)) {
                     groqKeyManager.markRateLimited(apiKey);
-                    // Safe 3.5s pacing pause so we don't exceed per-minute token rate limits on key switch
-                    try { Thread.sleep(3500); } catch (InterruptedException ignored) {}
+                    log.warn("⚠️ Rate limit (429) hit on key ending with ...{}. Switch to next key (attempt {}/{})", 
+                            maskKey(apiKey), attempt, maxRetries);
                 } else if (errMsg.contains("400") || errMsg.toLowerCase().contains("bad request")) {
                     log.warn("⚠️ Groq 400 Bad Request on attempt {} (Error: {}). Expanding max_tokens to {}...", 
                             attempt, errMsg, currentMaxTokens + 1000);
@@ -577,12 +567,17 @@ public class AiQuestionGeneratorService {
                 .replace("\r", "\\\\r")
                 .replace("\b", "\\\\b");
 
+        // Auto-repair control character artifacts and unescaped TeX commands in JSON string
         s = s.replaceAll("(?<!\\\\)\\brac\\{", "\\\\frac{");
         s = s.replaceAll("(?<!\\\\)\\bimes\\b", "\\\\times");
         s = s.replaceAll("(?<!\\\\)\\bleft\\(", "\\\\left(");
         s = s.replaceAll("(?<!\\\\)\\bight\\)", "\\\\right)");
-        s = s.replaceAll("(?<!\\\\)\\begin\\{", "\\\\begin{");
+        s = s.replaceAll("(?<!\\\\)\\bbegin\\{", "\\\\begin{");
         s = s.replaceAll("(?<!\\\\)\\bend\\{", "\\\\end{");
+        s = s.replaceAll("(?<!\\\\)\\bsqrt\\{", "\\\\sqrt{");
+        s = s.replaceAll("(?<!\\\\)\\boverline\\{", "\\\\overline{");
+        s = s.replaceAll("(?<!\\\\)\\bcdot\\b", "\\\\cdot");
+        s = s.replaceAll("(?<!\\\\)\\bsum\\b", "\\\\sum");
         return s;
     }
 

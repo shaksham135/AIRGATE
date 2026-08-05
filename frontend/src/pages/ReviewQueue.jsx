@@ -87,13 +87,30 @@ export default function ReviewQueue() {
 
   // Sync state with current question in queue
   useEffect(() => {
-    if (questions.length > 0 && currentIndex < questions.length) {
-      const q = questions[currentIndex];
-      setText(q.text);
-      setQuestionType(q.questionType);
-      setMarks(q.marks);
-      setNegativeMarks(q.negativeMarks);
-      setYear(q.year);
+      // 🚀 Smart Auto-Detect Question Type (MCQ vs MSQ vs NAT)
+      let detectedType = q.questionType || 'MCQ';
+      const ans = (q.aiSuggestedAnswer || '').trim();
+      const txt = (q.text || '').toLowerCase();
+      const optCount = q.options ? q.options.length : 0;
+
+      if (ans.match(/.*[A-Da-d].*[,\\s]+.*[A-Da-d].*/)) {
+        detectedType = 'MSQ';
+      } else if (optCount === 0 || txt.includes('numerical') || (txt.includes('nat') && !txt.includes('native'))) {
+        detectedType = 'NAT';
+      } else if (txt.includes('is/are') || txt.includes('statement(s)') || txt.includes('are true') || txt.includes('are correct') || txt.includes('select all') || txt.includes('msq')) {
+        detectedType = 'MSQ';
+      }
+
+      setQuestionType(detectedType);
+      setMarks(q.marks || 1);
+
+      if (detectedType === 'MSQ' || detectedType === 'NAT') {
+        setNegativeMarks(0.0);
+      } else {
+        setNegativeMarks(q.negativeMarks !== undefined ? q.negativeMarks : ((q.marks || 1) === 2 ? -0.66 : -0.33));
+      }
+
+      setYear(q.year || 2024);
       setImagePath(q.imagePath || '');
       setAiSuggestedAnswer(q.aiSuggestedAnswer || 'A');
       setAiSuggestedExplanation(q.aiSuggestedExplanation || '');
@@ -977,15 +994,39 @@ export default function ReviewQueue() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div className="form-group">
                 <label className="form-label" style={{ color: '#9ca3af' }}>Type</label>
-                <select className="form-select" value={questionType} onChange={(e) => setQuestionType(e.target.value)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }}>
-                  <option value="MCQ">MCQ</option>
-                  <option value="MSQ">MSQ</option>
-                  <option value="NAT">NAT</option>
+                <select 
+                  className="form-select" 
+                  value={questionType} 
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setQuestionType(newType);
+                    if (newType === 'MSQ' || newType === 'NAT') {
+                      setNegativeMarks(0.0);
+                    } else {
+                      setNegativeMarks(marks === 2 ? -0.66 : -0.33);
+                    }
+                  }} 
+                  style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }}
+                >
+                  <option value="MCQ">MCQ (Single Correct)</option>
+                  <option value="MSQ">MSQ (Multiple Select)</option>
+                  <option value="NAT">NAT (Numerical Answer)</option>
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label" style={{ color: '#9ca3af' }}>Marks</label>
-                <select className="form-select" value={marks} onChange={(e) => setMarks(parseInt(e.target.value))} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }}>
+                <select 
+                  className="form-select" 
+                  value={marks} 
+                  onChange={(e) => {
+                    const m = parseInt(e.target.value);
+                    setMarks(m);
+                    if (questionType === 'MCQ') {
+                      setNegativeMarks(m === 2 ? -0.66 : -0.33);
+                    }
+                  }} 
+                  style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6' }}
+                >
                   <option value={1}>1 Mark</option>
                   <option value={2}>2 Marks</option>
                 </select>
@@ -1036,7 +1077,9 @@ export default function ReviewQueue() {
               </div>
               
               <div className="form-group" style={{ marginBottom: '16px' }}>
-                <label className="form-label" style={{ color: '#9ca3af' }}>Correct Answer / Value</label>
+                <label className="form-label" style={{ color: '#9ca3af' }}>
+                  {questionType === 'MSQ' ? 'Select All Correct Options (MSQ):' : 'Correct Answer / Value:'}
+                </label>
                 {questionType === 'MCQ' ? (
                   <select 
                     className="form-select" 
@@ -1049,6 +1092,51 @@ export default function ReviewQueue() {
                     <option value="C">Option C</option>
                     <option value="D">Option D</option>
                   </select>
+                ) : questionType === 'MSQ' ? (
+                  <div>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                      {['A', 'B', 'C', 'D'].map(letter => {
+                        const selected = (aiSuggestedAnswer || '').toUpperCase().includes(letter);
+                        return (
+                          <button
+                            key={letter}
+                            type="button"
+                            onClick={() => {
+                              let currentArr = (aiSuggestedAnswer || '').toUpperCase().split(/[\s,]+/).filter(x => ['A','B','C','D'].includes(x));
+                              if (selected) {
+                                currentArr = currentArr.filter(x => x !== letter);
+                              } else {
+                                currentArr.push(letter);
+                              }
+                              currentArr.sort();
+                              setAiSuggestedAnswer(currentArr.join(', '));
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: selected ? '2px solid #10b981' : '1px solid #334155',
+                              backgroundColor: selected ? 'rgba(16, 185, 129, 0.2)' : '#1e293b',
+                              color: selected ? '#34d399' : '#94a3b8',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {selected ? `✓ Option ${letter}` : `Option ${letter}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={aiSuggestedAnswer} 
+                      onChange={(e) => setAiSuggestedAnswer(e.target.value)}
+                      style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6', fontWeight: 600, fontSize: '0.85rem' }}
+                      placeholder="e.g. A, B"
+                    />
+                  </div>
                 ) : (
                   <input 
                     type="text" 
@@ -1056,7 +1144,7 @@ export default function ReviewQueue() {
                     value={aiSuggestedAnswer} 
                     onChange={(e) => setAiSuggestedAnswer(e.target.value)}
                     style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f3f4f6', fontWeight: 600 }}
-                    placeholder={questionType === 'MSQ' ? "e.g. A, B" : "e.g. 10 or 4.5 or 10-12"}
+                    placeholder="e.g. 10 or 4.5 or 10-12"
                     required
                   />
                 )}

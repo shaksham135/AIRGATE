@@ -196,22 +196,22 @@ public class AdminAiGeneratorController {
     @GetMapping("/subject-summary")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<Map<String, Object>>> getSubjectSummary() {
-        List<Question> aiQuestions = questionRepository.findAll().stream()
-                .filter(q -> q.getPdfSourceName() != null && (q.getPdfSourceName().startsWith("AI_NIGHTLY") || q.getPdfSourceName().startsWith("AI_GENERATED")))
-                .collect(java.util.stream.Collectors.toList());
-
-        Map<String, List<Question>> grouped = aiQuestions.stream()
-                .collect(java.util.stream.Collectors.groupingBy(q -> q.getSubject() != null ? q.getSubject().getName() : "General CS"));
-
+        List<Object[]> summaries = questionRepository.getAiQuestionSubjectSummaries();
         List<Map<String, Object>> result = new ArrayList<>();
-        grouped.forEach((subName, qList) -> {
+
+        for (Object[] row : summaries) {
+            String subName = row[0] != null ? String.valueOf(row[0]) : "General CS";
+            long totalCount = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+            long pendingCount = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+            long approvedCount = row[3] != null ? ((Number) row[3]).longValue() : 0L;
+
             Map<String, Object> map = new HashMap<>();
             map.put("subjectName", subName);
-            map.put("totalCount", qList.size());
-            map.put("pendingCount", qList.stream().filter(q -> "PENDING_REVIEW".equalsIgnoreCase(q.getStatus()) || "PENDING".equalsIgnoreCase(q.getStatus())).count());
-            map.put("approvedCount", qList.stream().filter(q -> "APPROVED".equalsIgnoreCase(q.getStatus()) || Boolean.TRUE.equals(q.getIsCommunityVerified())).count());
+            map.put("totalCount", totalCount);
+            map.put("pendingCount", pendingCount);
+            map.put("approvedCount", approvedCount);
             result.add(map);
-        });
+        }
 
         result.sort((a, b) -> String.valueOf(a.get("subjectName")).compareTo(String.valueOf(b.get("subjectName"))));
         return ResponseEntity.ok(result);

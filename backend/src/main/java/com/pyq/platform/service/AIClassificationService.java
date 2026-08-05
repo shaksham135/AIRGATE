@@ -44,6 +44,9 @@ public class AIClassificationService {
 
     @Value("${groq.model.fast:gemma-2-9b-it}")
     private String fastModel;
+
+    @Value("${groq.model.heavy:llama-3.3-70b-versatile}")
+    private String heavyModel;
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -253,6 +256,12 @@ public class AIClassificationService {
         res.topicName = parsedResult.path("topicName").asText("Binary Search Trees");
         res.suggestedAnswer = cleanAnswer(parsedResult.path("suggestedAnswer").asText("A"));
 
+        // Auto-correct to MSQ if suggested answer contains multiple option letters (e.g. "A, B" or "A,D")
+        if (res.suggestedAnswer != null && res.suggestedAnswer.matches(".*[A-Da-d].*[,\\s]+.*[A-Da-d].*")) {
+            res.questionType = "MSQ";
+            res.negativeMarks = 0.0;
+        }
+
         res.suggestedExplanation = "### Detailed Solution\n"
                 + "The correct answer is **" + res.suggestedAnswer + "**.\n\n"
                 + "### Core Concept Tested\n"
@@ -298,15 +307,24 @@ public class AIClassificationService {
         String lower = rawText.toLowerCase();
 
         // 1. Guess type and marks
-        if (lower.contains("msq") || lower.contains("multiple select")) {
+        boolean isMsqPhrasing = lower.contains("msq") 
+                             || lower.contains("multiple select")
+                             || lower.contains("is/are")
+                             || lower.contains("statement(s)")
+                             || lower.contains("are true")
+                             || lower.contains("are correct")
+                             || lower.contains("which of the following are")
+                             || lower.contains("select all");
+
+        if (isMsqPhrasing) {
             res.questionType = "MSQ";
-            res.marks = 2;
+            res.marks = lower.contains("2 mark") ? 2 : 1;
             res.negativeMarks = 0.0;
         } else if (lower.contains("numerical") || lower.contains("nat")
                 || (!lower.contains("(a)") && !lower.contains("(b)") && !lower.contains("(c)") && !lower.contains("(d)")
                         && !lower.contains("a)") && !lower.contains("b)"))) {
             res.questionType = "NAT";
-            res.marks = 2;
+            res.marks = lower.contains("2 mark") ? 2 : 1;
             res.negativeMarks = 0.0;
             res.suggestedAnswer = "10";
         } else {
@@ -682,7 +700,7 @@ public class AIClassificationService {
             userMsg.put("role", "user");
 
             if (imageUrlsOrPaths != null && !imageUrlsOrPaths.isEmpty()) {
-                rootNode.put("model", "llama-3.2-11b-vision-preview");
+                rootNode.put("model", "llama-3.2-11b-vision-instruct");
                 ArrayNode contentArray = objectMapper.createArrayNode();
                 ObjectNode textObj = contentArray.addObject();
                 textObj.put("type", "text");
@@ -698,12 +716,26 @@ public class AIClassificationService {
                 }
                 userMsg.set("content", contentArray);
             } else {
-                rootNode.put("model", fastModel);
+                rootNode.put("model", heavyModel != null && !heavyModel.isBlank() ? heavyModel : "llama-3.3-70b-versatile");
                 userMsg.put("content", userPrompt);
             }
 
             HttpEntity<String> entity = new HttpEntity<>(rootNode.toString(), headers);
-            ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> response;
+            try {
+                response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+            } catch (Exception visionErr) {
+                if (imageUrlsOrPaths != null && !imageUrlsOrPaths.isEmpty()) {
+                    log.warn("⚠️ Vision model call failed ({}), falling back to text model (llama-3.3-70b-versatile)...", visionErr.getMessage());
+                    rootNode.put("model", "llama-3.3-70b-versatile");
+                    userMsg.removeAll();
+                    userMsg.put("content", userPrompt);
+                    entity = new HttpEntity<>(rootNode.toString(), headers);
+                    response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+                } else {
+                    throw visionErr;
+                }
+            }
 
             JsonNode jsonResponse = objectMapper.readTree(response.getBody());
             long tokenUsage = jsonResponse.path("usage").path("total_tokens").asLong(0);
