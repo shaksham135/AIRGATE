@@ -141,7 +141,7 @@ export const sanitizeLatexString = (str) => {
 
   // 3. Auto-wrap unwrapped \frac{...}{...} and \sqrt{...} if not enclosed in $
   s = s.replace(/(?<!\$)\\frac\{([^{}]+|\{[^{}]*\})\}\{([^{}]+|\{[^{}]*\})\}(?!\$)/gi, ' $\\frac{$1}{$2}$ ');
-  s = s.replace(/(?<!\$)([-+]?[0-9]*\.?[0-9]*\s*\\sqrt\{[^{}]+\})(?!\$)/gi, ' $$1$ ');
+  s = s.replace(/(?<!\$)([-+]?[0-9]*\.?[0-9]*\s*\\sqrt\{[^{}]+\})(?!\$)/gi, (m, p1) => ` $${p1}$ `);
 
   // 4. Fix stashed words & commands (e.g. cdot(-1) -> \cdot (-1), det(A) -> \det(A))
   s = s.replace(/\bcdot([^\s])/g, ' \\cdot $1');
@@ -151,7 +151,7 @@ export const sanitizeLatexString = (str) => {
   s = s.replace(/\$(?!\$)([\s\S]*?)\$/g, (fullMatch, content) => {
     if (/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/i.test(content)) {
       let repaired = content.replace(/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/gi, ' $1 ');
-      repaired = repaired.replace(/(?<!\$)\b([a-zA-Z]_[0-9a-zA-Z{}]+|[a-zA-Z]\^\{[^}]+\}|\\forall\s*[a-zA-Z]|\\exists\s*[a-zA-Z])(?!\$)/g, ' $$1$ ');
+      repaired = repaired.replace(/(?<!\$)\b([a-zA-Z]_[0-9a-zA-Z{}]+|[a-zA-Z]\^\{[^}]+\}|\\forall\s*[a-zA-Z]|\\exists\s*[a-zA-Z])(?!\$)/g, (m, p1) => ` $${p1}$ `);
       return repaired;
     }
     return fullMatch;
