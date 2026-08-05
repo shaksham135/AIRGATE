@@ -148,7 +148,7 @@ export const sanitizeLatexString = (str) => {
   s = s.replace(/andtheminor/gi, ' and the minor ');
 
   // 4b. Auto-repair dollar signs that accidentally wrap English sentences/phrases (e.g. $...and require...units of processing time...$)
-  s = s.replace(/\$(?!\$)([\s\S]*?)\$/g, (fullMatch, content) => {
+  s = s.replace(/\$(?!\$)([^\$\n]*?)\$/g, (fullMatch, content) => {
     if (/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/i.test(content)) {
       let repaired = content.replace(/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/gi, ' $1 ');
       repaired = repaired.replace(/(?<!\$)\b([a-zA-Z]_[0-9a-zA-Z{}]+|[a-zA-Z]\^\{[^}]+\}|\\forall\s*[a-zA-Z]|\\exists\s*[a-zA-Z])(?!\$)/g, (m, p1) => ` $${p1}$ `);
@@ -179,8 +179,8 @@ export const sanitizeLatexString = (str) => {
     if (part.type === 'math') return part.value;
     let t = part.value;
 
-    // Match specific unwrapped LaTeX tokens like \lambda, \sum, b_3, b_0 without greedily swallowing words
-    t = t.replace(/(?<!\$)(\\?(?:lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|det|tr)\b|(?<![a-zA-Z])[a-zA-Z]_[0-9a-zA-Z{}]+)(?!\$)/gi, (token) => {
+    // Match specific unwrapped LaTeX tokens like \lambda, \sum (requires \ backslash for commands) or b_3, b_0
+    t = t.replace(/(?<!\$)(\\(?:lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|det|tr)\b|(?<![a-zA-Z])[a-zA-Z]_[0-9a-zA-Z{}]+)(?!\$)/gi, (token) => {
       let trimmed = token.trim();
       if (trimmed && !/^(and|the|where|if|is|are|with|matrix|eigenvalues|vectors|trace|minor|determinant)$/i.test(trimmed)) {
         return ` $${trimmed}$ `;
