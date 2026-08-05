@@ -47,6 +47,7 @@ public class AIClassificationService {
 
     @Value("${groq.model.heavy:llama-3.3-70b-versatile}")
     private String heavyModel;
+
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -699,44 +700,20 @@ public class AIClassificationService {
             ObjectNode userMsg = messages.addObject();
             userMsg.put("role", "user");
 
-            if (imageUrlsOrPaths != null && !imageUrlsOrPaths.isEmpty()) {
-                rootNode.put("model", "llama-3.2-11b-vision-instruct");
-                ArrayNode contentArray = objectMapper.createArrayNode();
-                ObjectNode textObj = contentArray.addObject();
-                textObj.put("type", "text");
-                textObj.put("text", userPrompt + "\n\nNote: The question contains the attached diagram/image(s). Refer to the visual features to build the step-by-step calculations/solution.");
-                for (String imgPath : imageUrlsOrPaths) {
-                    String dataUri = convertImageToDataUriOrUrl(imgPath);
-                    if (dataUri != null) {
-                        ObjectNode imgObj = contentArray.addObject();
-                        imgObj.put("type", "image_url");
-                        ObjectNode imgUrlObj = imgObj.putObject("image_url");
-                        imgUrlObj.put("url", dataUri);
-                    }
+            if (imageUrlsOrPaths != null && !imageUrlsOrPaths.isEmpty() && geminiApiKey != null && !geminiApiKey.isBlank()) {
+                try {
+                    log.info("🖼️ [Solution Generator] Routing image question to Gemini 2.5 Flash Vision engine...");
+                    return executeGeminiVisionSolutionCall(userPrompt, imageUrlsOrPaths);
+                } catch (Exception geminiErr) {
+                    log.warn("⚠️ Gemini 2.5 Flash Vision failed ({}), falling back to Groq 70B Heavy model...", geminiErr.getMessage());
                 }
-                userMsg.set("content", contentArray);
-            } else {
-                rootNode.put("model", heavyModel != null && !heavyModel.isBlank() ? heavyModel : "llama-3.3-70b-versatile");
-                userMsg.put("content", userPrompt);
             }
 
+            rootNode.put("model", heavyModel != null && !heavyModel.isBlank() ? heavyModel : "llama-3.3-70b-versatile");
+            userMsg.put("content", userPrompt);
+
             HttpEntity<String> entity = new HttpEntity<>(rootNode.toString(), headers);
-            ResponseEntity<String> response;
-            try {
-                response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
-            } catch (Exception visionErr) {
-                if (imageUrlsOrPaths != null && !imageUrlsOrPaths.isEmpty()) {
-                    log.warn("⚠️ Vision model call failed ({}), falling back to text model (llama-3.3-70b-versatile)...", visionErr.getMessage());
-                    rootNode.put("model", "llama-3.3-70b-versatile");
-                    userMsg.removeAll();
-                    userMsg.put("role", "user");
-                    userMsg.put("content", userPrompt);
-                    entity = new HttpEntity<>(rootNode.toString(), headers);
-                    response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
-                } else {
-                    throw visionErr;
-                }
-            }
+            ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
 
             JsonNode jsonResponse = objectMapper.readTree(response.getBody());
             long tokenUsage = jsonResponse.path("usage").path("total_tokens").asLong(0);
@@ -765,6 +742,54 @@ public class AIClassificationService {
                     "### Detailed Solution\nThe correct answer is " + correctOption
                     + ".\n\n*(Generation failed: " + e.getMessage() + ")*");
         }
+    }
+
+    private SolutionResult executeGeminiVisionSolutionCall(String prompt, List<String> imageUrlsOrPaths) throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String modelToUse = geminiModel != null && !geminiModel.isBlank() ? geminiModel : "gemini-2.5-flash";
+        String url = GEMINI_BASE_URL + modelToUse + ":generateContent?key=" + geminiApiKey;
+
+        ObjectNode req = objectMapper.createObjectNode();
+        ArrayNode contents = req.putArray("contents");
+        ObjectNode contentObj = contents.addObject();
+        contentObj.put("role", "user");
+        ArrayNode parts = contentObj.putArray("parts");
+
+        ObjectNode textPart = parts.addObject();
+        textPart.put("text", prompt);
+
+        if (imageUrlsOrPaths != null) {
+            for (String imgPath : imageUrlsOrPaths) {
+                String dataUri = convertImageToDataUriOrUrl(imgPath);
+                if (dataUri != null && dataUri.contains(";base64,")) {
+                    String[] uriParts = dataUri.split(";base64,");
+                    String mimeType = uriParts[0].replace("data:", "");
+                    String base64Data = uriParts[1];
+
+                    ObjectNode inlineData = parts.addObject().putObject("inlineData");
+                    inlineData.put("mimeType", mimeType);
+                    inlineData.put("data", base64Data);
+                }
+            }
+        }
+
+        ObjectNode genConfig = req.putObject("generationConfig");
+        genConfig.put("temperature", 0.1);
+        genConfig.put("maxOutputTokens", 2500);
+
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(req.toString(), headers), String.class);
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode candidate = root.path("candidates").get(0);
+            String text = candidate.path("content").path("parts").get(0).path("text").asText().trim();
+
+            String[] sparts = text.split(SECTION_DELIMITER, 2);
+            String shortPart = sparts[0].trim().replaceAll("(?i)^SHORT_SOLUTION\\s*\\n?", "").trim();
+            String detailedPart = sparts.length > 1 ? sparts[1].trim() : text;
+            return new SolutionResult(shortPart, detailedPart);
+        }
+        throw new RuntimeException("Gemini vision API returned empty response.");
     }
 }
 
