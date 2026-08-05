@@ -70,6 +70,9 @@ export default function AiGeneratorHub() {
   const [ledgerPageSize, setLedgerPageSize] = useState(10);
   const [ledgerTotalPages, setLedgerTotalPages] = useState(1);
   const [ledgerTotalElements, setLedgerTotalElements] = useState(0);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerList, setLedgerList] = useState([]);
+
   // AI Batches State
   const [aiBatches, setAiBatches] = useState([]);
   const [batchesLoading, setBatchesLoading] = useState(false);
