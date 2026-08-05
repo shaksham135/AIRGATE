@@ -131,7 +131,7 @@ public class AIClassificationService {
                     headers.set("Authorization", "Bearer " + currentApiKey);
 
                     ObjectNode rootNode = objectMapper.createObjectNode();
-                    rootNode.put("model", fastModel);
+                    rootNode.put("model", heavyModel != null && !heavyModel.isBlank() ? heavyModel : "llama-3.3-70b-versatile");
                     rootNode.put("temperature", 0.1);
                     rootNode.put("max_tokens", 1500);
 
@@ -729,6 +729,7 @@ public class AIClassificationService {
                     log.warn("⚠️ Vision model call failed ({}), falling back to text model (llama-3.3-70b-versatile)...", visionErr.getMessage());
                     rootNode.put("model", "llama-3.3-70b-versatile");
                     userMsg.removeAll();
+                    userMsg.put("role", "user");
                     userMsg.put("content", userPrompt);
                     entity = new HttpEntity<>(rootNode.toString(), headers);
                     response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
