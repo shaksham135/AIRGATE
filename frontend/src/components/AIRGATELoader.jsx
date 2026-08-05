@@ -7,8 +7,8 @@ import API_CONFIG from '../config/api';
 import CacheService from '../services/CacheService';
 
 const DYNAMIC_GATE_MESSAGES = [
-  { category: "Motivation", text: "⚡ AIR 1 is built one question at a time." },
-  { category: "Exam Strategy", text: "🎯 Target Top 100 in GATE 2026!" },
+  { category: "Motivation", text: "⚡ Top rank is built one question at a time." },
+  { category: "Exam Strategy", text: "🎯 Target Top Ranks in GATE CS!" },
   { category: "Algorithms", text: "💡 Master's Theorem: Compare $\\log_b a$ with $k$." },
   { category: "Consistency", text: "🚀 Daily reps create massive GATE ranks." },
   { category: "Exam Trick", text: "🔥 Zero negative marks on NATs—always attempt!" },
@@ -25,7 +25,7 @@ const DYNAMIC_GATE_MESSAGES = [
   { category: "Operating Systems", text: "🧠 Banker's Algorithm = Deadlock Avoidance." },
   { category: "Mindset", text: "⚡ Master the basics; the rank will follow." },
   { category: "MSQ Trick", text: "🎯 Read every option before submitting MSQs." },
-  { category: "Motivation", text: "💪 Doubt today, derivation tomorrow, Rank 1 soon." },
+  { category: "Motivation", text: "💪 Doubt today, derivation tomorrow, excellence soon." },
   { category: "ToC", text: "🔥 Regular languages are closed under Kleene Star." },
   { category: "Dream High", text: "✨ Push through the struggle—IISc is waiting!" },
   { category: "Compounding", text: "⏳ Hard work compounds just like interest." },

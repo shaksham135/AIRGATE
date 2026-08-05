@@ -40,6 +40,7 @@ export default function AiGeneratorHub() {
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+  const [activeSubjectModal, setActiveSubjectModal] = useState(null);
   
   // Pagination & Sorting state
   const [page, setPage] = useState(0);
@@ -729,271 +730,196 @@ export default function AiGeneratorHub() {
           </div>
         </div>
 
-        {/* Subject-Wise AI Question Access & Batch Delete Control Section */}
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+        {/* Subject-Wise AI Questions Stats Cards Grid */}
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                📚 Subject-Wise AI Generated Questions ({filteredQuestions.length})
+              <h3 style={{ fontSize: '1.25rem', color: '#fff', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
+                📚 Subject Question Inventories ({subjectNamesList.length} GATE Subjects)
               </h3>
-              {selectedQuestionIds.length > 0 && (
-                <span style={{ fontSize: '0.8rem', color: '#8b5cf6', fontWeight: 600 }}>
-                  ✓ {selectedQuestionIds.length} questions selected for batch action
-                </span>
-              )}
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Click any subject card to inspect, filter, or bulk-manage its generated questions
+              </span>
             </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              {/* Batch Action Buttons */}
-              {selectedQuestionIds.length > 0 && (
-                <button
-                  onClick={() => handleBatchDelete('SELECTED')}
-                  style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <FiTrash2 size={14} /> Delete Selected ({selectedQuestionIds.length})
-                </button>
-              )}
-
-              {selectedSubjectFilter !== 'ALL' && (
-                <button
-                  onClick={() => handleBatchDelete('SUBJECT')}
-                  style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.4)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  Delete All In {selectedSubjectFilter}
-                </button>
-              )}
-
+            {selectedSubjectFilter !== 'ALL' && (
               <button
-                onClick={() => handleBatchDelete('ALL')}
-                style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem' }}
+                onClick={() => setSelectedSubjectFilter('ALL')}
+                style={{ background: 'rgba(139, 92, 246, 0.15)', border: '1px solid #8b5cf6', color: '#c4b5fd', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}
               >
-                Delete ALL AI Questions
+                Reset Subject Filter
               </button>
-
-              {/* Subject Filter Pills */}
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
-                <button
-                  onClick={() => setSelectedSubjectFilter('ALL')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                    background: selectedSubjectFilter === 'ALL' ? '#8b5cf6' : 'transparent',
-                    color: '#fff',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  All Subjects
-                </button>
-                {subjectNamesList.map((sub, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedSubjectFilter(sub)}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-color)',
-                      background: selectedSubjectFilter === sub ? '#8b5cf6' : 'transparent',
-                      color: '#fff',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {sub} ({subjectsMap[sub]?.length || 0})
-                  </button>
-                ))}
-              </div>
-
-              {/* Search Bar */}
-              <div style={{ position: 'relative' }}>
-                <FiSearch style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} size={14} />
-                <input
-                  type="text"
-                  placeholder="Search questions..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  style={{
-                    padding: '6px 12px 6px 32px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                    background: 'var(--bg-input)',
-                    color: '#fff',
-                    fontSize: '0.82rem',
-                    width: '170px'
-                  }}
-                />
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Questions Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '12px', width: '40px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={questions.length > 0 && selectedQuestionIds.length === questions.length} 
-                      onChange={toggleSelectAll}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </th>
-                  <th onClick={() => handleSort('id')} style={{ padding: '12px', cursor: 'pointer', userSelect: 'none' }}>
-                    ID {sortBy === 'id' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th onClick={() => handleSort('subject.name')} style={{ padding: '12px', cursor: 'pointer', userSelect: 'none' }}>
-                    Subject {sortBy === 'subject.name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th onClick={() => handleSort('topic.name')} style={{ padding: '12px', cursor: 'pointer', userSelect: 'none' }}>
-                    Topic {sortBy === 'topic.name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th style={{ padding: '12px', width: '38%' }}>Question Preview</th>
-                  <th onClick={() => handleSort('questionType')} style={{ padding: '12px', cursor: 'pointer', userSelect: 'none' }}>
-                    Type {sortBy === 'questionType' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th onClick={() => handleSort('difficulty')} style={{ padding: '12px', cursor: 'pointer', userSelect: 'none' }}>
-                    Difficulty {sortBy === 'difficulty' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                  </th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questionsLoading ? (
-                  <tr>
-                    <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      Loading AI questions...
-                    </td>
-                  </tr>
-                ) : questions.length > 0 ? (
-                  questions.map((q) => {
-                    const subName = q.subjectName || q.subject?.name || 'General CS';
-                    const topName = q.topicName || q.topic?.name || 'General';
-                    const qPreviewText = q.text || q.questionText || '';
-                    const diff = q.difficulty || 'MEDIUM';
+          {/* Grid of Subject Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            {subjectNamesList.map((subName, i) => {
+              const subQuestions = subjectsMap[subName] || [];
+              const totalCount = subQuestions.length;
+              const pendingCount = subQuestions.filter(q => q.status === 'PENDING_REVIEW' || q.status === 'PENDING').length;
+              const approvedCount = subQuestions.filter(q => q.status === 'APPROVED' || q.isCommunityVerified).length;
 
-                    return (
-                      <tr key={q.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <td style={{ padding: '12px' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={selectedQuestionIds.includes(q.id)} 
-                            onChange={() => toggleSelectQuestion(q.id)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </td>
-                        <td style={{ padding: '12px', fontWeight: 700, color: '#8b5cf6' }}>#{q.id}</td>
-                        <td style={{ padding: '12px', fontWeight: 600, color: '#fff' }}>{subName}</td>
-                        <td style={{ padding: '12px' }}>{topName}</td>
-                        <td style={{ padding: '12px', color: 'var(--text-primary)' }}>
-                          <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              const colors = [
+                { bg: 'rgba(56, 189, 248, 0.08)', border: 'rgba(56, 189, 248, 0.3)', text: '#38bdf8' },
+                { bg: 'rgba(139, 92, 246, 0.08)', border: 'rgba(139, 92, 246, 0.3)', text: '#a855f7' },
+                { bg: 'rgba(16, 185, 129, 0.08)', border: 'rgba(16, 185, 129, 0.3)', text: '#10b981' },
+                { bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b' },
+                { bg: 'rgba(236, 72, 153, 0.08)', border: 'rgba(236, 72, 153, 0.3)', text: '#ec4899' },
+                { bg: 'rgba(99, 102, 241, 0.08)', border: 'rgba(99, 102, 241, 0.3)', text: '#6366f1' }
+              ];
+              const theme = colors[i % colors.length];
+
+              return (
+                <div
+                  key={subName}
+                  onClick={() => {
+                    setSelectedSubjectFilter(subName);
+                    setActiveSubjectModal(subName);
+                  }}
+                  style={{
+                    background: theme.bg,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '14px',
+                    padding: '20px',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>{subName}</span>
+                    <span style={{ background: theme.border, color: theme.text, fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                      {totalCount} Qs
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ display: 'block', fontSize: '0.7rem', color: '#9ca3af', textTransform: 'uppercase' }}>Pending</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#f59e0b' }}>{pendingCount}</span>
+                    </div>
+                    <div style={{ flex: 1, background: 'rgba(0,0,0,0.2)', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ display: 'block', fontSize: '0.7rem', color: '#9ca3af', textTransform: 'uppercase' }}>Approved</span>
+                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>{approvedCount}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                    <span style={{ fontSize: '0.78rem', color: theme.text, fontWeight: 700 }}>Inspect Questions</span>
+                    <span style={{ color: theme.text, fontSize: '0.9rem' }}>➔</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Interactive Subject Questions Modal */}
+        {activeSubjectModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 999, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '16px', width: '100%', maxWidth: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}>
+              
+              {/* Modal Header */}
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#fff', fontSize: '1.25rem', fontWeight: 800 }}>
+                    📚 {activeSubjectModal} — AI Generated Questions ({filteredQuestions.length})
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>Manage or purge AI generated questions for this subject</span>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => handleBatchDelete('SUBJECT')}
+                    style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#fca5a5', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}
+                  >
+                    🗑️ Purge All In {activeSubjectModal}
+                  </button>
+                  <button
+                    onClick={() => setActiveSubjectModal(null)}
+                    style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '1.5rem', cursor: 'pointer', padding: '4px' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body: Question List */}
+              <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+                <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <FiSearch style={{ position: 'absolute', left: '10px', top: '10px', color: '#9ca3af' }} size={14} />
+                    <input
+                      type="text"
+                      placeholder="Search questions in this subject..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid #334155', background: '#1e293b', color: '#fff', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {filteredQuestions.length > 0 ? (
+                    filteredQuestions.map((q) => {
+                      const topName = q.topicName || q.topic?.name || 'General';
+                      const qPreviewText = q.text || q.questionText || '';
+                      const diff = q.difficulty || 'MEDIUM';
+
+                      return (
+                        <div key={q.id} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ color: '#a855f7', fontWeight: 800, fontSize: '0.85rem' }}>#{q.id}</span>
+                              <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>• {topName}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <span style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                {q.questionType}
+                              </span>
+                              <span style={{ 
+                                background: diff === 'EASY' ? 'rgba(16,185,129,0.15)' : diff === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: diff === 'EASY' ? '#10b981' : diff === 'MEDIUM' ? '#f59e0b' : '#ef4444',
+                                padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 
+                              }}>
+                                {diff}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ color: '#e2e8f0', fontSize: '0.9rem', lineHeight: '1.5' }}>
                             {formatMathText(qPreviewText)}
                           </div>
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{ background: 'rgba(56,189,248,0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
-                            {q.questionType}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{ 
-                            background: diff === 'EASY' ? 'rgba(16,185,129,0.15)' : diff === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: diff === 'EASY' ? '#10b981' : diff === 'MEDIUM' ? '#f59e0b' : '#ef4444',
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 
-                          }}>
-                            {diff}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
 
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                             <button
                               onClick={() => navigate(`/questions/${q.id}`)}
-                              title="View Question"
-                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #3b82f6', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', cursor: 'pointer' }}
+                              style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #3b82f6', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                             >
-                              <FiEye size={14} />
+                              View Details ➔
                             </button>
                             <button
                               onClick={() => handleDeleteQuestion(q.id, qPreviewText)}
-                              title="Delete Question"
-                              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', cursor: 'pointer' }}
+                              style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #ef4444', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                             >
-                              <FiTrash2 size={14} />
+                              Delete Question
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No AI Generated questions found. Click "Test Sample Batch" to generate questions!
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Showing {questions.length} of <strong>{totalElements}</strong> total AI questions (Page <strong>{page + 1}</strong> of <strong>{totalPages}</strong>)
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                <span>Rows per page:</span>
-                <select 
-                  value={pageSize} 
-                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
-                  style={{ padding: '6px 10px', borderRadius: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: '#fff', cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button 
-                  disabled={page === 0} 
-                  onClick={() => setPage(0)}
-                  style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  « First
-                </button>
-                <button 
-                  disabled={page === 0} 
-                  onClick={() => setPage(prev => Math.max(0, prev - 1))}
-                  style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  ◀ Prev
-                </button>
-                <button 
-                  disabled={page >= totalPages - 1} 
-                  onClick={() => setPage(prev => Math.min(totalPages - 1, prev + 1))}
-                  style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page >= totalPages - 1 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  Next ▶
-                </button>
-                <button 
-                  disabled={page >= totalPages - 1} 
-                  onClick={() => setPage(totalPages - 1)}
-                  style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: '#fff', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page >= totalPages - 1 ? 0.4 : 1, fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  Last »
-                </button>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                      No AI questions found for {activeSubjectModal}.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Dynamic Subject & Topic Question Distribution Ledger */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: '32px' }}>

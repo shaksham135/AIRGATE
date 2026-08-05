@@ -887,7 +887,7 @@ export default function AdminPanel() {
                   <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Coupon Code Name</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. GATE2026 or EARLYBIRD50" 
+                    placeholder="e.g. AIRGATE50 or EARLYBIRD50" 
                     value={couponCodeInput}
                     onChange={e => setCouponCodeInput(e.target.value.toUpperCase())}
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700 }}
@@ -1087,7 +1087,7 @@ export default function AdminPanel() {
                     <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Attached Coupon Code</label>
                     <input 
                       type="text" 
-                      placeholder="e.g. GATE2026" 
+                      placeholder="e.g. AIRGATE50" 
                       value={bannerCouponCode} 
                       onChange={e => setBannerCouponCode(e.target.value.toUpperCase())}
                       style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: '#fff', textTransform: 'uppercase', fontFamily: 'monospace' }}
@@ -2780,7 +2780,7 @@ export default function AdminPanel() {
                   type="text"
                   value={settings.seoKeywords || ''}
                   onChange={e => setSettings(prev => ({ ...prev, seoKeywords: e.target.value }))}
-                  placeholder="e.g. GATE 2026, AIRGATE, GATE CS PYQ, Operating Systems GATE, Mock Test"
+                  placeholder="e.g. AIRGATE, GATE CS PYQ, Operating Systems GATE, Mock Test"
                   style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                 />
               </div>
@@ -3109,7 +3109,7 @@ export default function AdminPanel() {
                   type="text" 
                   value={newTipText}
                   onChange={e => setNewTipText(e.target.value)}
-                  placeholder="e.g. 🎯 Target Top 100 in GATE 2027!"
+                  placeholder="e.g. 🎯 Master GATE CS with AIRGATE!"
                   style={{ width: '100%', padding: '10px 14px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem' }}
                   required
                 />

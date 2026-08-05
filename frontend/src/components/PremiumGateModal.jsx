@@ -268,7 +268,7 @@ export default function PremiumGateModal({ isOpen, onClose, onUpgradeSuccess, in
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input 
                   type="text" 
-                  placeholder="Enter Coupon Code (e.g. GATE2026)"
+                  placeholder="Enter Coupon Code (e.g. AIRGATE50)"
                   value={couponCode}
                   onChange={e => setCouponCode(e.target.value.toUpperCase())}
                   style={{

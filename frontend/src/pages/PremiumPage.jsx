@@ -506,7 +506,7 @@ export default function PremiumPage() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input 
                   type="text" 
-                  placeholder="Enter Code (e.g. GATE2026)"
+                  placeholder="Enter Code (e.g. AIRGATE50)"
                   value={couponCode}
                   onChange={e => setCouponCode(e.target.value.toUpperCase())}
                   disabled={upgraded}
