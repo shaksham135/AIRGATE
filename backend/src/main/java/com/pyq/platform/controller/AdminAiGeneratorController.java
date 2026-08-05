@@ -1,6 +1,7 @@
 package com.pyq.platform.controller;
 
 import com.pyq.platform.entity.AiGenerationLedger;
+import com.pyq.platform.entity.Question;
 import com.pyq.platform.entity.SystemSettings;
 import com.pyq.platform.repository.AiGenerationLedgerRepository;
 import com.pyq.platform.repository.SystemSettingsRepository;
@@ -190,6 +191,30 @@ public class AdminAiGeneratorController {
         response.put("last", ledgerPage.isLast());
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/subject-summary")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<List<Map<String, Object>>> getSubjectSummary() {
+        List<Question> aiQuestions = questionRepository.findAll().stream()
+                .filter(q -> q.getPdfSourceName() != null && (q.getPdfSourceName().startsWith("AI_NIGHTLY") || q.getPdfSourceName().startsWith("AI_GENERATED")))
+                .collect(java.util.stream.Collectors.toList());
+
+        Map<String, List<Question>> grouped = aiQuestions.stream()
+                .collect(java.util.stream.Collectors.groupingBy(q -> q.getSubject() != null ? q.getSubject().getName() : "General CS"));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        grouped.forEach((subName, qList) -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("subjectName", subName);
+            map.put("totalCount", qList.size());
+            map.put("pendingCount", qList.stream().filter(q -> "PENDING_REVIEW".equalsIgnoreCase(q.getStatus()) || "PENDING".equalsIgnoreCase(q.getStatus())).count());
+            map.put("approvedCount", qList.stream().filter(q -> "APPROVED".equalsIgnoreCase(q.getStatus()) || Boolean.TRUE.equals(q.getIsCommunityVerified())).count());
+            result.add(map);
+        });
+
+        result.sort((a, b) -> String.valueOf(a.get("subjectName")).compareTo(String.valueOf(b.get("subjectName"))));
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/toggle")

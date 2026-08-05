@@ -73,13 +73,27 @@ export default function AiGeneratorHub() {
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerList, setLedgerList] = useState([]);
 
+  // Subject Summaries State
+  const [subjectSummaries, setSubjectSummaries] = useState([]);
+
+  const fetchSubjectSummaries = async () => {
+    try {
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/generator/subject-summary`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setSubjectSummaries(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to load subject summary", err);
+    }
+  };
+
   // AI Batches State
   const [aiBatches, setAiBatches] = useState([]);
   const [batchesLoading, setBatchesLoading] = useState(false);
 
-  const fetchAiBatches = async () => {
+  const fetchAiBatches = async (showLoading = false) => {
     try {
-      setBatchesLoading(true);
+      if (showLoading || aiBatches.length === 0) setBatchesLoading(true);
       const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/admin/ai-batches`, {
         headers: AuthService.getAuthHeader()
       });
@@ -117,9 +131,9 @@ export default function AiGeneratorHub() {
     });
   };
 
-  const fetchLedgerHistory = async (p = 0) => {
+  const fetchLedgerHistory = async (p = 0, showLoading = false) => {
     try {
-      setLedgerLoading(true);
+      if (showLoading || ledgerList.length === 0) setLedgerLoading(true);
       const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/generator/ledger`, {
         params: { page: p, size: ledgerPageSize },
         headers: AuthService.getAuthHeader()
@@ -419,15 +433,17 @@ export default function AiGeneratorHub() {
     fetchSubjects();
     fetchReportHistory();
     fetchAiBatches();
+    fetchSubjectSummaries();
 
     const interval = setInterval(() => {
       fetchAiGenStatus();
       fetchLedgerHistory(ledgerPage);
       fetchReportHistory();
       fetchAiBatches();
-    }, 15000);
+      fetchSubjectSummaries();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [ledgerPage]);
+  }, []);
 
   const handleResolveReport = async (reportId) => {
     try {
@@ -757,10 +773,11 @@ export default function AiGeneratorHub() {
           {/* Grid of Subject Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
             {subjectNamesList.map((subName, i) => {
+              const summary = subjectSummaries.find(s => s.subjectName === subName);
               const subQuestions = subjectsMap[subName] || [];
-              const totalCount = subQuestions.length;
-              const pendingCount = subQuestions.filter(q => q.status === 'PENDING_REVIEW' || q.status === 'PENDING').length;
-              const approvedCount = subQuestions.filter(q => q.status === 'APPROVED' || q.isCommunityVerified).length;
+              const totalCount = summary ? summary.totalCount : subQuestions.length;
+              const pendingCount = summary ? summary.pendingCount : subQuestions.filter(q => q.status === 'PENDING_REVIEW' || q.status === 'PENDING').length;
+              const approvedCount = summary ? summary.approvedCount : subQuestions.filter(q => q.status === 'APPROVED' || q.isCommunityVerified).length;
 
               const colors = [
                 { bg: 'rgba(56, 189, 248, 0.08)', border: 'rgba(56, 189, 248, 0.3)', text: '#38bdf8' },
@@ -778,6 +795,8 @@ export default function AiGeneratorHub() {
                   onClick={() => {
                     setSelectedSubjectFilter(subName);
                     setActiveSubjectModal(subName);
+                    setPageSize(100);
+                    setPage(0);
                   }}
                   style={{
                     background: theme.bg,

@@ -666,6 +666,16 @@ public class QuestionController {
     }
 
     // ── AI Generation Batch Management Endpoints ──────────────────────────────
+    private String resolveBatchKey(Question q) {
+        if (q.getPdfSourceName() != null && q.getPdfSourceName().matches("AI_NIGHTLY_\\d{4}-\\d{2}-\\d{2}")) {
+            return q.getPdfSourceName();
+        }
+        if (q.getCreatedAt() != null) {
+            return "AI_NIGHTLY_" + q.getCreatedAt().toLocalDate().toString();
+        }
+        return q.getPdfSourceName() != null ? q.getPdfSourceName() : "AI_NIGHTLY_UNKNOWN";
+    }
+
     @GetMapping("/admin/ai-batches")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getAiGenerationBatches() {
@@ -674,7 +684,7 @@ public class QuestionController {
                 .collect(Collectors.toList());
 
         Map<String, List<Question>> grouped = aiQuestions.stream()
-                .collect(Collectors.groupingBy(Question::getPdfSourceName));
+                .collect(Collectors.groupingBy(this::resolveBatchKey));
 
         List<Map<String, Object>> result = new ArrayList<>();
         grouped.forEach((batchName, qList) -> {
@@ -694,12 +704,16 @@ public class QuestionController {
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<Map<String, Object>> deleteAiBatch(@PathVariable String batchName) {
-        List<Question> batchQuestions = questionRepository.findByPdfSourceName(batchName);
-        if (batchQuestions.isEmpty()) {
+        List<Question> aiQuestions = questionRepository.findAll().stream()
+                .filter(q -> q.getPdfSourceName() != null && (q.getPdfSourceName().startsWith("AI_NIGHTLY") || q.getPdfSourceName().startsWith("AI_GENERATED")))
+                .filter(q -> resolveBatchKey(q).equalsIgnoreCase(batchName))
+                .collect(Collectors.toList());
+
+        if (aiQuestions.isEmpty()) {
             return ResponseEntity.ok(Map.of("message", "No questions found for batch: " + batchName, "deletedCount", 0));
         }
 
-        List<Long> qIds = batchQuestions.stream().map(Question::getId).collect(Collectors.toList());
+        List<Long> qIds = aiQuestions.stream().map(Question::getId).collect(Collectors.toList());
         questionRepository.deleteQuestionTagsIn(qIds);
         questionRepository.deleteQuestionsBulk(qIds);
 
