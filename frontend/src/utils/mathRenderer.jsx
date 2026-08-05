@@ -157,8 +157,8 @@ export const sanitizeLatexString = (str) => {
     return fullMatch;
   });
 
-  // 5. Split string into already-wrapped math vs plain text segments
-  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,300}?\$)/g;
+  // 5. Split string into already-wrapped math vs plain text segments (inline $...$ cannot cross newlines)
+  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\\n]|\\.){1,300}?\$)/g;
   const parts = [];
   let lastIndex = 0;
   let match;
