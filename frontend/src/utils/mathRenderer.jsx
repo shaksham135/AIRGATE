@@ -179,11 +179,10 @@ export const sanitizeLatexString = (str) => {
     if (part.type === 'math') return part.value;
     let t = part.value;
 
-    // Match LaTeX expressions like \lambda_1^2 = 4, \sum_{i=1}^{3} \lambda_i, v_1 = [1 0 0]
-    t = t.replace(/(?<!\$)(\\?(?:lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|det|tr|a_|b_|M_|v_|\b[a-zA-Z]\b_\d+)(?:[^\$\n,;]+)?)(?!\$)/gi, (token) => {
+    // Match specific unwrapped LaTeX tokens like \lambda, \sum, b_3, b_0 without greedily swallowing words
+    t = t.replace(/(?<!\$)(\\?(?:lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|det|tr)\b|(?<![a-zA-Z])[a-zA-Z]_[0-9a-zA-Z{}]+)(?!\$)/gi, (token) => {
       let trimmed = token.trim();
-      if ((trimmed.startsWith('\\') || /[_\^]=?/.test(trimmed)) && 
-          !/^(and|the|where|if|is|are|with|matrix|eigenvalues|vectors|trace|minor|determinant)$/i.test(trimmed)) {
+      if (trimmed && !/^(and|the|where|if|is|are|with|matrix|eigenvalues|vectors|trace|minor|determinant)$/i.test(trimmed)) {
         return ` $${trimmed}$ `;
       }
       return token;
