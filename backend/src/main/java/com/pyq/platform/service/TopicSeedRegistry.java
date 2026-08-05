@@ -134,8 +134,7 @@ public class TopicSeedRegistry {
         String subAspect = String.format("Analytical evaluation of '%s' focusing on edge cases, boundary parameters, and step-by-step mathematical proof.",
                 topicName != null ? topicName : "the core topic");
 
-        String paramConstraints = String.format("Use explicit distinct numerical constants (seed token: %d), avoid generic default values.",
-                random.nextInt(9000) + 1000);
+        String paramConstraints = String.format("Formulate a unique numerical problem. Use distinct realistic values for parameters (e.g. process execution times between 10ms-100ms, matrix sizes between 2x2 to 4x4, probabilities between 0.1 to 0.9). DO NOT mention the word 'seed' or 'token' in the question statement or options!");
 
         return SeedMatrix.builder()
                 .domainScenario(selectedDomain)

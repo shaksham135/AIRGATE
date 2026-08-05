@@ -664,4 +664,46 @@ public class QuestionController {
 
         return ResponseEntity.ok(selected);
     }
+
+    // ── AI Generation Batch Management Endpoints ──────────────────────────────
+    @GetMapping("/admin/ai-batches")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Map<String, Object>>> getAiGenerationBatches() {
+        List<Question> aiQuestions = questionRepository.findAll().stream()
+                .filter(q -> q.getPdfSourceName() != null && (q.getPdfSourceName().startsWith("AI_NIGHTLY") || q.getPdfSourceName().startsWith("AI_GENERATED")))
+                .collect(Collectors.toList());
+
+        Map<String, List<Question>> grouped = aiQuestions.stream()
+                .collect(Collectors.groupingBy(Question::getPdfSourceName));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        grouped.forEach((batchName, qList) -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("batchName", batchName);
+            map.put("totalQuestions", qList.size());
+            map.put("pendingCount", qList.stream().filter(q -> "PENDING_REVIEW".equalsIgnoreCase(q.getStatus()) || "PENDING".equalsIgnoreCase(q.getStatus())).count());
+            map.put("approvedCount", qList.stream().filter(q -> "APPROVED".equalsIgnoreCase(q.getStatus())).count());
+            result.add(map);
+        });
+
+        result.sort((a, b) -> String.valueOf(b.get("batchName")).compareTo(String.valueOf(a.get("batchName"))));
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/admin/ai-batches/{batchName}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> deleteAiBatch(@PathVariable String batchName) {
+        List<Question> batchQuestions = questionRepository.findByPdfSourceName(batchName);
+        if (batchQuestions.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "No questions found for batch: " + batchName, "deletedCount", 0));
+        }
+
+        List<Long> qIds = batchQuestions.stream().map(Question::getId).collect(Collectors.toList());
+        questionRepository.deleteQuestionTagsIn(qIds);
+        questionRepository.deleteQuestionsBulk(qIds);
+
+        log.info("🗑️ [Admin] Batch deleted! Purged {} questions from batch: {}", qIds.size(), batchName);
+        return ResponseEntity.ok(Map.of("message", "Successfully purged AI batch: " + batchName, "deletedCount", qIds.size()));
+    }
 }

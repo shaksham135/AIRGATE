@@ -484,13 +484,13 @@ public class AiQuestionGeneratorService {
                   "1. Work out the solution mathematically.\n" +
                   "2. Output STRICT JSON in a SINGLE response:\n" +
                   "   - \"answer\": \"A\" (for MCQ), \"A,C\" (for MSQ), or \"42\" (for NAT)\n" +
-                  "   - \"explanation\": \"Concise 2-sentence mathematical proof explaining why the answer is correct.\"\n" +
+                  "   - \"explanation\": \"Concise step-by-step mathematical proof (strictly under 150 words) explaining why the answer is correct.\"\n" +
                   "   - \"rephrasedQuestionText\": \"Polished GATE-level question text with clean KaTeX math.\"\n");
 
         // ── Direct Groq Call: Llama 3.3 70B (Heavy Reasoning Model for Verification) ──
         try {
             log.info("🤖 Answer Verification & Quality Polish via Groq 70B...");
-            JsonNode res = executeGroqCall(sb.toString(), true, 1600);
+            JsonNode res = executeGroqCall(sb.toString(), true, 3072);
             if (res != null) {
                 String ans = res.has("answer") ? res.get("answer").asText() : "";
                 String exp = res.has("explanation") ? res.get("explanation").asText() : "";
@@ -542,7 +542,8 @@ public class AiQuestionGeneratorService {
                         }
                         if (root.has("choices") && root.get("choices").isArray() && root.get("choices").size() > 0) {
                             String content = root.get("choices").get(0).get("message").get("content").asText();
-                            return objectMapper.readTree(content);
+                            String sanitized = sanitizeLaTeXInJson(content);
+                            return objectMapper.readTree(sanitized);
                         }
                     }
                 }
@@ -566,6 +567,23 @@ public class AiQuestionGeneratorService {
             }
         }
         return null;
+    }
+
+    private String sanitizeLaTeXInJson(String json) {
+        if (json == null) return null;
+        String s = json
+                .replace("\f", "\\\\f")
+                .replace("\t", "\\\\t")
+                .replace("\r", "\\\\r")
+                .replace("\b", "\\\\b");
+
+        s = s.replaceAll("(?<!\\\\)\\brac\\{", "\\\\frac{");
+        s = s.replaceAll("(?<!\\\\)\\bimes\\b", "\\\\times");
+        s = s.replaceAll("(?<!\\\\)\\bleft\\(", "\\\\left(");
+        s = s.replaceAll("(?<!\\\\)\\bight\\)", "\\\\right)");
+        s = s.replaceAll("(?<!\\\\)\\begin\\{", "\\\\begin{");
+        s = s.replaceAll("(?<!\\\\)\\bend\\{", "\\\\end{");
+        return s;
     }
 
     private boolean is429RateLimitError(Exception e, String errMsg) {
@@ -805,7 +823,7 @@ public class AiQuestionGeneratorService {
                     .topic(topic)
                     .isCommunityVerified("APPROVED".equalsIgnoreCase(status))
                     .checksumHash(checksumHash)
-                    .pdfSourceName("AI_NIGHTLY_GENERATOR")
+                    .pdfSourceName("AI_NIGHTLY_" + java.time.LocalDate.now().toString())
                     .pdfSourcePath("system/ai-generator")
                     .pdfPageNumber(1)
                     .status(status)

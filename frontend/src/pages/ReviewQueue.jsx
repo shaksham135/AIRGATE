@@ -58,6 +58,7 @@ export default function ReviewQueue() {
   const [startTime] = useState(Date.now());
   const [avgTimePerQuestion, setAvgTimePerQuestion] = useState(0);
   const [pendingTotal, setPendingTotal] = useState(0);
+  const [aiBatches, setAiBatches] = useState([]);
 
   // 10-Second Undo States
   const [showUndoToast, setShowUndoToast] = useState(false);
@@ -78,6 +79,7 @@ export default function ReviewQueue() {
     const timer = setTimeout(() => {
       fetchSubjects();
       fetchAnalyticsDashboard();
+      fetchAiBatches();
     }, 100);
 
     return () => clearTimeout(timer);
@@ -187,6 +189,34 @@ export default function ReviewQueue() {
     } catch (e) {
       console.error('Failed to load subjects', e);
       setSubjects([]);
+    }
+  };
+
+  const fetchAiBatches = async () => {
+    try {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/admin/ai-batches`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setAiBatches(Array.isArray(response.data) ? response.data : []);
+    } catch (e) {
+      console.error('Failed to load AI batches', e);
+    }
+  };
+
+  const handlePurgeBatch = async (batchName) => {
+    if (!window.confirm(`⚠️ CRITICAL ADMIN ACTION:\nAre you sure you want to PERMANENTLY PURGE all questions in batch "${batchName}"?\n\nThis will instantly delete all questions generated in this nightly batch.`)) {
+      return;
+    }
+    try {
+      const response = await axios.delete(`${API_CONFIG.BASE_URL}/api/questions/admin/ai-batches/${encodeURIComponent(batchName)}`, {
+        headers: AuthService.getAuthHeader()
+      });
+      alert(`✅ ${response.data?.message || 'Batch purged successfully'}`);
+      fetchPendingQuestions();
+      fetchAiBatches();
+    } catch (e) {
+      console.error('Failed to purge batch', e);
+      alert('❌ Failed to purge batch: ' + (e.response?.data?.message || e.message));
     }
   };
 
@@ -603,6 +633,7 @@ export default function ReviewQueue() {
           <span>Reviewed Today: <strong style={{ color: '#10b981' }}>{sessionReviewedCount}</strong></span>
           <span>Average Speed: <strong style={{ color: '#38bdf8' }}>{avgTimePerQuestion ? `${avgTimePerQuestion} sec/q` : '--'}</strong></span>
         </div>
+
         <div className="desktop-shortcuts-hint">
           <span style={{ fontSize: '0.75rem', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
             Shortcuts: <kbd style={{ color: '#38bdf8' }}>A</kbd> Approve | <kbd style={{ color: '#ef4444' }}>R</kbd> Reject | <kbd style={{ color: '#a855f7' }}>←/→</kbd> Navigate

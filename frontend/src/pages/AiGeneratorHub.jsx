@@ -69,8 +69,49 @@ export default function AiGeneratorHub() {
   const [ledgerPageSize, setLedgerPageSize] = useState(10);
   const [ledgerTotalPages, setLedgerTotalPages] = useState(1);
   const [ledgerTotalElements, setLedgerTotalElements] = useState(0);
-  const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [ledgerList, setLedgerList] = useState([]);
+  // AI Batches State
+  const [aiBatches, setAiBatches] = useState([]);
+  const [batchesLoading, setBatchesLoading] = useState(false);
+
+  const fetchAiBatches = async () => {
+    try {
+      setBatchesLoading(true);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/admin/ai-batches`, {
+        headers: AuthService.getAuthHeader()
+      });
+      setAiBatches(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to load AI batches", err);
+    } finally {
+      setBatchesLoading(false);
+    }
+  };
+
+  const handlePurgeBatch = (batchName, totalQs) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Purge Nightly Batch "${batchName}"?`,
+      message: `Are you sure you want to PERMANENTLY PURGE all ${totalQs} questions generated in batch "${batchName}"? This action cannot be undone!`,
+      confirmText: "Purge Entire Batch",
+      cancelText: "Cancel",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          const res = await axios.delete(`${API_CONFIG.BASE_URL}/api/questions/admin/ai-batches/${encodeURIComponent(batchName)}`, {
+            headers: AuthService.getAuthHeader()
+          });
+          setActionMsg(`✅ ${res.data?.message || 'Batch purged successfully'}`);
+          fetchAiBatches();
+          fetchGeneratedQuestions(page);
+        } catch (e) {
+          console.error('Failed to purge batch', e);
+          setActionMsg('❌ Failed to purge batch: ' + (e.response?.data?.message || e.message));
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
 
   const fetchLedgerHistory = async (p = 0) => {
     try {
@@ -373,11 +414,13 @@ export default function AiGeneratorHub() {
     fetchLedgerHistory(0);
     fetchSubjects();
     fetchReportHistory();
+    fetchAiBatches();
 
     const interval = setInterval(() => {
       fetchAiGenStatus();
       fetchLedgerHistory(ledgerPage);
       fetchReportHistory();
+      fetchAiBatches();
     }, 15000);
     return () => clearInterval(interval);
   }, [ledgerPage]);
@@ -1074,6 +1117,92 @@ export default function AiGeneratorHub() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Nightly Generation Batches & Purge Manager */}
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '1.2rem', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📦 Nightly Generation Batches ({aiBatches.length} Batches Tracked)
+              </h3>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                View and purge entire nightly AI generation sessions in one click
+              </span>
+            </div>
+            <button 
+              onClick={fetchAiBatches}
+              style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <FiRefreshCw size={14} /> Refresh Batches
+            </button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '12px' }}>Batch Identifier</th>
+                  <th style={{ padding: '12px' }}>Total Questions</th>
+                  <th style={{ padding: '12px' }}>Pending Review</th>
+                  <th style={{ padding: '12px' }}>Approved</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchesLoading ? (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading AI generation batches...</td>
+                  </tr>
+                ) : aiBatches && aiBatches.length > 0 ? (
+                  aiBatches.map((b) => (
+                    <tr key={b.batchName} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <td style={{ padding: '12px', fontWeight: 700, color: '#c4b5fd', fontFamily: 'monospace' }}>
+                        {b.batchName}
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 600, color: '#fff' }}>{b.totalQuestions}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {b.pendingCount} Pending
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {b.approvedCount} Approved
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <button
+                          onClick={() => handlePurgeBatch(b.batchName, b.totalQuestions)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <FiTrash2 size={13} /> Purge Batch
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No AI generation batches found yet. Nightly batches will appear here as they run!
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* ── USER REPORTED QUESTIONS AUDIT & HISTORY PANEL ──────────────────── */}

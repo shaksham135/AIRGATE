@@ -90,7 +90,27 @@ export const sanitizeLatexString = (str) => {
 
   let s = key;
 
-  // 0. Auto-decode escaped Unicode sequences from OCR output (e.g. \u2212 -> -, \u221a2 -> \sqrt{2}, \u00d7 -> \times)
+  // 0a. Repair JSON control character escapes (\f -> formfeed \u000C, \t -> tab \u0009, \r -> \u000D, \b -> \u0008)
+  s = s.replace(/\u000Crac/gi, '\\frac')
+       .replace(/\u0009imes/gi, '\\times')
+       .replace(/\u000Dight/gi, '\\right')
+       .replace(/\u0008egin/gi, '\\begin');
+
+  // 0b. Auto-repair stripped backslashes from AI JSON string escaping quirks
+  // e.g., rac{a}{b} -> \frac{a}{b}, rac12 -> \frac{1}{2}, 2imes2 -> 2\times 2, Pleft( -> P\left(, ight)^n -> \right)^n
+  s = s.replace(/(?<![a-zA-Z\\])rac\{([^{}]+|\{[^{}]*\})\}\{([^{}]+|\{[^{}]*\})\}/gi, '\\frac{$1}{$2}')
+       .replace(/(?<![a-zA-Z\\])rac\s*([0-9])\s*([0-9])/gi, '\\frac{$1}{$2}')
+       .replace(/(?<![a-zA-Z\\])imes(?![a-zA-Z])/gi, ' \\times ')
+       .replace(/(?<![a-zA-Z\\])left\(/gi, '\\left(')
+       .replace(/(?<![a-zA-Z\\])ight\)/gi, '\\right)')
+       .replace(/(?<![a-zA-Z\\])egin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}/gi, '\\begin{$1}')
+       .replace(/(?<![a-zA-Z\\])end(bmatrix|matrix|pmatrix|vmatrix|aligned)/gi, '\\end{$1}')
+       .replace(/(?<![a-zA-Z\\])\b(S|A|B|C|X|Y)rightarrow(epsilon|[a-zA-Z0-9]+)?/gi, (m, p1, p2) => {
+          return `${p1} \\rightarrow ${p2 === 'epsilon' ? '\\epsilon' : (p2 || '')}`;
+       })
+       .replace(/(?<![a-zA-Z\\])\b(Sigma|lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega)\b/g, '\\$1');
+
+  // 0c. Auto-decode escaped Unicode sequences from OCR output (e.g. \u2212 -> -, \u221a2 -> \sqrt{2}, \u00d7 -> \times)
   s = s.replace(/\\u2212/gi, '-')
        .replace(/\\u221a([0-9a-zA-Z]+|\{[^{}]+\})/gi, '\\sqrt{$1}')
        .replace(/\\u221a/gi, '\\sqrt{}')
@@ -119,8 +139,9 @@ export const sanitizeLatexString = (str) => {
   s = s.replace(/\\\[([\s\S]*?)\\\]/g, ' $$ $1 $$ ');
   s = s.replace(/\\\(([\s\S]*?)\\\)/g, ' $ $1 $ ');
 
-  // 3. Auto-wrap unwrapped \frac{...}{...} if not enclosed in $
+  // 3. Auto-wrap unwrapped \frac{...}{...} and \sqrt{...} if not enclosed in $
   s = s.replace(/(?<!\$)\\frac\{([^{}]+|\{[^{}]*\})\}\{([^{}]+|\{[^{}]*\})\}(?!\$)/gi, ' $\\frac{$1}{$2}$ ');
+  s = s.replace(/(?<!\$)([-+]?[0-9]*\.?[0-9]*\s*\\sqrt\{[^{}]+\})(?!\$)/gi, ' $$1$ ');
 
   // 4. Fix stashed words & commands (e.g. cdot(-1) -> \cdot (-1), det(A) -> \det(A))
   s = s.replace(/\bcdot([^\s])/g, ' \\cdot $1');
