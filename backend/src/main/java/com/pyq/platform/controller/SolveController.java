@@ -73,8 +73,10 @@ public class SolveController {
         Question question = questionOpt.get();
 
         // ── Daily Quota Check for AI Practice Questions ─────────────────────────────
-        boolean isAiPracticeQ = "AI_NIGHTLY_GENERATOR".equalsIgnoreCase(question.getPdfSourceName()) ||
-                "AI_GENERATED".equalsIgnoreCase(question.getPdfSourceName());
+        boolean isAiPracticeQ = question.getPdfSourceName() != null &&
+                (question.getPdfSourceName().toLowerCase().startsWith("ai_nightly") ||
+                 question.getPdfSourceName().toLowerCase().startsWith("ai_generated") ||
+                 question.getPdfSourceName().toLowerCase().contains("practice"));
         boolean isPremium = Boolean.TRUE.equals(user.getIsPremium());
 
         if (isAiPracticeQ && !isPremium) {

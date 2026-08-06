@@ -87,8 +87,12 @@ public class PracticeQuestionController {
                 List<Predicate> predicates = new ArrayList<>();
 
                 // Filter ONLY AI Generated Practice Questions
-                predicates.add(root.get("pdfSourceName").in("AI_NIGHTLY_GENERATOR", "AI_GENERATED", "AI_GENERATION",
-                        "AI_SYSTEM", "CONCEPTUAL_PRACTICE"));
+                Predicate isAiNightly = cb.like(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
+                Predicate isAiGenerated = cb.like(cb.lower(root.get("pdfSourceName")), "ai_generated%");
+                Predicate isAiGenerator = cb.like(cb.lower(root.get("pdfSourceName")), "%ai generator%");
+                Predicate isPractice = cb.like(cb.lower(root.get("pdfSourceName")), "%practice%");
+
+                predicates.add(cb.or(isAiNightly, isAiGenerated, isAiGenerator, isPractice));
                 predicates.add(cb.equal(root.get("status"), "APPROVED"));
 
                 // Subject Filter

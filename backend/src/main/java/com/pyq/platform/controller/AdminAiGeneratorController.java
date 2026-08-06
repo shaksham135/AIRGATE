@@ -50,7 +50,9 @@ public class AdminAiGeneratorController {
         org.springframework.data.jpa.domain.Specification<com.pyq.platform.entity.Question> spec = (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
             
-            predicates.add(root.get("pdfSourceName").in("AI_NIGHTLY_GENERATOR", "AI_GENERATED"));
+            jakarta.persistence.criteria.Predicate isAiNightly = cb.like(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
+            jakarta.persistence.criteria.Predicate isAiGenerated = cb.like(cb.lower(root.get("pdfSourceName")), "ai_generated%");
+            predicates.add(cb.or(isAiNightly, isAiGenerated));
 
             if (subjectId != null) {
                 predicates.add(cb.equal(root.get("subject").get("id"), subjectId));
