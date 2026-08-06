@@ -51,7 +51,15 @@ public class QuestionService {
                 }
 
                 // Exclude AI practice questions from Explorer page (show only real PYQs)
-                predicates.add(cb.not(root.get("pdfSourceName").in("AI_NIGHTLY_GENERATOR", "AI_GENERATED")));
+                Predicate notAiNightly = cb.notLike(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
+                Predicate notAiGenerated = cb.notLike(cb.lower(root.get("pdfSourceName")), "ai_generated%");
+                Predicate notAiGenerator = cb.notLike(cb.lower(root.get("pdfSourceName")), "%ai generator%");
+                Predicate notPractice = cb.notLike(cb.lower(root.get("pdfSourceName")), "%practice%");
+
+                Predicate isNullPdf = cb.isNull(root.get("pdfSourceName"));
+                Predicate isRealPyq = cb.and(notAiNightly, notAiGenerated, notAiGenerator, notPractice);
+
+                predicates.add(cb.or(isNullPdf, isRealPyq));
 
                 // Text search query
                 if (query != null && !query.trim().isEmpty()) {

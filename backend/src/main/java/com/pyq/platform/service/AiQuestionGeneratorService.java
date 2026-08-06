@@ -485,6 +485,10 @@ public class AiQuestionGeneratorService {
         try {
             log.info("🤖 Answer Verification & Quality Polish via Groq 70B...");
             JsonNode res = executeGroqCall(sb.toString(), true, 3072);
+            if (res == null && geminiApiKey != null && !geminiApiKey.isBlank()) {
+                log.info("🌐 [AI Verifier] Groq 70B rate-limited — Fallback to Gemini 2.5 Flash Verifier...");
+                res = executeGeminiCall(sb.toString(), 3072);
+            }
             if (res != null) {
                 String ans = res.has("answer") ? res.get("answer").asText() : "";
                 String exp = res.has("explanation") ? res.get("explanation").asText() : "";
@@ -495,7 +499,7 @@ public class AiQuestionGeneratorService {
                 }
             }
         } catch (Exception e) {
-            log.error("❌ Groq verifier call failed: {}", e.getMessage());
+            log.error("❌ Verifier call failed: {}", e.getMessage());
         }
         return new VerificationResult("", "");
     }
@@ -545,8 +549,9 @@ public class AiQuestionGeneratorService {
                 String errMsg = e.getMessage() != null ? e.getMessage() : "";
                 if (is429RateLimitError(e, errMsg)) {
                     groqKeyManager.markRateLimited(apiKey);
-                    log.warn("⚠️ Rate limit (429) hit on key ending with ...{}. Switch to next key (attempt {}/{})", 
-                            maskKey(apiKey), attempt, maxRetries);
+                    log.warn("⚠️ Groq HTTP 429 Rate Limit on attempt {}/{} for key [...{}]. Pacing 3.5s & switching key...", 
+                            attempt, maxRetries, maskKey(apiKey));
+                    try { Thread.sleep(3500); } catch (InterruptedException ignored) {}
                 } else if (errMsg.contains("400") || errMsg.toLowerCase().contains("bad request")) {
                     log.warn("⚠️ Groq 400 Bad Request on attempt {} (Error: {}). Expanding max_tokens to {}...", 
                             attempt, errMsg, currentMaxTokens + 1000);
@@ -578,6 +583,9 @@ public class AiQuestionGeneratorService {
         s = s.replaceAll("(?<!\\\\)\\boverline\\{", "\\\\overline{");
         s = s.replaceAll("(?<!\\\\)\\bcdot\\b", "\\\\cdot");
         s = s.replaceAll("(?<!\\\\)\\bsum\\b", "\\\\sum");
+
+        // Auto-repair any unescaped single backslashes in JSON strings (e.g. \s, \m, \d, \w, \p)
+        s = s.replaceAll("(?<!\\\\)\\\\(?![\"\\\\/bfnrtu])", "\\\\\\\\");
         return s;
     }
 
