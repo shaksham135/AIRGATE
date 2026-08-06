@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
@@ -17,11 +17,13 @@ import {
 export default function QuestionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state || {};
   const currentUser = AuthService.getCurrentUser();
 
   const [question, setQuestion] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedOption, setSelectedOption] = useState(locationState.preselectedOption || null);
   const [tempSelectedMsq, setTempSelectedMsq] = useState([]);
   const [natInput, setNatInput] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
@@ -176,12 +178,15 @@ export default function QuestionDetail() {
           .then(statusRes => {
             const { isBookmarked: bm, isSolved: sol, selectedOption: opt } = statusRes.data || {};
             setIsBookmarked(!!bm);
-            if (sol && opt) {
-              setSelectedOption(opt);
-              setNatInput(opt);
-              if (qRes.data.questionType === 'MSQ') {
-                const letters = opt.toUpperCase().replace(/[^A-D]/g, '').split('');
-                setTempSelectedMsq(letters);
+            if (sol) {
+              const lockedOpt = (opt && opt.trim()) ? opt : (locationState.preselectedOption || 'SOLVED');
+              setSelectedOption(lockedOpt);
+              if (opt && opt.trim()) {
+                setNatInput(opt);
+                if (qRes.data?.questionType === 'MSQ') {
+                  const letters = opt.toUpperCase().replace(/[^A-D]/g, '').split('');
+                  setTempSelectedMsq(letters);
+                }
               }
             }
           })

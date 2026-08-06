@@ -636,7 +636,7 @@ export default function PracticeArena() {
                     <div className="practice-header-actions">
                       <button
                         type="button"
-                        onClick={() => navigate(`/questions/${q.id}`)}
+                        onClick={() => navigate(`/questions/${q.id}`, { state: { preselectedOption: selectedOptions[q.id], isSolved: !!selectedOptions[q.id] } })}
                         title="View Detailed Question Page"
                         className="practice-action-btn details-btn"
                       >
