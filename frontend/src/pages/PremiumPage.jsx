@@ -52,7 +52,11 @@ export default function PremiumPage() {
             qrImageUrl: response.data.betaQrImageUrl || '',
             spotsRemaining: response.data.betaSpotsRemaining !== undefined ? response.data.betaSpotsRemaining : 100,
             tier1Price: response.data.betaTier1Price || 49,
-            tier2Price: response.data.betaTier2Price || 249
+            tier2Price: response.data.betaTier2Price || 249,
+            betaBannerHeading: response.data.betaBannerHeading || "⚡ Limited Founder's VIP Beta Access",
+            betaBannerSubheading: response.data.betaBannerSubheading || "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!",
+            betaTier1Offer: response.data.betaTier1Offer || "⚡ 1-Month Founder Pass — Save 75%!",
+            betaTier2Offer: response.data.betaTier2Offer || "🔥 6-Month Season Pass — Save 75%!"
           });
           setTiers(prev => ({
             enabled: response.data.enabled !== undefined ? response.data.enabled : prev.enabled,
@@ -263,35 +267,38 @@ export default function PremiumPage() {
   return (
     <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto', width: '100%', fontFamily: 'var(--font-main)' }}>
 
-      {/* 🚀 Founder's VIP Beta Highlight Banner */}
+      {/* 🚀 Dynamic Admin Controlled Founder's VIP Beta Highlight Banner */}
       {isBetaMode && !upgraded && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(139,92,246,0.18) 100%)',
+          background: 'linear-gradient(135deg, rgba(236,72,153,0.2) 0%, rgba(139,92,246,0.2) 100%)',
           border: '1px solid rgba(236,72,153,0.4)',
           borderRadius: '20px',
-          padding: '20px 28px',
-          marginBottom: '36px',
+          padding: '24px 32px',
+          marginBottom: '40px',
           textAlign: 'center',
-          boxShadow: '0 10px 40px rgba(236,72,153,0.2)',
-          backdropFilter: 'blur(10px)'
+          boxShadow: '0 12px 40px rgba(236,72,153,0.25)',
+          backdropFilter: 'blur(12px)',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
           <span style={{
             background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-            color: '#fff', fontSize: '0.78rem', fontWeight: 800, padding: '4px 16px',
-            borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'inline-block', marginBottom: '8px'
+            color: '#fff', fontSize: '0.8rem', fontWeight: 800, padding: '5px 18px',
+            borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'inline-block', marginBottom: '10px',
+            boxShadow: '0 4px 15px rgba(236, 72, 153, 0.4)'
           }}>
-            ⚡ Limited Founder's VIP Beta Offer
+            {betaDetails.betaBannerHeading || "⚡ Limited Founder's VIP Beta Access"}
           </span>
-          <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', margin: '4px 0 6px 0' }}>
-            Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!
+          <h3 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#fff', margin: '4px 0 8px 0', fontFamily: 'var(--font-title)' }}>
+            {betaDetails.betaBannerSubheading || "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!"}
           </h3>
-          <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.85)', margin: 0, fontWeight: 500 }}>
-            🔥 Direct UPI QR Payment Special • First 100 Aspirants Only • <strong style={{ color: '#ec4899' }}>{betaDetails.spotsRemaining} / 100 Spots Remaining</strong>
+          <p style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.9)', margin: 0, fontWeight: 600 }}>
+            🔥 Direct Founder's UPI Special • First 100 Aspirants Only • <strong style={{ color: '#ec4899', fontSize: '1.05rem' }}>{betaDetails.spotsRemaining} / 100 Early-Bird Spots Remaining</strong>
           </p>
         </div>
       )}
 
-      {/* Hero Header */}
+      {/* 🎯 15-Year Marketing Manager Emotional Hero Hook */}
       <div style={{ textAlign: 'center', marginBottom: '48px' }}>
         <span style={{
           backgroundColor: 'rgba(139, 92, 246, 0.12)',
@@ -309,20 +316,23 @@ export default function PremiumPage() {
           marginBottom: '18px',
           boxShadow: '0 4px 20px rgba(139, 92, 246, 0.2)'
         }}>
-          ✨ Rank Accelerator Suite
+          ✨ AIRGATE Rank Accelerator Suite
         </span>
-        <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff', marginBottom: '16px', fontFamily: 'var(--font-title)' }}>
-          Don't Just Practice. Accelerate Your GATE Rank.
+        <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#fff', marginBottom: '16px', fontFamily: 'var(--font-title)', lineHeight: 1.25 }}>
+          Your Top 100 GATE Rank Starts Here.<br />
+          <span style={{ background: 'linear-gradient(90deg, #ec4899 0%, #38bdf8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            Stop Losing 20+ Marks to Silly Errors & Unsolved Doubts.
+          </span>
         </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '680px', margin: '0 auto', lineHeight: 1.6, marginBottom: '32px' }}>
-          Aspirant Pro isn't a feature bundle — it is your daily competitive edge engineered to convert negative marks into AIR top ranks.
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.15rem', maxWidth: '720px', margin: '0 auto', lineHeight: 1.6, marginBottom: '32px' }}>
+          Engineered specifically for GATE aspirants who cannot afford to waste another attempt. Turn negative marks into IISc / IIT M.Tech admission calls.
         </p>
       </div>
 
-      {/* Outcome Highlights Banner */}
+      {/* 4 Pillar Transformation Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: '20px',
         marginBottom: '48px',
         marginTop: '-16px'
@@ -335,9 +345,9 @@ export default function PremiumPage() {
           textAlign: 'left'
         }}>
           <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>⚡</div>
-          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>Instant Doubt Elimination</h4>
+          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>Zero Doubt Friction</h4>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
-            Never spend 2 hours stuck on a single derivation. Get step-by-step KaTeX mathematical solutions in seconds.
+            Never waste 3 hours stuck on 1 derivation. Instant step-by-step KaTeX solutions & 24/7 AI tutor guidance.
           </p>
         </div>
         
@@ -349,9 +359,9 @@ export default function PremiumPage() {
           textAlign: 'left'
         }}>
           <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>🎯</div>
-          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>Unlimited 3-Hr Exam Reps</h4>
+          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>Real TCS iON Environment</h4>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
-            Condition your brain for exam day. Take unlimited 65-question (100 marks) full syllabus exam simulations.
+            Condition your mind for exam day. Take unlimited 65-question (100 marks) full syllabus exam simulations.
           </p>
         </div>
 
@@ -362,10 +372,24 @@ export default function PremiumPage() {
           padding: '24px',
           textAlign: 'left'
         }}>
-          <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>📄</div>
-          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>Fast Offline Revision Sheets</h4>
+          <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>📊</div>
+          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>Weak Area Generators</h4>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
-            Compile all your bookmarked weak questions and AI derivations into clean text files for quick last-week revisions.
+            Instantly target weak subjects (DBMS, OS, Discrete Math) with AI generated 10-question rapid sprints.
+          </p>
+        </div>
+
+        <div style={{
+          backgroundColor: 'rgba(236, 72, 153, 0.05)',
+          border: '1px solid rgba(236, 72, 153, 0.2)',
+          borderRadius: '16px',
+          padding: '24px',
+          textAlign: 'left'
+        }}>
+          <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>📄</div>
+          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>1-Click Printable PDFs</h4>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+            Compile all your bookmarked weak questions & AI explanations into clean text documents for last-week revisions.
           </p>
         </div>
       </div>
@@ -558,11 +582,11 @@ export default function PremiumPage() {
                 if (selectedDuration === 6) {
                   currentPrice = betaDetails.tier2Price;
                   currentDuration = 6;
-                  currentOffer = '🔥 6-Month Season Pass — Save 75%!';
+                  currentOffer = betaDetails.betaTier2Offer || '🔥 6-Month Season Pass — Save 75%!';
                 } else {
                   currentPrice = betaDetails.tier1Price;
                   currentDuration = 1;
-                  currentOffer = '⚡ 1-Month Founder Pass — Save 75%!';
+                  currentOffer = betaDetails.betaTier1Offer || '⚡ 1-Month Founder Pass — Save 75%!';
                 }
               } else {
                 const t1 = tiers?.tier1 || { price: 99.0, duration: 1, offer: 'Best for quick revisions' };
@@ -601,16 +625,27 @@ export default function PremiumPage() {
                 calculatedFinalPrice = Math.max(0, currentPrice - calculatedDiscountAmount);
               }
 
+              const originalPrice = isBetaMode ? (selectedDuration === 6 ? 999 : 199) : null;
+
               return (
                 <div style={{ marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
                     {appliedCoupon ? (
                       <>
-                        <span style={{ fontSize: '3rem', fontWeight: 800, color: '#10b981' }}>
+                        <span style={{ fontSize: '3rem', fontWeight: 900, color: '#10b981' }}>
                           ₹{calculatedFinalPrice}
                         </span>
                         <span style={{ fontSize: '1.4rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
                           ₹{currentPrice}
+                        </span>
+                      </>
+                    ) : isBetaMode ? (
+                      <>
+                        <span style={{ fontSize: '3.2rem', fontWeight: 900, color: '#fff', background: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                          ₹{currentPrice}
+                        </span>
+                        <span style={{ fontSize: '1.4rem', color: 'rgba(255,255,255,0.4)', textDecoration: 'line-through', fontWeight: 600 }}>
+                          ₹{originalPrice}
                         </span>
                       </>
                     ) : (
@@ -618,7 +653,7 @@ export default function PremiumPage() {
                         ₹{currentPrice}
                       </span>
                     )}
-                    <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 600 }}>
                       {currentDuration === 1 ? ' / month' : ` / ${currentDuration} months`}
                     </span>
                   </div>
@@ -641,20 +676,20 @@ export default function PremiumPage() {
 
                   {currentOffer && !appliedCoupon && (
                     <div style={{ 
-                      background: 'linear-gradient(90deg, rgba(168,85,247,0.15), rgba(6,182,212,0.15))',
-                      border: '1px solid rgba(168,85,247,0.3)',
-                      color: '#e9d5ff',
-                      padding: '6px 12px',
+                      background: isBetaMode ? 'linear-gradient(90deg, rgba(236,72,153,0.2), rgba(139,92,246,0.2))' : 'linear-gradient(90deg, rgba(168,85,247,0.15), rgba(6,182,212,0.15))',
+                      border: isBetaMode ? '1px solid rgba(236,72,153,0.4)' : '1px solid rgba(168,85,247,0.3)',
+                      color: isBetaMode ? '#f472b6' : '#e9d5ff',
+                      padding: '6px 14px',
                       borderRadius: '8px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 0 12px rgba(168,85,247,0.25)',
+                      boxShadow: '0 0 16px rgba(236,72,153,0.2)',
                       marginTop: '4px'
                     }}>
-                      🎁 Deal: {currentOffer}
+                      🎁 {currentOffer}
                     </div>
                   )}
                 </div>

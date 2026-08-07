@@ -87,6 +87,14 @@ public class PaymentController {
                     settings.getBetaTier1Price() != null ? settings.getBetaTier1Price() : new BigDecimal("49.00"));
             response.put("betaTier2Price",
                     settings.getBetaTier2Price() != null ? settings.getBetaTier2Price() : new BigDecimal("249.00"));
+            response.put("betaBannerHeading",
+                    settings.getBetaBannerHeading() != null ? settings.getBetaBannerHeading() : "⚡ Limited Founder's VIP Beta Access");
+            response.put("betaBannerSubheading",
+                    settings.getBetaBannerSubheading() != null ? settings.getBetaBannerSubheading() : "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!");
+            response.put("betaTier1Offer",
+                    settings.getBetaTier1Offer() != null ? settings.getBetaTier1Offer() : "⚡ 1-Month Founder Pass — Save 75%!");
+            response.put("betaTier2Offer",
+                    settings.getBetaTier2Offer() != null ? settings.getBetaTier2Offer() : "🔥 6-Month Season Pass — Save 75%!");
 
             response.put("tier1",
                     Map.of("price", settings.getTier1PriceInr(), "duration", settings.getTier1DurationMonths(), "offer",
@@ -103,6 +111,10 @@ public class PaymentController {
             response.put("betaSpotsRemaining", 100);
             response.put("betaTier1Price", new BigDecimal("49.00"));
             response.put("betaTier2Price", new BigDecimal("249.00"));
+            response.put("betaBannerHeading", "⚡ Limited Founder's VIP Beta Access");
+            response.put("betaBannerSubheading", "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!");
+            response.put("betaTier1Offer", "⚡ 1-Month Founder Pass — Save 75%!");
+            response.put("betaTier2Offer", "🔥 6-Month Season Pass — Save 75%!");
             response.put("tier1",
                     Map.of("price", BigDecimal.valueOf(99.00), "duration", 1, "offer", "Best for quick revisions"));
             response.put("tier2",
@@ -528,6 +540,18 @@ public class PaymentController {
         }
         if (body.containsKey("betaTier2Price")) {
             settings.setBetaTier2Price(new BigDecimal(body.get("betaTier2Price").toString()));
+        }
+        if (body.containsKey("betaBannerHeading")) {
+            settings.setBetaBannerHeading(body.get("betaBannerHeading").toString().trim());
+        }
+        if (body.containsKey("betaBannerSubheading")) {
+            settings.setBetaBannerSubheading(body.get("betaBannerSubheading").toString().trim());
+        }
+        if (body.containsKey("betaTier1Offer")) {
+            settings.setBetaTier1Offer(body.get("betaTier1Offer").toString().trim());
+        }
+        if (body.containsKey("betaTier2Offer")) {
+            settings.setBetaTier2Offer(body.get("betaTier2Offer").toString().trim());
         }
 
         systemSettingsRepository.save(settings);

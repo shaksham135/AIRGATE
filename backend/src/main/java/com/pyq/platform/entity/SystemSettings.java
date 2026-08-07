@@ -125,4 +125,20 @@ public class SystemSettings {
     @Builder.Default
     @Column(name = "beta_tier2_price", nullable = false)
     private BigDecimal betaTier2Price = new BigDecimal("249.00");
+
+    @Builder.Default
+    @Column(name = "beta_banner_heading")
+    private String betaBannerHeading = "⚡ Limited Founder's VIP Beta Access";
+
+    @Builder.Default
+    @Column(name = "beta_banner_subheading", columnDefinition = "TEXT")
+    private String betaBannerSubheading = "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!";
+
+    @Builder.Default
+    @Column(name = "beta_tier1_offer")
+    private String betaTier1Offer = "⚡ 1-Month Founder Pass — Save 75%!";
+
+    @Builder.Default
+    @Column(name = "beta_tier2_offer")
+    private String betaTier2Offer = "🔥 6-Month Season Pass — Save 75%!";
 }

@@ -50,8 +50,9 @@ public class DataInitializer implements CommandLineRunner {
         runSchemaMigrations();
 
         // Ensure SystemSettings Singleton Record (ID = 1) exists
-        if (systemSettingsRepository.findById(1).isEmpty()) {
-            SystemSettings settings = SystemSettings.builder()
+        SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+        if (settings == null) {
+            settings = SystemSettings.builder()
                     .id(1)
                     .premiumPriceInr(new java.math.BigDecimal("199.00"))
                     .premiumDurationMonths(1)
@@ -73,8 +74,20 @@ public class DataInitializer implements CommandLineRunner {
                     .betaTier2Price(new java.math.BigDecimal("249.00"))
                     .build();
             systemSettingsRepository.save(settings);
-            log.info("⚙️ Initialized SystemSettings singleton configuration in DB.");
+        } else {
+            // Self-healing: ensure beta fields are initialized
+            boolean updated = false;
+            if (settings.getBetaPaymentEnabled() == null) { settings.setBetaPaymentEnabled(true); updated = true; }
+            if (settings.getBetaUpiId() == null || settings.getBetaUpiId().isBlank()) { settings.setBetaUpiId("airgate@upi"); updated = true; }
+            if (settings.getBetaSpotsRemaining() == null) { settings.setBetaSpotsRemaining(100); updated = true; }
+            if (settings.getBetaTier1Price() == null) { settings.setBetaTier1Price(new java.math.BigDecimal("49.00")); updated = true; }
+            if (settings.getBetaTier2Price() == null) { settings.setBetaTier2Price(new java.math.BigDecimal("249.00")); updated = true; }
+            if (updated) {
+                systemSettingsRepository.save(settings);
+                log.info("⚙️ DataInitializer: Updated SystemSettings with VIP Beta defaults.");
+            }
         }
+        log.info("⚙️ Initialized SystemSettings singleton configuration in DB.");
 
         // 1. Always Ensure Admin User from Environment Variables
         String adminUser  = resolvePassword("ADMIN_USERNAME",   "admin");

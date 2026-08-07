@@ -425,7 +425,11 @@ export default function AdminPanel() {
     betaQrImageUrl: '',
     betaSpotsRemaining: 100,
     betaTier1Price: 49,
-    betaTier2Price: 249
+    betaTier2Price: 249,
+    betaBannerHeading: "⚡ Limited Founder's VIP Beta Access",
+    betaBannerSubheading: "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!",
+    betaTier1Offer: "⚡ 1-Month Founder Pass — Save 75%!",
+    betaTier2Offer: "🔥 6-Month Season Pass — Save 75%!"
   });
   const [betaVerifications, setBetaVerifications] = useState([]);
   const [betaVerificationsLoading, setBetaVerificationsLoading] = useState(false);
@@ -458,7 +462,11 @@ export default function AdminPanel() {
           betaQrImageUrl: res.data.betaQrImageUrl || '',
           betaSpotsRemaining: res.data.betaSpotsRemaining !== undefined ? res.data.betaSpotsRemaining : 100,
           betaTier1Price: res.data.betaTier1Price || 49,
-          betaTier2Price: res.data.betaTier2Price || 249
+          betaTier2Price: res.data.betaTier2Price || 249,
+          betaBannerHeading: res.data.betaBannerHeading || "⚡ Limited Founder's VIP Beta Access",
+          betaBannerSubheading: res.data.betaBannerSubheading || "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!",
+          betaTier1Offer: res.data.betaTier1Offer || "⚡ 1-Month Founder Pass — Save 75%!",
+          betaTier2Offer: res.data.betaTier2Offer || "🔥 6-Month Season Pass — Save 75%!"
         });
       }
     } catch (err) {
@@ -1021,6 +1029,30 @@ export default function AdminPanel() {
                   />
                 </div>
 
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    Beta Banner Title Heading
+                  </label>
+                  <input 
+                    type="text" 
+                    value={betaSettings.betaBannerHeading}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaBannerHeading: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    Beta Banner Subheading
+                  </label>
+                  <input 
+                    type="text" 
+                    value={betaSettings.betaBannerSubheading}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaBannerSubheading: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
@@ -1045,6 +1077,30 @@ export default function AdminPanel() {
                       style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem' }}
                     />
                   </div>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    1-Month Offer Text Badge
+                  </label>
+                  <input 
+                    type="text" 
+                    value={betaSettings.betaTier1Offer}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaTier1Offer: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    6-Month Offer Text Badge
+                  </label>
+                  <input 
+                    type="text" 
+                    value={betaSettings.betaTier2Offer}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaTier2Offer: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
+                  />
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
