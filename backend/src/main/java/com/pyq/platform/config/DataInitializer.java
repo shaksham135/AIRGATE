@@ -23,24 +23,59 @@ public class DataInitializer implements CommandLineRunner {
     private final TagRepository tagRepository;
     private final QuestionRepository questionRepository;
     private final QuestionAIAnalysisRepository aiAnalysisRepository;
+    private final SystemSettingsRepository systemSettingsRepository;
     private final PasswordEncoder passwordEncoder;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public DataInitializer(UserRepository userRepository, SubjectRepository subjectRepository,
                            TopicRepository topicRepository, TagRepository tagRepository,
                            QuestionRepository questionRepository, QuestionAIAnalysisRepository aiAnalysisRepository,
-                           PasswordEncoder passwordEncoder) {
+                           SystemSettingsRepository systemSettingsRepository,
+                           PasswordEncoder passwordEncoder,
+                           org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.userRepository = userRepository;
         this.subjectRepository = subjectRepository;
         this.topicRepository = topicRepository;
         this.tagRepository = tagRepository;
         this.questionRepository = questionRepository;
         this.aiAnalysisRepository = aiAnalysisRepository;
+        this.systemSettingsRepository = systemSettingsRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
-    @Transactional
     public void run(String... args) throws Exception {
+        // 0. Run Self-Healing Schema Migrations before any JPA Repository queries
+        runSchemaMigrations();
+
+        // Ensure SystemSettings Singleton Record (ID = 1) exists
+        if (systemSettingsRepository.findById(1).isEmpty()) {
+            SystemSettings settings = SystemSettings.builder()
+                    .id(1)
+                    .premiumPriceInr(new java.math.BigDecimal("199.00"))
+                    .premiumDurationMonths(1)
+                    .aiDailyLimitPremium(100)
+                    .isMaintenanceMode(false)
+                    .tier1PriceInr(new java.math.BigDecimal("99.00"))
+                    .tier1DurationMonths(1)
+                    .tier1SpecialOffer("Best for quick revisions")
+                    .tier2PriceInr(new java.math.BigDecimal("249.00"))
+                    .tier2DurationMonths(3)
+                    .tier2SpecialOffer("Save 15% - Most Popular")
+                    .tier3PriceInr(new java.math.BigDecimal("449.00"))
+                    .tier3DurationMonths(6)
+                    .tier3SpecialOffer("Save 25% - Complete Prep")
+                    .betaPaymentEnabled(true)
+                    .betaUpiId("airgate@upi")
+                    .betaSpotsRemaining(100)
+                    .betaTier1Price(new java.math.BigDecimal("49.00"))
+                    .betaTier2Price(new java.math.BigDecimal("249.00"))
+                    .build();
+            systemSettingsRepository.save(settings);
+            log.info("⚙️ Initialized SystemSettings singleton configuration in DB.");
+        }
+
         // 1. Always Ensure Admin User from Environment Variables
         String adminUser  = resolvePassword("ADMIN_USERNAME",   "admin");
         String adminEmail = resolvePassword("ADMIN_EMAIL",      "admin@airgate.in");
@@ -300,5 +335,53 @@ public class DataInitializer implements CommandLineRunner {
         }
         log.warn("DataInitializer: env var '{}' not set — using built-in fallback password. Set this in production!", envVar);
         return fallback;
+    }
+
+    private void runSchemaMigrations() {
+        log.info("🔧 Running Self-Healing Database Schema Migrations for Production MySQL/TiDB...");
+        
+        // Add branch, paper_set, question_number columns to questions table if missing
+        addMissingColumn("questions", "branch", "VARCHAR(32) DEFAULT 'cse'");
+        addMissingColumn("questions", "paper_set", "INT DEFAULT 1");
+        addMissingColumn("questions", "question_number", "INT");
+
+        // Add VIP Beta payment columns to system_settings table if missing
+        addMissingColumn("system_settings", "beta_payment_enabled", "BOOLEAN DEFAULT TRUE");
+        addMissingColumn("system_settings", "beta_upi_id", "VARCHAR(255) DEFAULT 'airgate@upi'");
+        addMissingColumn("system_settings", "beta_qr_image_url", "TEXT");
+        addMissingColumn("system_settings", "beta_spots_remaining", "INT DEFAULT 100");
+        addMissingColumn("system_settings", "beta_tier1_price", "DECIMAL(10,2) DEFAULT 49.00");
+        addMissingColumn("system_settings", "beta_tier2_price", "DECIMAL(10,2) DEFAULT 249.00");
+
+        // Create payment_verifications table if missing
+        try {
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS payment_verifications (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    plan_type VARCHAR(64) NOT NULL,
+                    duration_months INT NOT NULL,
+                    amount DECIMAL(10,2) NOT NULL,
+                    utr_number VARCHAR(64) NOT NULL,
+                    screenshot_url TEXT,
+                    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+                    admin_notes TEXT,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME,
+                    CONSTRAINT fk_payment_verifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+        } catch (Exception e) {
+            log.warn("Schema Migration Note: payment_verifications table creation: {}", e.getMessage());
+        }
+    }
+
+    private void addMissingColumn(String tableName, String columnName, String columnDefinition) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition);
+            log.info("✅ Self-Healing DB: Successfully added missing column '{}.{}' to production database.", tableName, columnName);
+        } catch (Exception e) {
+            // Column already exists or matches schema
+        }
     }
 }

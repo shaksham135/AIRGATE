@@ -101,4 +101,28 @@ public class SystemSettings {
     @Builder.Default
     @Column(name = "auto_drip_offer_email_enabled", nullable = false)
     private Boolean autoDripOfferEmailEnabled = true;
+
+    // Dynamic Hybrid VIP Beta Payment Settings
+    @Builder.Default
+    @Column(name = "beta_payment_enabled", nullable = false)
+    private Boolean betaPaymentEnabled = true;
+
+    @Builder.Default
+    @Column(name = "beta_upi_id")
+    private String betaUpiId = "airgate@upi";
+
+    @Column(name = "beta_qr_image_url", columnDefinition = "TEXT")
+    private String betaQrImageUrl;
+
+    @Builder.Default
+    @Column(name = "beta_spots_remaining", nullable = false)
+    private Integer betaSpotsRemaining = 100;
+
+    @Builder.Default
+    @Column(name = "beta_tier1_price", nullable = false)
+    private BigDecimal betaTier1Price = new BigDecimal("49.00");
+
+    @Builder.Default
+    @Column(name = "beta_tier2_price", nullable = false)
+    private BigDecimal betaTier2Price = new BigDecimal("249.00");
 }

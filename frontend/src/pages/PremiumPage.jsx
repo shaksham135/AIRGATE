@@ -19,6 +19,21 @@ export default function PremiumPage() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponMsg, setCouponMsg] = useState('');
 
+  const [isBetaMode, setIsBetaMode] = useState(true);
+  const [betaDetails, setBetaDetails] = useState({
+    upiId: 'airgate@upi',
+    qrImageUrl: '',
+    spotsRemaining: 100,
+    tier1Price: 49,
+    tier2Price: 249
+  });
+  const [showUpiModal, setShowUpiModal] = useState(false);
+  const [utrInput, setUtrInput] = useState('');
+  const [screenshotUrlInput, setScreenshotUrlInput] = useState('');
+  const [submittingUpi, setSubmittingUpi] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [myVerification, setMyVerification] = useState(null);
+
   // Dynamic Multi-Tier Pricing state
   const [tiers, setTiers] = useState({
     tier1: { price: 99.0, duration: 1, offer: 'Best for quick revisions' },
@@ -31,21 +46,36 @@ export default function PremiumPage() {
       try {
         const response = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/pricing`);
         if (response.data) {
+          setIsBetaMode(!!response.data.isBetaMode);
+          setBetaDetails({
+            upiId: response.data.betaUpiId || 'airgate@upi',
+            qrImageUrl: response.data.betaQrImageUrl || '',
+            spotsRemaining: response.data.betaSpotsRemaining !== undefined ? response.data.betaSpotsRemaining : 100,
+            tier1Price: response.data.betaTier1Price || 49,
+            tier2Price: response.data.betaTier2Price || 249
+          });
           setTiers(prev => ({
             enabled: response.data.enabled !== undefined ? response.data.enabled : prev.enabled,
-            tier1: response.data.tier1 || prev.tier1 || { price: 99.0, duration: 1, offer: 'Best for quick revisions' },
-            tier2: response.data.tier2 || prev.tier2 || { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' },
-            tier3: response.data.tier3 || prev.tier3 || { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' }
+            tier1: response.data.tier1 || prev.tier1,
+            tier2: response.data.tier2 || prev.tier2,
+            tier3: response.data.tier3 || prev.tier3
           }));
-          if (response.data.tier1?.duration) {
-            setSelectedDuration(response.data.tier1.duration);
-          }
         }
       } catch (err) {
         console.error("Failed to load dynamic pricing tiers:", err);
       }
     };
     fetchTiers();
+
+    if (AuthService.getCurrentUser()) {
+      axios.get(`${API_CONFIG.BASE_URL}/api/payments/my-verification`, {
+        headers: AuthService.getAuthHeader()
+      }).then(res => {
+        if (res.data && res.data.hasSubmitted) {
+          setMyVerification(res.data);
+        }
+      }).catch(e => console.error("Failed to fetch my verification status:", e));
+    }
   }, []);
 
   const loadRazorpayScript = () => {
@@ -159,6 +189,58 @@ export default function PremiumPage() {
       setError(err.response?.data?.error || 'Failed to start payment processing. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(betaDetails.upiId);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
+
+  const handleUpiSubmit = async (e) => {
+    e.preventDefault();
+    if (!utrInput || utrInput.trim().length < 6) {
+      setError("Please enter a valid 12-digit UTR or Transaction Reference number.");
+      return;
+    }
+    const currentUser = AuthService.getCurrentUser();
+    if (!currentUser) {
+      setError("Please Sign In first to submit payment proof.");
+      navigate('/login');
+      return;
+    }
+
+    setSubmittingUpi(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const activeAmount = selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price;
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/submit-upi`, {
+        planType: selectedDuration === 6 ? 'SEASONAL_249' : 'MONTHLY_49',
+        durationMonths: selectedDuration,
+        amount: activeAmount,
+        utrNumber: utrInput.trim(),
+        screenshotUrl: screenshotUrlInput.trim()
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+
+      setSuccess(res.data.message || "Payment proof submitted successfully! Verification usually takes 5-15 minutes.");
+      setShowUpiModal(false);
+      setMyVerification({
+        hasSubmitted: true,
+        utrNumber: utrInput.trim(),
+        status: 'PENDING',
+        amount: activeAmount,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Failed to submit UPI payment proof:", err);
+      setError(err.response?.data?.error || "Failed to submit verification request. Please check UTR number.");
+    } finally {
+      setSubmittingUpi(false);
     }
   };
 
@@ -575,96 +657,279 @@ export default function PremiumPage() {
             </div>
           </div>
 
-          <div>
-            {upgraded ? (
-              <button 
-                type="button" 
-                className="btn btn-outline" 
-                style={{ width: '100%', padding: '14px', borderColor: 'var(--color-success)', color: 'var(--color-success)', cursor: 'default' }}
-                disabled={true}
-              >
-                ✓ Subscriber Active
-              </button>
-            ) : tiers.enabled === false ? (
-              <div>
+            <div>
+              {upgraded ? (
                 <button 
                   type="button" 
                   className="btn btn-outline" 
-                  style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: 0.9, cursor: 'not-allowed', borderColor: '#38bdf8', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.08)' }}
+                  style={{ width: '100%', padding: '14px', borderColor: 'var(--color-success)', color: 'var(--color-success)', cursor: 'default' }}
                   disabled={true}
                 >
-                  Coming Soon 🚀
+                  ✓ Subscriber Active
                 </button>
-                <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '10px', lineHeight: 1.45 }}>
-                  Payment gateway integration in progress. All GATE practice features are currently 100% FREE for all users!
+              ) : isBetaMode ? (
+                <div>
+                  {myVerification && myVerification.status === 'PENDING' ? (
+                    <div style={{
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      color: '#f59e0b',
+                      padding: '14px',
+                      borderRadius: '12px',
+                      textAlign: 'center',
+                      fontSize: '0.88rem',
+                      fontWeight: 700
+                    }}>
+                      ⏳ Payment Verification Pending
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: 500 }}>
+                        UTR #{myVerification.utrNumber}. Verification takes 5-15 mins.
+                      </div>
+                    </div>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      style={{ 
+                        width: '100%', 
+                        padding: '16px', 
+                        fontSize: '1.05rem', 
+                        fontWeight: 800,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '8px',
+                        background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
+                        boxShadow: '0 8px 25px rgba(236, 72, 153, 0.3)'
+                      }}
+                      onClick={() => setShowUpiModal(true)}
+                    >
+                      ⚡ Claim VIP Beta Pass ({selectedDuration === 6 ? `₹${betaDetails.tier2Price}` : `₹${betaDetails.tier1Price}`}) →
+                    </button>
+                  )}
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '12px' }}>
+                    🔥 Direct Founder's Beta Discount. Limited to first 100 students.
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                  onClick={handleUpgrade}
-                  disabled={loading}
-                >
-                  {loading ? <FiLoader className="spin" /> : <>Activate Aspirant Pro <FiAward /></>}
-                </button>
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '12px' }}>
-                  Instant upgrade. Cancel subscription anytime.
+              ) : tiers.enabled === false ? (
+                <div>
+                  <button 
+                    type="button" 
+                    className="btn btn-outline" 
+                    style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: 0.9, cursor: 'not-allowed', borderColor: '#38bdf8', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.08)' }}
+                    disabled={true}
+                  >
+                    Coming Soon 🚀
+                  </button>
+                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '10px', lineHeight: 1.45 }}>
+                    Payment gateway integration in progress. All GATE practice features are currently 100% FREE for all users!
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div>
+                  <button 
+                    type="button" 
+                    className="btn btn-primary" 
+                    style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    onClick={handleUpgrade}
+                    disabled={loading}
+                  >
+                    {loading ? <FiLoader className="spin" /> : <>Activate Aspirant Pro <FiAward /></>}
+                  </button>
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '12px' }}>
+                    Instant upgrade. Cancel subscription anytime.
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Feature matrix table */}
-      <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', marginBottom: '20px', textAlign: 'center' }}>Plan Feature Matrix</h3>
-      <div style={{
-        overflowX: 'auto',
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '16px',
-        boxShadow: 'var(--shadow-sm)'
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>Features</th>
-              <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>Free Tier</th>
-              <th style={{ padding: '16px 20px', color: 'var(--color-primary)', fontWeight: 700 }}>Aspirant Pro (₹99)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-              <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Previous Year Questions Explorer</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-              <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Full-Syllabus Mock Exams</td>
-              <td style={{ padding: '16px 20px', color: 'var(--text-muted)' }}>Max 5 Attempts</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-              <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Subject-Wise Practice Generator</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-error)' }}><FiX /> Locked</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-              <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Interactive AI Doubt Solver (Tutor)</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-error)' }}><FiX /> Locked</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Printable Revision Compilation exports</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-error)' }}><FiX /> Locked</td>
-              <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
-            </tr>
-          </tbody>
-        </table>
+        {/* Feature matrix table */}
+        <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', marginBottom: '20px', textAlign: 'center' }}>Plan Feature Matrix</h3>
+        <div style={{
+          overflowX: 'auto',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>Features</th>
+                <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>Free Tier</th>
+                <th style={{ padding: '16px 20px', color: 'var(--color-primary)', fontWeight: 700 }}>
+                  {isBetaMode ? `VIP Beta (₹${selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price})` : 'Aspirant Pro'}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Previous Year Questions Explorer</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Full-Syllabus Mock Exams</td>
+                <td style={{ padding: '16px 20px', color: 'var(--text-muted)' }}>Max 5 Attempts</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Subject-Wise Practice Generator</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-error)' }}><FiX /> Locked</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Interactive AI Doubt Solver (Tutor)</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-error)' }}><FiX /> Locked</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '16px 20px', color: '#fff', fontWeight: 600 }}>Printable Revision Compilation exports</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-error)' }}><FiX /> Locked</td>
+                <td style={{ padding: '16px 20px', color: 'var(--color-success)' }}><FiCheck /> Unlimited</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 📲 Interactive VIP Beta UPI Payment Modal */}
+        {showUpiModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
+          }}>
+            <div style={{
+              backgroundColor: 'var(--bg-card)', border: '1px solid rgba(139, 92, 246, 0.4)',
+              borderRadius: '24px', maxWidth: '460px', width: '100%', padding: '28px',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(139, 92, 246, 0.2)',
+              position: 'relative'
+            }}>
+              {/* Close Button */}
+              <button 
+                onClick={() => setShowUpiModal(false)}
+                style={{
+                  position: 'absolute', top: '18px', right: '18px', background: 'none',
+                  border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem'
+                }}
+              >
+                <FiX />
+              </button>
+
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <span style={{
+                  background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+                  color: '#fff', fontSize: '0.75rem', fontWeight: 800, padding: '4px 14px',
+                  borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.06em'
+                }}>
+                  ⚡ Founder's VIP Beta Access
+                </span>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#fff', marginTop: '10px', marginBottom: '4px' }}>
+                  Scan & Pay via UPI App
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Amount to Pay: <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>₹{selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price}</strong> ({selectedDuration === 6 ? '6-Month Pass' : '1-Month Pass'})
+                </p>
+              </div>
+
+              {/* QR Code Container */}
+              <div style={{
+                backgroundColor: '#fff', padding: '16px', borderRadius: '16px', textOverflow: 'ellipsis',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                maxWidth: '220px', margin: '0 auto 20px auto', boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+              }}>
+                <img 
+                  src={betaDetails.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${betaDetails.upiId}&pn=AIRGATE&am=${selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price}&cu=INR`)}`}
+                  alt="AIRGATE UPI Payment QR Code"
+                  style={{ width: '180px', height: '180px', borderRadius: '8px' }}
+                />
+                <span style={{ fontSize: '0.7rem', color: '#666', fontWeight: 700, marginTop: '8px' }}>
+                  GPay • PhonePe • Paytm • BHIM
+                </span>
+              </div>
+
+              {/* UPI ID Copy Box */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)',
+                borderRadius: '12px', padding: '10px 14px', marginBottom: '20px'
+              }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Official UPI ID
+                  </span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace' }}>
+                    {betaDetails.upiId}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyUpi}
+                  style={{
+                    backgroundColor: copiedUpi ? '#10b981' : 'rgba(139, 92, 246, 0.2)',
+                    border: `1px solid ${copiedUpi ? '#10b981' : 'var(--color-primary)'}`,
+                    color: copiedUpi ? '#fff' : 'var(--color-primary)',
+                    padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700,
+                    cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                >
+                  {copiedUpi ? '✓ Copied' : 'Copy ID'}
+                </button>
+              </div>
+
+              {/* Payment Proof Submission Form */}
+              <form onSubmit={handleUpiSubmit}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '6px' }}>
+                    Enter 12-Digit UTR / Ref No. <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 421890123456"
+                    value={utrInput}
+                    onChange={e => setUtrInput(e.target.value)}
+                    style={{
+                      width: '100%', padding: '12px 14px', borderRadius: '10px',
+                      border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)',
+                      color: '#fff', fontSize: '0.9rem', fontFamily: 'monospace', fontWeight: 700
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '6px' }}>
+                    Payment Screenshot URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Paste image link if available"
+                    value={screenshotUrlInput}
+                    onChange={e => setScreenshotUrlInput(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: '10px',
+                      border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)',
+                      color: '#fff', fontSize: '0.85rem'
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submittingUpi || !utrInput.trim()}
+                  className="btn btn-primary"
+                  style={{
+                    width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  }}
+                >
+                  {submittingUpi ? <FiLoader className="spin" /> : 'Submit Proof for Instant Activation'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
+    );
+  }

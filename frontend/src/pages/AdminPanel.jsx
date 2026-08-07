@@ -418,6 +418,97 @@ export default function AdminPanel() {
     }
   };
 
+  // VIP Beta Payment Approvals & Settings State
+  const [betaSettings, setBetaSettings] = useState({
+    betaPaymentEnabled: true,
+    betaUpiId: 'airgate@upi',
+    betaQrImageUrl: '',
+    betaSpotsRemaining: 100,
+    betaTier1Price: 49,
+    betaTier2Price: 249
+  });
+  const [betaVerifications, setBetaVerifications] = useState([]);
+  const [betaVerificationsLoading, setBetaVerificationsLoading] = useState(false);
+  const [betaSettingsLoading, setBetaSettingsLoading] = useState(false);
+  const [betaMsg, setBetaMsg] = useState('');
+
+  const fetchBetaVerifications = async () => {
+    try {
+      setBetaVerificationsLoading(true);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/admin/verifications`, {
+        headers: AuthService.getAuthHeader()
+      });
+      if (res.data && res.data.content) {
+        setBetaVerifications(res.data.content);
+      }
+    } catch (err) {
+      console.error("Failed to load payment verifications:", err);
+    } finally {
+      setBetaVerificationsLoading(false);
+    }
+  };
+
+  const fetchBetaSettings = async () => {
+    try {
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/pricing`);
+      if (res.data) {
+        setBetaSettings({
+          betaPaymentEnabled: res.data.isBetaMode !== undefined ? res.data.isBetaMode : true,
+          betaUpiId: res.data.betaUpiId || 'airgate@upi',
+          betaQrImageUrl: res.data.betaQrImageUrl || '',
+          betaSpotsRemaining: res.data.betaSpotsRemaining !== undefined ? res.data.betaSpotsRemaining : 100,
+          betaTier1Price: res.data.betaTier1Price || 49,
+          betaTier2Price: res.data.betaTier2Price || 249
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load beta payment settings:", err);
+    }
+  };
+
+  const handleApproveUpi = async (id) => {
+    try {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/admin/verifications/${id}/approve`, {}, {
+        headers: AuthService.getAuthHeader()
+      });
+      alert(res.data.message || "Payment approved!");
+      fetchBetaVerifications();
+    } catch (err) {
+      alert("Failed to approve payment: " + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleRejectUpi = async (id) => {
+    const notes = prompt("Enter reason for rejection (optional):", "Invalid UTR / Transaction Proof");
+    if (notes === null) return;
+    try {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/admin/verifications/${id}/reject`, { notes }, {
+        headers: AuthService.getAuthHeader()
+      });
+      alert(res.data.message || "Payment rejected.");
+      fetchBetaVerifications();
+    } catch (err) {
+      alert("Failed to reject payment.");
+    }
+  };
+
+  const handleSaveBetaSettings = async (e) => {
+    e.preventDefault();
+    try {
+      setBetaSettingsLoading(true);
+      setBetaMsg('');
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/admin/settings/beta`, betaSettings, {
+        headers: AuthService.getAuthHeader()
+      });
+      setBetaMsg('✅ VIP Beta Settings updated successfully!');
+      fetchBetaSettings();
+    } catch (err) {
+      alert("Failed to update VIP Beta settings.");
+    } finally {
+      setBetaSettingsLoading(false);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       setStatsLoading(true);
@@ -600,11 +691,14 @@ export default function AdminPanel() {
     setTimeout(fetchBgStats, 200);
     setTimeout(fetchGroqUsage, 240);
     setTimeout(fetchAdminMetrics, 280);
+    setTimeout(fetchBetaVerifications, 320);
+    setTimeout(fetchBetaSettings, 360);
 
     // Poll background stats every 30 seconds for real-time progress tracking
     const interval = setInterval(() => {
       fetchBgStats();
       fetchGroqUsage();
+      fetchBetaVerifications();
     }, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -615,6 +709,7 @@ export default function AdminPanel() {
       setActiveTab(tab);
       if (tab === 'aigen') fetchAiGenStatus();
       if (tab === 'email') fetchEmailLogs();
+      if (tab === 'beta-payments') fetchBetaVerifications();
     }
   }, [location.search]);
 
@@ -786,6 +881,7 @@ export default function AdminPanel() {
           overflowX: 'auto', scrollbarWidth: 'none',
         }}>
           {[
+            { key: 'beta-payments', icon: <FiSend size={14}/>, label: 'VIP Beta Payments', accent: '#ec4899', count: betaVerifications.filter(v => v.status === 'PENDING').length, onClick: fetchBetaVerifications },
             { key: 'metrics',  icon: <FiActivity size={14}/>,      label: 'Metrics',       accent: '#10b981' },
             { key: 'tips',     icon: <FiBookOpen size={14}/>,      label: 'Loader Tips',   accent: '#f59e0b', onClick: fetchTipsAdmin },
             { key: 'coupons',  icon: <FiGift size={14}/>,          label: 'Coupons',       accent: '#ec4899', onClick: fetchCoupons },
@@ -856,6 +952,219 @@ export default function AdminPanel() {
 
 
 
+
+      {/* 🚀 VIP BETA PAYMENTS APPROVAL & CONFIGURATION TAB */}
+      {activeTab === 'beta-payments' && (
+        <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+          
+          {/* Header Banner */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid rgba(236,72,153,0.3)', borderRadius: '16px', padding: '24px 28px', marginBottom: '28px', boxShadow: '0 10px 30px rgba(236,72,153,0.1)' }}>
+            <h2 style={{ fontSize: '1.4rem', color: '#fff', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
+              <FiSend style={{ color: '#ec4899' }} /> Founder's VIP Beta UPI Payment Engine
+            </h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5 }}>
+              Control manual UPI payments, set direct QR Code offers, and approve/reject pending student subscription submissions with 1-click.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '28px', marginBottom: '32px' }}>
+            
+            {/* Left: VIP Beta Payment Settings Card */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+              <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚙️ VIP Beta Payment Settings
+              </h3>
+
+              {betaMsg && (
+                <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                  {betaMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveBetaSettings}>
+                {/* Toggle Mode */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, color: '#fff' }}>Enable VIP Beta UPI Mode</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Shows QR Code modal on /premium</span>
+                  </div>
+                  <input 
+                    type="checkbox"
+                    checked={betaSettings.betaPaymentEnabled}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaPaymentEnabled: e.target.checked })}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    Official UPI ID
+                  </label>
+                  <input 
+                    type="text" 
+                    value={betaSettings.betaUpiId}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaUpiId: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem', fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    Custom QR Code Image URL (Optional)
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Paste Cloudinary / image URL"
+                    value={betaSettings.betaQrImageUrl}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaQrImageUrl: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                      Monthly Beta Price (₹)
+                    </label>
+                    <input 
+                      type="number" 
+                      value={betaSettings.betaTier1Price}
+                      onChange={e => setBetaSettings({ ...betaSettings, betaTier1Price: parseFloat(e.target.value) || 0 })}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                      6-Month Season Price (₹)
+                    </label>
+                    <input 
+                      type="number" 
+                      value={betaSettings.betaTier2Price}
+                      onChange={e => setBetaSettings({ ...betaSettings, betaTier2Price: parseFloat(e.target.value) || 0 })}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    VIP Beta Spots Remaining Counter
+                  </label>
+                  <input 
+                    type="number" 
+                    value={betaSettings.betaSpotsRemaining}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaSpotsRemaining: parseInt(e.target.value, 10) || 0 })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem' }}
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={betaSettingsLoading}
+                  style={{ width: '100%', padding: '12px', fontWeight: 800 }}
+                >
+                  {betaSettingsLoading ? 'Saving...' : '💾 Save VIP Beta Settings'}
+                </button>
+              </form>
+            </div>
+
+            {/* Right: Payment Verification Queue Table */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📩 Verification Queue ({betaVerifications.length})
+                </h3>
+                <button 
+                  className="btn btn-outline"
+                  onClick={fetchBetaVerifications}
+                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+
+              {betaVerificationsLoading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading verifications...</div>
+              ) : betaVerifications.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                  No payment verification requests submitted yet.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                        <th style={{ padding: '10px' }}>User</th>
+                        <th style={{ padding: '10px' }}>Amount</th>
+                        <th style={{ padding: '10px' }}>UTR / Ref No.</th>
+                        <th style={{ padding: '10px' }}>Proof</th>
+                        <th style={{ padding: '10px' }}>Status</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {betaVerifications.map(v => (
+                        <tr key={v.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td style={{ padding: '10px', color: '#fff', fontWeight: 600 }}>
+                            {v.username}
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>{v.email}</div>
+                          </td>
+                          <td style={{ padding: '10px', color: '#10b981', fontWeight: 700 }}>
+                            ₹{v.amount}
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 400 }}>{v.durationMonths === 6 ? '6-Month Pass' : '1-Month Pass'}</div>
+                          </td>
+                          <td style={{ padding: '10px', fontFamily: 'monospace', fontWeight: 700, color: '#c4b5fd' }}>
+                            {v.utrNumber}
+                          </td>
+                          <td style={{ padding: '10px' }}>
+                            {v.screenshotUrl ? (
+                              <a href={v.screenshotUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline', fontSize: '0.75rem' }}>View Proof ↗</a>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>None</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{
+                              padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 800,
+                              backgroundColor: v.status === 'APPROVED' ? 'rgba(16,185,129,0.15)' : v.status === 'REJECTED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                              color: v.status === 'APPROVED' ? '#10b981' : v.status === 'REJECTED' ? '#ef4444' : '#f59e0b'
+                            }}>
+                              {v.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px', textAlign: 'right' }}>
+                            {v.status === 'PENDING' ? (
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => handleApproveUpi(v.id)}
+                                  style={{ backgroundColor: 'rgba(16,185,129,0.2)', border: '1px solid #10b981', color: '#10b981', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  ✅ Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRejectUpi(v.id)}
+                                  style={{ backgroundColor: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  ❌ Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Done</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* ENTERPRISE COUPONS MANAGEMENT TAB */}
       {activeTab === 'coupons' && (

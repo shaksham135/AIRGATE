@@ -20,8 +20,10 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -37,49 +39,79 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository;
+    private final com.pyq.platform.repository.PaymentVerificationRepository paymentVerificationRepository;
     private final com.pyq.platform.service.EmailService emailService;
     private final com.pyq.platform.service.CouponService couponService;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public PaymentController(PaymentRepository paymentRepository, 
-                             UserRepository userRepository,
-                             com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository,
-                             com.pyq.platform.service.EmailService emailService,
-                             com.pyq.platform.service.CouponService couponService) {
+    public PaymentController(PaymentRepository paymentRepository,
+            UserRepository userRepository,
+            com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository,
+            com.pyq.platform.repository.PaymentVerificationRepository paymentVerificationRepository,
+            com.pyq.platform.service.EmailService emailService,
+            com.pyq.platform.service.CouponService couponService) {
         this.paymentRepository = paymentRepository;
         this.userRepository = userRepository;
         this.systemSettingsRepository = systemSettingsRepository;
+        this.paymentVerificationRepository = paymentVerificationRepository;
         this.emailService = emailService;
         this.couponService = couponService;
     }
 
     private boolean isRazorpayConfigured() {
-        return keyId != null && !keyId.isBlank() && !keyId.equalsIgnoreCase("placeholder") && !keyId.startsWith("YOUR_");
+        return keyId != null && !keyId.isBlank() && !keyId.equalsIgnoreCase("placeholder")
+                && !keyId.startsWith("YOUR_");
     }
 
     @GetMapping("/pricing")
-    @org.springframework.cache.annotation.Cacheable(value = "publicMeta", key = "'pricingTiersV2'")
     public ResponseEntity<?> getPricingTiers() {
-        boolean enabled = isRazorpayConfigured();
-        try {
-            com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
-            if (settings != null) {
-                return ResponseEntity.ok(Map.of(
-                        "enabled", enabled,
-                        "tier1", Map.of("price", settings.getTier1PriceInr(), "duration", settings.getTier1DurationMonths(), "offer", settings.getTier1SpecialOffer() != null ? settings.getTier1SpecialOffer() : ""),
-                        "tier2", Map.of("price", settings.getTier2PriceInr(), "duration", settings.getTier2DurationMonths(), "offer", settings.getTier2SpecialOffer() != null ? settings.getTier2SpecialOffer() : ""),
-                        "tier3", Map.of("price", settings.getTier3PriceInr(), "duration", settings.getTier3DurationMonths(), "offer", settings.getTier3SpecialOffer() != null ? settings.getTier3SpecialOffer() : "")
-                ));
-            }
-        } catch (Exception e) {
-            log.error("Failed to fetch settings pricing: {}", e.getMessage());
+        boolean rzpConfigured = isRazorpayConfigured();
+        com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+
+        boolean isBetaMode = true; // Default to Beta mode unless explicitly disabled and Razorpay is configured
+        if (settings != null) {
+            isBetaMode = Boolean.TRUE.equals(settings.getBetaPaymentEnabled()) || !rzpConfigured;
         }
-        return ResponseEntity.ok(Map.of(
-                "enabled", enabled,
-                "tier1", Map.of("price", BigDecimal.valueOf(99.00), "duration", 1, "offer", "Best for quick revisions"),
-                "tier2", Map.of("price", BigDecimal.valueOf(249.00), "duration", 3, "offer", "Save 15% - Most Popular"),
-                "tier3", Map.of("price", BigDecimal.valueOf(449.00), "duration", 6, "offer", "Save 25% - Complete Prep")
-        ));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("isBetaMode", isBetaMode);
+        response.put("isRazorpayConfigured", rzpConfigured);
+        response.put("enabled", rzpConfigured || isBetaMode);
+
+        if (settings != null) {
+            response.put("betaUpiId", settings.getBetaUpiId() != null ? settings.getBetaUpiId() : "airgate@upi");
+            response.put("betaQrImageUrl", settings.getBetaQrImageUrl() != null ? settings.getBetaQrImageUrl() : "");
+            response.put("betaSpotsRemaining",
+                    settings.getBetaSpotsRemaining() != null ? settings.getBetaSpotsRemaining() : 100);
+            response.put("betaTier1Price",
+                    settings.getBetaTier1Price() != null ? settings.getBetaTier1Price() : new BigDecimal("49.00"));
+            response.put("betaTier2Price",
+                    settings.getBetaTier2Price() != null ? settings.getBetaTier2Price() : new BigDecimal("249.00"));
+
+            response.put("tier1",
+                    Map.of("price", settings.getTier1PriceInr(), "duration", settings.getTier1DurationMonths(), "offer",
+                            settings.getTier1SpecialOffer() != null ? settings.getTier1SpecialOffer() : ""));
+            response.put("tier2",
+                    Map.of("price", settings.getTier2PriceInr(), "duration", settings.getTier2DurationMonths(), "offer",
+                            settings.getTier2SpecialOffer() != null ? settings.getTier2SpecialOffer() : ""));
+            response.put("tier3",
+                    Map.of("price", settings.getTier3PriceInr(), "duration", settings.getTier3DurationMonths(), "offer",
+                            settings.getTier3SpecialOffer() != null ? settings.getTier3SpecialOffer() : ""));
+        } else {
+            response.put("betaUpiId", "airgate@upi");
+            response.put("betaQrImageUrl", "");
+            response.put("betaSpotsRemaining", 100);
+            response.put("betaTier1Price", new BigDecimal("49.00"));
+            response.put("betaTier2Price", new BigDecimal("249.00"));
+            response.put("tier1",
+                    Map.of("price", BigDecimal.valueOf(99.00), "duration", 1, "offer", "Best for quick revisions"));
+            response.put("tier2",
+                    Map.of("price", BigDecimal.valueOf(249.00), "duration", 3, "offer", "Save 15% - Most Popular"));
+            response.put("tier3",
+                    Map.of("price", BigDecimal.valueOf(449.00), "duration", 6, "offer", "Save 25% - Complete Prep"));
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/create-order")
@@ -101,26 +133,34 @@ public class PaymentController {
                 Integer t3Dur = settings.getTier3DurationMonths();
 
                 if (durationMonths == 1 || (t1Dur != null && durationMonths == t1Dur)) {
-                    amountInRupees = settings.getTier1PriceInr() != null ? settings.getTier1PriceInr() : BigDecimal.valueOf(99.00);
+                    amountInRupees = settings.getTier1PriceInr() != null ? settings.getTier1PriceInr()
+                            : BigDecimal.valueOf(99.00);
                 } else if (durationMonths == 3 || (t2Dur != null && durationMonths == t2Dur)) {
-                    amountInRupees = settings.getTier2PriceInr() != null ? settings.getTier2PriceInr() : BigDecimal.valueOf(249.00);
+                    amountInRupees = settings.getTier2PriceInr() != null ? settings.getTier2PriceInr()
+                            : BigDecimal.valueOf(249.00);
                 } else if (durationMonths == 6 || (t3Dur != null && durationMonths == t3Dur)) {
-                    amountInRupees = settings.getTier3PriceInr() != null ? settings.getTier3PriceInr() : BigDecimal.valueOf(449.00);
+                    amountInRupees = settings.getTier3PriceInr() != null ? settings.getTier3PriceInr()
+                            : BigDecimal.valueOf(449.00);
                 } else {
                     // Fallback proportional calculation using BigDecimal division
-                    BigDecimal t1Price = settings.getTier1PriceInr() != null ? settings.getTier1PriceInr() : BigDecimal.valueOf(99.00);
+                    BigDecimal t1Price = settings.getTier1PriceInr() != null ? settings.getTier1PriceInr()
+                            : BigDecimal.valueOf(99.00);
                     int baseDuration = (t1Dur != null && t1Dur > 0) ? t1Dur : 1;
                     amountInRupees = t1Price
                             .divide(BigDecimal.valueOf(baseDuration), 2, RoundingMode.HALF_UP)
                             .multiply(BigDecimal.valueOf(durationMonths));
                 }
             } else {
-                if (durationMonths == 3) amountInRupees = BigDecimal.valueOf(249.00);
-                else if (durationMonths == 6) amountInRupees = BigDecimal.valueOf(449.00);
+                if (durationMonths == 3)
+                    amountInRupees = BigDecimal.valueOf(249.00);
+                else if (durationMonths == 6)
+                    amountInRupees = BigDecimal.valueOf(449.00);
             }
         } catch (Exception e) {
-            if (durationMonths == 3) amountInRupees = BigDecimal.valueOf(249.00);
-            else if (durationMonths == 6) amountInRupees = BigDecimal.valueOf(449.00);
+            if (durationMonths == 3)
+                amountInRupees = BigDecimal.valueOf(249.00);
+            else if (durationMonths == 6)
+                amountInRupees = BigDecimal.valueOf(449.00);
         }
 
         // Apply Coupon Discount if couponCode provided
@@ -143,7 +183,7 @@ public class PaymentController {
         // Sandbox check: if Razorpay keys are not configured, return a mock order
         if (keyId == null || keyId.isBlank() || keyId.equals("placeholder")) {
             String mockOrderId = "mock_order_" + System.currentTimeMillis();
-            
+
             Payment payment = Payment.builder()
                     .user(user)
                     .orderId(mockOrderId)
@@ -159,8 +199,7 @@ public class PaymentController {
                     "amount", amountInPaise,
                     "currency", "INR",
                     "keyId", "sandbox_key",
-                    "isMock", true
-            ));
+                    "isMock", true));
         }
 
         try {
@@ -168,7 +207,7 @@ public class PaymentController {
             String url = "https://api.razorpay.com/v1/orders";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             String auth = keyId + ":" + keySecret;
             String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
             headers.set("Authorization", "Basic " + encodedAuth);
@@ -199,8 +238,7 @@ public class PaymentController {
                         "amount", amountInPaise,
                         "currency", "INR",
                         "keyId", keyId,
-                        "isMock", false
-                ));
+                        "isMock", false));
             } else {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(Map.of("error", "Failed to create order with Razorpay gateway"));
@@ -211,7 +249,6 @@ public class PaymentController {
                     .body(Map.of("error", "Error contacting payment gateway: " + e.getMessage()));
         }
     }
-
 
     @PostMapping("/verify")
     @PreAuthorize("isAuthenticated()")
@@ -234,7 +271,8 @@ public class PaymentController {
         // ── Idempotency guard ─────────────────────────────────────────────────
         // Protects against double-submit / network retries calling verifyPayment twice.
         if ("SUCCESS".equals(payment.getStatus())) {
-            log.info("Payment {} already verified for user {}. Returning idempotent response.", orderId, userDetails.getId());
+            log.info("Payment {} already verified for user {}. Returning idempotent response.", orderId,
+                    userDetails.getId());
             return ResponseEntity.ok(Map.of("success", true, "message", "Payment already verified successfully."));
         }
         // ─────────────────────────────────────────────────────────────────────
@@ -273,7 +311,8 @@ public class PaymentController {
             } else {
                 payment.setStatus("FAILED");
                 paymentRepository.save(payment);
-                return ResponseEntity.badRequest().body(Map.of("error", "Invalid payment signature verification failed"));
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Invalid payment signature verification failed"));
             }
         } catch (Exception e) {
             log.error("Payment verification error: {}", e.getMessage());
@@ -302,6 +341,201 @@ public class PaymentController {
         }
     }
 
+    @PostMapping("/submit-upi")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> submitUpiPayment(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        User user = userRepository.findById(userDetails.getId()).orElseThrow();
+        String planType = (String) body.getOrDefault("planType", "MONTHLY_49");
+        int durationMonths = body.containsKey("durationMonths")
+                ? Integer.parseInt(body.get("durationMonths").toString())
+                : 1;
+        BigDecimal amount = new BigDecimal(body.getOrDefault("amount", "49.00").toString());
+        String utrNumber = (String) body.get("utrNumber");
+        String screenshotUrl = (String) body.get("screenshotUrl");
+
+        if (utrNumber == null || utrNumber.trim().isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "12-digit UTR/Transaction reference number is required."));
+        }
+
+        String cleanUtr = utrNumber.trim().replaceAll("\\s+", "");
+        if (cleanUtr.length() < 6) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid UTR number length. Please enter a valid 12-digit transaction ID."));
+        }
+
+        if (paymentVerificationRepository.existsByUtrNumber(cleanUtr)) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "This UTR number has already been submitted for verification."));
+        }
+
+        com.pyq.platform.entity.PaymentVerification pv = com.pyq.platform.entity.PaymentVerification.builder()
+                .user(user)
+                .planType(planType)
+                .durationMonths(durationMonths)
+                .amount(amount)
+                .utrNumber(cleanUtr)
+                .screenshotUrl(screenshotUrl != null ? screenshotUrl.trim() : "")
+                .status(com.pyq.platform.entity.PaymentVerification.Status.PENDING)
+                .build();
+
+        paymentVerificationRepository.save(pv);
+        log.info("📩 User {} submitted VIP Beta UPI verification with UTR {}", user.getUsername(), cleanUtr);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Payment proof submitted successfully! Verification usually takes 5-15 minutes.",
+                "id", pv.getId(),
+                "status", pv.getStatus().name()));
+    }
+
+    @GetMapping("/my-verification")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyVerification(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        Optional<com.pyq.platform.entity.PaymentVerification> pvOpt = paymentVerificationRepository
+                .findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                        userDetails.getId(), com.pyq.platform.entity.PaymentVerification.Status.PENDING);
+        if (pvOpt.isEmpty()) {
+            List<com.pyq.platform.entity.PaymentVerification> list = paymentVerificationRepository
+                    .findByUserIdOrderByCreatedAtDesc(userDetails.getId());
+            pvOpt = list.stream().findFirst();
+        }
+        if (pvOpt.isEmpty()) {
+            return ResponseEntity.ok(Map.of("hasSubmitted", false));
+        }
+        com.pyq.platform.entity.PaymentVerification pv = pvOpt.get();
+        return ResponseEntity.ok(Map.of(
+                "hasSubmitted", true,
+                "id", pv.getId(),
+                "planType", pv.getPlanType(),
+                "amount", pv.getAmount(),
+                "utrNumber", pv.getUtrNumber(),
+                "status", pv.getStatus().name(),
+                "adminNotes", pv.getAdminNotes() != null ? pv.getAdminNotes() : "",
+                "createdAt", pv.getCreatedAt()));
+    }
+
+    @GetMapping("/admin/verifications")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAdminVerifications(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        org.springframework.data.domain.Page<com.pyq.platform.entity.PaymentVerification> pvPage = paymentVerificationRepository
+                .findAllOrderedByPendingFirst(pageable);
+
+        List<Map<String, Object>> content = pvPage.getContent().stream().map(pv -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", pv.getId());
+            m.put("userId", pv.getUser() != null ? pv.getUser().getId() : null);
+            m.put("username", pv.getUser() != null ? pv.getUser().getUsername() : "Unknown");
+            m.put("email", pv.getUser() != null ? pv.getUser().getEmail() : "");
+            m.put("planType", pv.getPlanType());
+            m.put("durationMonths", pv.getDurationMonths());
+            m.put("amount", pv.getAmount());
+            m.put("utrNumber", pv.getUtrNumber());
+            m.put("screenshotUrl", pv.getScreenshotUrl() != null ? pv.getScreenshotUrl() : "");
+            m.put("status", pv.getStatus().name());
+            m.put("adminNotes", pv.getAdminNotes() != null ? pv.getAdminNotes() : "");
+            m.put("createdAt", pv.getCreatedAt());
+            return m;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+                "content", content,
+                "totalPages", pvPage.getTotalPages(),
+                "totalElements", pvPage.getTotalElements(),
+                "currentPage", page));
+    }
+
+    @PostMapping("/admin/verifications/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> approveVerification(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+
+        com.pyq.platform.entity.PaymentVerification pv = paymentVerificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Verification request not found with ID: " + id));
+
+        pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.APPROVED);
+        if (body != null && body.containsKey("notes")) {
+            pv.setAdminNotes(body.get("notes").toString());
+        }
+        paymentVerificationRepository.save(pv);
+
+        User user = pv.getUser();
+        if (user != null) {
+            upgradeUserPremium(user, null);
+        }
+
+        // Decrement VIP spots remaining in settings if > 0
+        com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+        if (settings != null && settings.getBetaSpotsRemaining() != null && settings.getBetaSpotsRemaining() > 0) {
+            settings.setBetaSpotsRemaining(settings.getBetaSpotsRemaining() - 1);
+            systemSettingsRepository.save(settings);
+        }
+
+        log.info("✅ Admin approved VIP Beta payment ID {} for user {}", id, user != null ? user.getUsername() : "null");
+
+        return ResponseEntity
+                .ok(Map.of("message", "VIP Beta payment approved and Premium access activated successfully!"));
+    }
+
+    @PostMapping("/admin/verifications/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> rejectVerification(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+
+        com.pyq.platform.entity.PaymentVerification pv = paymentVerificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Verification request not found with ID: " + id));
+
+        pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.REJECTED);
+        if (body != null && body.containsKey("notes")) {
+            pv.setAdminNotes(body.get("notes").toString());
+        } else {
+            pv.setAdminNotes("Transaction UTR or payment proof could not be verified.");
+        }
+        paymentVerificationRepository.save(pv);
+
+        log.info("❌ Admin rejected VIP Beta payment ID {}", id);
+
+        return ResponseEntity.ok(Map.of("message", "Payment verification request rejected."));
+    }
+
+    @PostMapping("/admin/settings/beta")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateBetaSettings(@RequestBody Map<String, Object> body) {
+        com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1)
+                .orElseGet(() -> com.pyq.platform.entity.SystemSettings.builder().id(1).build());
+
+        if (body.containsKey("betaPaymentEnabled")) {
+            settings.setBetaPaymentEnabled(Boolean.parseBoolean(body.get("betaPaymentEnabled").toString()));
+        }
+        if (body.containsKey("betaUpiId")) {
+            settings.setBetaUpiId(body.get("betaUpiId").toString().trim());
+        }
+        if (body.containsKey("betaQrImageUrl")) {
+            settings.setBetaQrImageUrl(body.get("betaQrImageUrl").toString().trim());
+        }
+        if (body.containsKey("betaSpotsRemaining")) {
+            settings.setBetaSpotsRemaining(Integer.parseInt(body.get("betaSpotsRemaining").toString()));
+        }
+        if (body.containsKey("betaTier1Price")) {
+            settings.setBetaTier1Price(new BigDecimal(body.get("betaTier1Price").toString()));
+        }
+        if (body.containsKey("betaTier2Price")) {
+            settings.setBetaTier2Price(new BigDecimal(body.get("betaTier2Price").toString()));
+        }
+
+        systemSettingsRepository.save(settings);
+        log.info("⚙️ Admin updated VIP Beta Payment Settings in DB.");
+
+        return ResponseEntity.ok(Map.of("message", "VIP Beta Payment settings updated successfully!"));
+    }
+
     private String calculateHmacSha256(String data, String secret) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
@@ -310,7 +544,8 @@ public class PaymentController {
         StringBuilder hexString = new StringBuilder();
         for (byte b : rawHmac) {
             String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) hexString.append('0');
+            if (hex.length() == 1)
+                hexString.append('0');
             hexString.append(hex);
         }
         return hexString.toString();
