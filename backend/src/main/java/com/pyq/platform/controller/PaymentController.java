@@ -86,15 +86,19 @@ public class PaymentController {
             response.put("betaTier1Price",
                     settings.getBetaTier1Price() != null ? settings.getBetaTier1Price() : new BigDecimal("49.00"));
             response.put("betaTier2Price",
-                    settings.getBetaTier2Price() != null ? settings.getBetaTier2Price() : new BigDecimal("249.00"));
+                    settings.getBetaTier2Price() != null ? settings.getBetaTier2Price() : new BigDecimal("149.00"));
+            response.put("betaTier3Price",
+                    settings.getBetaTier3Price() != null ? settings.getBetaTier3Price() : new BigDecimal("249.00"));
             response.put("betaBannerHeading",
                     settings.getBetaBannerHeading() != null ? settings.getBetaBannerHeading() : "⚡ Limited Founder's VIP Beta Access");
             response.put("betaBannerSubheading",
-                    settings.getBetaBannerSubheading() != null ? settings.getBetaBannerSubheading() : "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!");
+                    settings.getBetaBannerSubheading() != null ? settings.getBetaBannerSubheading() : "Get Full Aspirant Pro Access starting at ₹49/month!");
             response.put("betaTier1Offer",
                     settings.getBetaTier1Offer() != null ? settings.getBetaTier1Offer() : "⚡ 1-Month Founder Pass — Save 75%!");
             response.put("betaTier2Offer",
-                    settings.getBetaTier2Offer() != null ? settings.getBetaTier2Offer() : "🔥 6-Month Season Pass — Save 75%!");
+                    settings.getBetaTier2Offer() != null ? settings.getBetaTier2Offer() : "🔥 3-Month Sprint Pass — Save 70%!");
+            response.put("betaTier3Offer",
+                    settings.getBetaTier3Offer() != null ? settings.getBetaTier3Offer() : "🔥 6-Month Season Pass — Save 75%!");
 
             response.put("tier1",
                     Map.of("price", settings.getTier1PriceInr(), "duration", settings.getTier1DurationMonths(), "offer",
@@ -110,11 +114,13 @@ public class PaymentController {
             response.put("betaQrImageUrl", "");
             response.put("betaSpotsRemaining", 100);
             response.put("betaTier1Price", new BigDecimal("49.00"));
-            response.put("betaTier2Price", new BigDecimal("249.00"));
+            response.put("betaTier2Price", new BigDecimal("149.00"));
+            response.put("betaTier3Price", new BigDecimal("249.00"));
             response.put("betaBannerHeading", "⚡ Limited Founder's VIP Beta Access");
-            response.put("betaBannerSubheading", "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!");
+            response.put("betaBannerSubheading", "Get Full Aspirant Pro Access starting at ₹49/month!");
             response.put("betaTier1Offer", "⚡ 1-Month Founder Pass — Save 75%!");
-            response.put("betaTier2Offer", "🔥 6-Month Season Pass — Save 75%!");
+            response.put("betaTier2Offer", "🔥 3-Month Sprint Pass — Save 70%!");
+            response.put("betaTier3Offer", "🔥 6-Month Season Pass — Save 75%!");
             response.put("tier1",
                     Map.of("price", BigDecimal.valueOf(99.00), "duration", 1, "offer", "Best for quick revisions"));
             response.put("tier2",
@@ -397,6 +403,13 @@ public class PaymentController {
         paymentVerificationRepository.save(pv);
         log.info("📩 User {} submitted VIP Beta UPI verification with UTR {}", user.getUsername(), cleanUtr);
 
+        // Send instant admin email alert
+        try {
+            emailService.sendAdminUpiPaymentNotification(pv, user);
+        } catch (Exception e) {
+            log.warn("Failed to dispatch admin notification email for UTR {}: {}", cleanUtr, e.getMessage());
+        }
+
         return ResponseEntity.ok(Map.of(
                 "message", "Payment proof submitted successfully! Verification usually takes 5-15 minutes.",
                 "id", pv.getId(),
@@ -435,8 +448,13 @@ public class PaymentController {
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size) {
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
-        org.springframework.data.domain.Page<com.pyq.platform.entity.PaymentVerification> pvPage = paymentVerificationRepository
-                .findAllOrderedByPendingFirst(pageable);
+        org.springframework.data.domain.Page<com.pyq.platform.entity.PaymentVerification> pvPage;
+        try {
+            pvPage = paymentVerificationRepository.findAllOrderedByPendingFirst(pageable);
+        } catch (Exception e) {
+            log.warn("findAllOrderedByPendingFirst failed, falling back to standard order: {}", e.getMessage());
+            pvPage = paymentVerificationRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
 
         List<Map<String, Object>> content = pvPage.getContent().stream().map(pv -> {
             Map<String, Object> m = new HashMap<>();
@@ -541,6 +559,9 @@ public class PaymentController {
         if (body.containsKey("betaTier2Price")) {
             settings.setBetaTier2Price(new BigDecimal(body.get("betaTier2Price").toString()));
         }
+        if (body.containsKey("betaTier3Price")) {
+            settings.setBetaTier3Price(new BigDecimal(body.get("betaTier3Price").toString()));
+        }
         if (body.containsKey("betaBannerHeading")) {
             settings.setBetaBannerHeading(body.get("betaBannerHeading").toString().trim());
         }
@@ -552,6 +573,9 @@ public class PaymentController {
         }
         if (body.containsKey("betaTier2Offer")) {
             settings.setBetaTier2Offer(body.get("betaTier2Offer").toString().trim());
+        }
+        if (body.containsKey("betaTier3Offer")) {
+            settings.setBetaTier3Offer(body.get("betaTier3Offer").toString().trim());
         }
 
         systemSettingsRepository.save(settings);

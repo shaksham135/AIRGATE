@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import { formatMathText, renderQuestionText, getAssetUrl } from '../utils/mathRenderer';
+import { getQuestionUrl } from '../utils/urlUtils';
 import API_CONFIG from '../config/api';
 import LoginGate from '../components/LoginGate';
 import PremiumGateModal from '../components/PremiumGateModal';
@@ -1055,7 +1056,7 @@ function BookmarksContent() {
         ) : (
           <div>
             {bookmarks.map(q => (
-              <div key={q.id} className="question-card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/questions/${q.id}`)}>
+              <div key={q.id} className="question-card" style={{ cursor: 'pointer' }} onClick={() => navigate(getQuestionUrl(q))}>
                 <div className="question-meta">
                   <span className="badge badge-info">GATE CSE {q.year}</span>
                   <span className="badge badge-dark">{q.questionType}</span>
@@ -1118,7 +1119,7 @@ function BookmarksContent() {
                     borderLeft: item.isCorrect ? '4px solid var(--color-success)' : '4px solid var(--color-error)',
                     cursor: 'pointer'
                   }}
-                  onClick={() => navigate(`/questions/${q.id}`)}
+                  onClick={() => navigate(getQuestionUrl(q))}
                 >
                   <div className="question-meta">
                     <span className="badge badge-info">GATE CSE {q.year}</span>

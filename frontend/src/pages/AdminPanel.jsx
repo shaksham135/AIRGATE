@@ -425,11 +425,13 @@ export default function AdminPanel() {
     betaQrImageUrl: '',
     betaSpotsRemaining: 100,
     betaTier1Price: 49,
-    betaTier2Price: 249,
+    betaTier2Price: 149,
+    betaTier3Price: 249,
     betaBannerHeading: "⚡ Limited Founder's VIP Beta Access",
-    betaBannerSubheading: "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!",
+    betaBannerSubheading: "Get Full Aspirant Pro Access starting at ₹49/month!",
     betaTier1Offer: "⚡ 1-Month Founder Pass — Save 75%!",
-    betaTier2Offer: "🔥 6-Month Season Pass — Save 75%!"
+    betaTier2Offer: "🔥 3-Month Sprint Pass — Save 70%!",
+    betaTier3Offer: "🔥 6-Month Season Pass — Save 75%!"
   });
   const [betaVerifications, setBetaVerifications] = useState([]);
   const [betaVerificationsLoading, setBetaVerificationsLoading] = useState(false);
@@ -462,11 +464,13 @@ export default function AdminPanel() {
           betaQrImageUrl: res.data.betaQrImageUrl || '',
           betaSpotsRemaining: res.data.betaSpotsRemaining !== undefined ? res.data.betaSpotsRemaining : 100,
           betaTier1Price: res.data.betaTier1Price || 49,
-          betaTier2Price: res.data.betaTier2Price || 249,
+          betaTier2Price: res.data.betaTier2Price || 149,
+          betaTier3Price: res.data.betaTier3Price || 249,
           betaBannerHeading: res.data.betaBannerHeading || "⚡ Limited Founder's VIP Beta Access",
-          betaBannerSubheading: res.data.betaBannerSubheading || "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!",
+          betaBannerSubheading: res.data.betaBannerSubheading || "Get Full Aspirant Pro Access starting at ₹49/month!",
           betaTier1Offer: res.data.betaTier1Offer || "⚡ 1-Month Founder Pass — Save 75%!",
-          betaTier2Offer: res.data.betaTier2Offer || "🔥 6-Month Season Pass — Save 75%!"
+          betaTier2Offer: res.data.betaTier2Offer || "🔥 3-Month Sprint Pass — Save 70%!",
+          betaTier3Offer: res.data.betaTier3Offer || "🔥 6-Month Season Pass — Save 75%!"
         });
       }
     } catch (err) {
@@ -1053,10 +1057,10 @@ export default function AdminPanel() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
-                      Monthly Beta Price (₹)
+                      1-Month Price (₹)
                     </label>
                     <input 
                       type="number" 
@@ -1068,12 +1072,24 @@ export default function AdminPanel() {
 
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
-                      6-Month Season Price (₹)
+                      3-Month Price (₹)
                     </label>
                     <input 
                       type="number" 
                       value={betaSettings.betaTier2Price}
                       onChange={e => setBetaSettings({ ...betaSettings, betaTier2Price: parseFloat(e.target.value) || 0 })}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                      6-Month Price (₹)
+                    </label>
+                    <input 
+                      type="number" 
+                      value={betaSettings.betaTier3Price}
+                      onChange={e => setBetaSettings({ ...betaSettings, betaTier3Price: parseFloat(e.target.value) || 0 })}
                       style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.9rem' }}
                     />
                   </div>
@@ -1093,12 +1109,24 @@ export default function AdminPanel() {
 
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
-                    6-Month Offer Text Badge
+                    3-Month Offer Text Badge
                   </label>
                   <input 
                     type="text" 
                     value={betaSettings.betaTier2Offer}
                     onChange={e => setBetaSettings({ ...betaSettings, betaTier2Offer: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
+                    6-Month Offer Text Badge
+                  </label>
+                  <input 
+                    type="text" 
+                    value={betaSettings.betaTier3Offer}
+                    onChange={e => setBetaSettings({ ...betaSettings, betaTier3Offer: e.target.value })}
                     style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: '#fff', fontSize: '0.85rem' }}
                   />
                 </div>

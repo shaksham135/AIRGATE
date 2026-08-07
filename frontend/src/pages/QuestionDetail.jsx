@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
@@ -179,6 +179,12 @@ export default function QuestionDetail() {
       const qData = qRes.data;
       setQuestion(qData);
       CacheService.set(`qd_${routeKey}`, qData, 300000); // 5 minutes TTL
+
+      // If accessed via legacy ID route (/question/1234), seamlessly update URL bar to clean SEO URL
+      if (id && (!branch && !subjectSlug)) {
+        const cleanPath = getQuestionUrl(qData);
+        window.history.replaceState(null, '', cleanPath);
+      }
 
       // Set Page Title & Meta Description & Canonical URL
       const titleStr = qData.year 

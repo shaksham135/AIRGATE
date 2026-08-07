@@ -675,7 +675,7 @@ export default function PracticeArena() {
 
                 {/* Question Stem (Clickable to view detailed page) */}
                 <div 
-                  onClick={() => navigate(`/questions/${q.id}`)}
+                  onClick={() => navigate(getQuestionUrl(q))}
                   style={{ fontSize: '1rem', lineHeight: '1.6', marginBottom: '20px', color: '#fff', cursor: 'pointer' }}
                   title="Click to view detailed question page with explanation"
                 >

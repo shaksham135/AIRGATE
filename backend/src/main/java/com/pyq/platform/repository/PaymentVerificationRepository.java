@@ -20,7 +20,10 @@ public interface PaymentVerificationRepository extends JpaRepository<PaymentVeri
 
     Page<PaymentVerification> findByStatusOrderByCreatedAtDesc(PaymentVerification.Status status, Pageable pageable);
 
-    @Query("SELECT pv FROM PaymentVerification pv ORDER BY CASE WHEN pv.status = 'PENDING' THEN 0 ELSE 1 END, pv.createdAt DESC")
+    Page<PaymentVerification> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Query(value = "SELECT pv FROM PaymentVerification pv ORDER BY CASE WHEN pv.status = com.pyq.platform.entity.PaymentVerification.Status.PENDING THEN 0 ELSE 1 END, pv.createdAt DESC",
+           countQuery = "SELECT COUNT(pv) FROM PaymentVerification pv")
     Page<PaymentVerification> findAllOrderedByPendingFirst(Pageable pageable);
 
     boolean existsByUtrNumber(String utrNumber);

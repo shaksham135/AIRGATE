@@ -364,11 +364,13 @@ public class DataInitializer implements CommandLineRunner {
         addMissingColumn("system_settings", "beta_qr_image_url", "TEXT");
         addMissingColumn("system_settings", "beta_spots_remaining", "INT DEFAULT 100");
         addMissingColumn("system_settings", "beta_tier1_price", "DECIMAL(10,2) DEFAULT 49.00");
-        addMissingColumn("system_settings", "beta_tier2_price", "DECIMAL(10,2) DEFAULT 249.00");
+        addMissingColumn("system_settings", "beta_tier2_price", "DECIMAL(10,2) DEFAULT 149.00");
+        addMissingColumn("system_settings", "beta_tier3_price", "DECIMAL(10,2) DEFAULT 249.00");
         addMissingColumn("system_settings", "beta_banner_heading", "VARCHAR(255)");
         addMissingColumn("system_settings", "beta_banner_subheading", "TEXT");
         addMissingColumn("system_settings", "beta_tier1_offer", "VARCHAR(255)");
         addMissingColumn("system_settings", "beta_tier2_offer", "VARCHAR(255)");
+        addMissingColumn("system_settings", "beta_tier3_offer", "VARCHAR(255)");
 
         // Create payment_verifications table if missing
         try {

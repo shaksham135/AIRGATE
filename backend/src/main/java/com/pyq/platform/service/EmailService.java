@@ -369,4 +369,59 @@ public class EmailService {
         String html = buildBrandedLayout(username, body);
         return sendHtmlEmail(toEmail, subject, html, "PASSWORD_RESET_OTP");
     }
+
+    /**
+     * Trigger E: Instant Admin Notification when a user submits VIP Beta UPI payment proof
+     */
+    @Async
+    public void sendAdminUpiPaymentNotification(com.pyq.platform.entity.PaymentVerification pv, User user) {
+        try {
+            String adminEmail = "support@airgate.in";
+            try {
+                com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+                if (settings != null && settings.getSupportEmail() != null && !settings.getSupportEmail().isBlank()) {
+                    adminEmail = settings.getSupportEmail().trim();
+                }
+            } catch (Exception e) {
+                log.warn("Could not fetch supportEmail from settings: {}", e.getMessage());
+            }
+
+            String subject = "⚡ NEW VIP Beta Payment Submitted - UTR #" + pv.getUtrNumber();
+            String body = """
+            <div style="background: linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(236,72,153,0.4); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+              <h2 style="color: #ffffff; margin: 0 0 8px 0; font-size: 20px; font-weight: 800;">⚡ New VIP Beta Payment Verification Request</h2>
+              <p style="color: #cbd5e1; font-size: 14px; margin: 0;">A user has submitted UPI payment proof for manual verification.</p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; color: #e2e8f0; font-size: 14px;">
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);"><td style="padding: 10px 0; color: #94a3b8;">User Name:</td><td style="font-weight: 700; color: #ffffff;">{USERNAME}</td></tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);"><td style="padding: 10px 0; color: #94a3b8;">User Email:</td><td style="font-weight: 700; color: #38bdf8;">{USER_EMAIL}</td></tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);"><td style="padding: 10px 0; color: #94a3b8;">Plan Type:</td><td style="font-weight: 700; color: #c4b5fd;">{PLAN_TYPE} ({DURATION} Months)</td></tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);"><td style="padding: 10px 0; color: #94a3b8;">Amount Paid:</td><td style="font-weight: 800; color: #10b981; font-size: 16px;">₹{AMOUNT}</td></tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);"><td style="padding: 10px 0; color: #94a3b8;">12-Digit UTR:</td><td style="font-weight: 800; color: #f59e0b; font-family: monospace; font-size: 16px;">{UTR_NUMBER}</td></tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);"><td style="padding: 10px 0; color: #94a3b8;">Screenshot URL:</td><td>{SCREENSHOT_URL}</td></tr>
+            </table>
+
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="{FRONTEND_URL}/admin/panel?tab=beta-payments" style="display: inline-block; background: linear-gradient(135deg, #ec4899, #8b5cf6); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px;">
+                🔑 Open Admin Panel to Approve / Reject →
+              </a>
+            </div>
+            """
+            .replace("{USERNAME}", user != null ? user.getUsername() : "Unknown User")
+            .replace("{USER_EMAIL}", user != null ? user.getEmail() : "N/A")
+            .replace("{PLAN_TYPE}", pv.getPlanType() != null ? pv.getPlanType() : "MONTHLY_49")
+            .replace("{DURATION}", String.valueOf(pv.getDurationMonths()))
+            .replace("{AMOUNT}", String.valueOf(pv.getAmount()))
+            .replace("{UTR_NUMBER}", pv.getUtrNumber() != null ? pv.getUtrNumber() : "N/A")
+            .replace("{SCREENSHOT_URL}", (pv.getScreenshotUrl() != null && !pv.getScreenshotUrl().isBlank()) ? ("<a href='" + pv.getScreenshotUrl() + "' style='color: #38bdf8;'>View Screenshot</a>") : "None Provided")
+            .replace("{FRONTEND_URL}", frontendUrl);
+
+            String html = buildBrandedLayout("Admin", body);
+            sendHtmlEmail(adminEmail, subject, html, "ADMIN_PAYMENT_VERIFICATION_ALERT");
+            log.info("📩 Notification email sent to admin [{}] for payment verification UTR {}", adminEmail, pv.getUtrNumber());
+        } catch (Exception e) {
+            log.error("Failed to send admin payment verification email alert: {}", e.getMessage(), e);
+        }
+    }
 }

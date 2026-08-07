@@ -4,6 +4,7 @@ import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import { formatMathText } from '../utils/mathRenderer';
+import { getQuestionUrl } from '../utils/urlUtils';
 import { FiCpu, FiPlay, FiPause, FiRefreshCw, FiExternalLink, FiLayers, FiTrash2, FiEye, FiSearch, FiFilter } from 'react-icons/fi';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -917,7 +918,7 @@ export default function AiGeneratorHub() {
 
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                             <button
-                              onClick={() => navigate(`/questions/${q.id}`)}
+                              onClick={() => navigate(getQuestionUrl(q))}
                               style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #3b82f6', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                             >
                               View Details ➔
@@ -1227,7 +1228,7 @@ export default function AiGeneratorHub() {
                             </>
                           )}
                           <button
-                            onClick={() => navigate(`/questions/${rep.questionId}`)}
+                            onClick={() => navigate(getQuestionUrl({ id: rep.questionId }))}
                             style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer' }}
                             title="Inspect Question"
                           >

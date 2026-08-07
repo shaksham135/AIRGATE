@@ -1188,7 +1188,7 @@ export default function Explorer() {
                 <div 
                   className="question-text" 
                   style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/questions/${q.id}`)}
+                  onClick={() => navigate(getQuestionUrl(q))}
                   title="View full details and discussions"
                 >
                   {renderQuestionText(q.text)}

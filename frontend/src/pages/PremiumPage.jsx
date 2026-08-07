@@ -53,11 +53,13 @@ export default function PremiumPage() {
             qrImageUrl: response.data.betaQrImageUrl || '',
             spotsRemaining: response.data.betaSpotsRemaining !== undefined ? response.data.betaSpotsRemaining : 100,
             tier1Price: response.data.betaTier1Price || 49,
-            tier2Price: response.data.betaTier2Price || 249,
+            tier2Price: response.data.betaTier2Price || 149,
+            tier3Price: response.data.betaTier3Price || 249,
             betaBannerHeading: response.data.betaBannerHeading || "⚡ Limited Founder's VIP Beta Access",
-            betaBannerSubheading: response.data.betaBannerSubheading || "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!",
+            betaBannerSubheading: response.data.betaBannerSubheading || "Get Full Aspirant Pro Access starting at ₹49/month!",
             betaTier1Offer: response.data.betaTier1Offer || "⚡ 1-Month Founder Pass — Save 75%!",
-            betaTier2Offer: response.data.betaTier2Offer || "🔥 6-Month Season Pass — Save 75%!"
+            betaTier2Offer: response.data.betaTier2Offer || "🔥 3-Month Sprint Pass — Save 70%!",
+            betaTier3Offer: response.data.betaTier3Offer || "🔥 6-Month Season Pass — Save 75%!"
           });
           setTiers(prev => ({
             enabled: response.data.enabled !== undefined ? response.data.enabled : prev.enabled,
@@ -523,7 +525,8 @@ export default function PremiumPage() {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
               {isBetaMode ? [
                 { months: 1, label: `1 Month (₹${betaDetails.tier1Price})` },
-                { months: 6, label: `6 Months (₹${betaDetails.tier2Price})` }
+                { months: 3, label: `3 Months (₹${betaDetails.tier2Price})` },
+                { months: 6, label: `6 Months (₹${betaDetails.tier3Price})` }
               ].map(opt => (
                 <button
                   key={opt.months}
@@ -531,8 +534,8 @@ export default function PremiumPage() {
                   disabled={upgraded}
                   style={{
                     flex: 1,
-                    padding: '10px 6px',
-                    fontSize: '0.82rem',
+                    padding: '10px 4px',
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     borderRadius: '8px',
                     border: 'none',
@@ -581,9 +584,13 @@ export default function PremiumPage() {
 
               if (isBetaMode) {
                 if (selectedDuration === 6) {
-                  currentPrice = betaDetails.tier2Price;
+                  currentPrice = betaDetails.tier3Price;
                   currentDuration = 6;
-                  currentOffer = betaDetails.betaTier2Offer || '🔥 6-Month Season Pass — Save 75%!';
+                  currentOffer = betaDetails.betaTier3Offer || '🔥 6-Month Season Pass — Save 75%!';
+                } else if (selectedDuration === 3) {
+                  currentPrice = betaDetails.tier2Price;
+                  currentDuration = 3;
+                  currentOffer = betaDetails.betaTier2Offer || '🔥 3-Month Sprint Pass — Save 70%!';
                 } else {
                   currentPrice = betaDetails.tier1Price;
                   currentDuration = 1;
@@ -626,7 +633,7 @@ export default function PremiumPage() {
                 calculatedFinalPrice = Math.max(0, currentPrice - calculatedDiscountAmount);
               }
 
-              const originalPrice = isBetaMode ? (selectedDuration === 6 ? 999 : 199) : null;
+              const originalPrice = isBetaMode ? (selectedDuration === 6 ? 999 : selectedDuration === 3 ? 499 : 199) : null;
 
               return (
                 <div style={{ marginBottom: '24px' }}>
@@ -820,7 +827,7 @@ export default function PremiumPage() {
                       }}
                       onClick={() => setShowUpiModal(true)}
                     >
-                      ⚡ Claim VIP Beta Pass ({selectedDuration === 6 ? `₹${betaDetails.tier2Price}` : `₹${betaDetails.tier1Price}`}) →
+                      ⚡ Claim VIP Beta Pass (₹{selectedDuration === 6 ? betaDetails.tier3Price : selectedDuration === 3 ? betaDetails.tier2Price : betaDetails.tier1Price}) →
                     </button>
                   )}
                   <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem', marginTop: '12px' }}>
@@ -876,7 +883,7 @@ export default function PremiumPage() {
                 <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>Features</th>
                 <th style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>Free Tier</th>
                 <th style={{ padding: '16px 20px', color: 'var(--color-primary)', fontWeight: 700 }}>
-                  {isBetaMode ? `VIP Beta (₹${selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price})` : 'Aspirant Pro'}
+                  {isBetaMode ? `VIP Beta (₹${selectedDuration === 6 ? betaDetails.tier3Price : selectedDuration === 3 ? betaDetails.tier2Price : betaDetails.tier1Price})` : 'Aspirant Pro'}
                 </th>
               </tr>
             </thead>
@@ -950,7 +957,7 @@ export default function PremiumPage() {
                   Scan & Pay via UPI App
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  Amount to Pay: <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>₹{selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price}</strong> ({selectedDuration === 6 ? '6-Month Pass' : '1-Month Pass'})
+                  Amount to Pay: <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>₹{selectedDuration === 6 ? betaDetails.tier3Price : selectedDuration === 3 ? betaDetails.tier2Price : betaDetails.tier1Price}</strong> ({selectedDuration === 6 ? '6-Month Season Pass' : selectedDuration === 3 ? '3-Month Sprint Pass' : '1-Month Pass'})
                 </p>
               </div>
 
@@ -961,7 +968,7 @@ export default function PremiumPage() {
                 maxWidth: '200px', margin: '0 auto 16px auto', boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
               }}>
                 <img 
-                  src={betaDetails.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${betaDetails.upiId}&pn=AIRGATE&am=${selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price}&cu=INR`)}`}
+                  src={betaDetails.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${betaDetails.upiId}&pn=AIRGATE&am=${selectedDuration === 6 ? betaDetails.tier3Price : selectedDuration === 3 ? betaDetails.tier2Price : betaDetails.tier1Price}&cu=INR`)}`}
                   alt="AIRGATE UPI Payment QR Code"
                   style={{ width: '150px', height: '150px', borderRadius: '8px' }}
                 />

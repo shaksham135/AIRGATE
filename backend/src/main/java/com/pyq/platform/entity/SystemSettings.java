@@ -124,7 +124,11 @@ public class SystemSettings {
 
     @Builder.Default
     @Column(name = "beta_tier2_price", nullable = false)
-    private BigDecimal betaTier2Price = new BigDecimal("249.00");
+    private BigDecimal betaTier2Price = new BigDecimal("149.00");
+
+    @Builder.Default
+    @Column(name = "beta_tier3_price", nullable = false)
+    private BigDecimal betaTier3Price = new BigDecimal("249.00");
 
     @Builder.Default
     @Column(name = "beta_banner_heading")
@@ -132,7 +136,7 @@ public class SystemSettings {
 
     @Builder.Default
     @Column(name = "beta_banner_subheading", columnDefinition = "TEXT")
-    private String betaBannerSubheading = "Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!";
+    private String betaBannerSubheading = "Get Full Aspirant Pro Access starting at ₹49/month!";
 
     @Builder.Default
     @Column(name = "beta_tier1_offer")
@@ -140,5 +144,9 @@ public class SystemSettings {
 
     @Builder.Default
     @Column(name = "beta_tier2_offer")
-    private String betaTier2Offer = "🔥 6-Month Season Pass — Save 75%!";
+    private String betaTier2Offer = "🔥 3-Month Sprint Pass — Save 70%!";
+
+    @Builder.Default
+    @Column(name = "beta_tier3_offer")
+    private String betaTier3Offer = "🔥 6-Month Season Pass — Save 75%!";
 }
