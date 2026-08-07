@@ -13,6 +13,7 @@ import {
 
 import { getAssetUrl, formatMathText, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis, renderAiChatText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
+import { getQuestionUrl } from '../utils/urlUtils';
 import PremiumGateModal from '../components/PremiumGateModal';
 import ConfirmModal from '../components/ConfirmModal';
 import AIRGATELoader from '../components/AIRGATELoader';
@@ -96,7 +97,7 @@ export default function Explorer() {
 
   const handleShareQuestion = async (e, q) => {
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}/questions/${q.id}`;
+    const shareUrl = `${window.location.origin}${getQuestionUrl(q)}`;
     const shareTitle = `GATE CSE ${q.year || ''} - ${q.topicName || 'Question'} | AIRGATE`;
 
     if (navigator.share) {
@@ -1449,7 +1450,7 @@ export default function Explorer() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px', alignItems: 'center' }}>
                   <button 
                     className="btn btn-outline" 
-                    onClick={() => navigate(`/questions/${q.id}`)}
+                    onClick={() => navigate(getQuestionUrl(q))}
                     style={{ fontSize: '0.8rem', padding: '6px 12px', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' }}
                   >
                     View Details & Discuss ➔

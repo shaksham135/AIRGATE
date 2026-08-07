@@ -5,6 +5,7 @@ import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
 import API_CONFIG from '../config/api';
 import { getAssetUrl, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis } from '../utils/mathRenderer';
+import { getQuestionUrl } from '../utils/urlUtils';
 import { 
   FiSearch, FiBookOpen, FiLayers, FiAlertTriangle, FiCheckCircle, 
   FiBookmark, FiMessageSquare, FiFilter, FiLoader, FiLock, FiClock, FiCheckSquare, FiRotateCcw, FiZap,
@@ -73,7 +74,7 @@ export default function PracticeArena() {
 
   const handleShareQuestion = async (e, q) => {
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}/questions/${q.id}`;
+    const shareUrl = `${window.location.origin}${getQuestionUrl(q)}`;
     const shareTitle = `GATE CSE ${q.year || ''} - ${q.topicName || 'Question'} | AIRGATE`;
 
     if (navigator.share) {
@@ -636,7 +637,7 @@ export default function PracticeArena() {
                     <div className="practice-header-actions">
                       <button
                         type="button"
-                        onClick={() => navigate(`/questions/${q.id}`, { state: { preselectedOption: selectedOptions[q.id], isSolved: !!selectedOptions[q.id] } })}
+                        onClick={() => navigate(getQuestionUrl(q), { state: { preselectedOption: selectedOptions[q.id], isSolved: !!selectedOptions[q.id] } })}
                         title="View Detailed Question Page"
                         className="practice-action-btn details-btn"
                       >

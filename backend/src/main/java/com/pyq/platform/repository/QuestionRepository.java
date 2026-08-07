@@ -36,6 +36,15 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @NonNull
     Optional<Question> findById(@NonNull Long id);
 
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    Optional<Question> findFirstByBranchAndYearAndPaperSetAndQuestionNumber(String branch, Integer year, Integer paperSet, Integer questionNumber);
+
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    Optional<Question> findFirstBySubjectIdAndQuestionNumber(Long subjectId, Integer questionNumber);
+
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    Optional<Question> findFirstByQuestionNumber(Integer questionNumber);
+
     Optional<Question> findByChecksumHash(String checksumHash);
     boolean existsByChecksumHash(String checksumHash);
     boolean existsByChecksumHashAndTopicId(String checksumHash, Long topicId);

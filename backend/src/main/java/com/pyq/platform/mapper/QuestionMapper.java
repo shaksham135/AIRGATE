@@ -5,6 +5,7 @@ import com.pyq.platform.dto.QuestionDTO;
 import com.pyq.platform.entity.*;
 import com.pyq.platform.repository.QuestionAIAnalysisRepository;
 import com.pyq.platform.repository.ExplanationVoteRepository;
+import com.pyq.platform.util.SubjectSlugUtils;
 import org.springframework.stereotype.Component;
 import java.util.Comparator;
 import java.util.List;
@@ -83,6 +84,23 @@ public class QuestionMapper {
             notHelpful = explanationVoteRepository.countByQuestionIdAndVoteType(question.getId(), ExplanationVote.VoteType.DOWNVOTE);
         }
 
+        String subjectName = question.getSubject() != null ? question.getSubject().getName() : null;
+        String subjectSlug = SubjectSlugUtils.toSlug(subjectName);
+        String branch = question.getBranch() != null && !question.getBranch().isBlank() ? question.getBranch() : "cse";
+        Integer paperSet = question.getPaperSet() != null ? question.getPaperSet() : 1;
+        Integer questionNumber = question.getQuestionNumber() != null ? question.getQuestionNumber() : (int) (question.getId() % 1000 + 1);
+
+        String pdfSource = question.getPdfSourceName();
+        boolean isAiPractice = pdfSource != null && (
+                pdfSource.toLowerCase().startsWith("ai_nightly") ||
+                pdfSource.toLowerCase().startsWith("ai_generated") ||
+                pdfSource.toLowerCase().contains("practice")
+        );
+
+        String seoUrl = isAiPractice
+                ? "/practice/" + subjectSlug + "/q" + questionNumber
+                : "/gate/" + branch + "/" + (question.getYear() != null ? question.getYear() : 2025) + "/set-" + paperSet + "/q" + questionNumber;
+
         return QuestionDTO.builder()
                 .id(question.getId())
                 .text(question.getText())
@@ -91,8 +109,13 @@ public class QuestionMapper {
                 .marks(question.getMarks())
                 .negativeMarks(question.getNegativeMarks())
                 .year(question.getYear())
+                .branch(branch)
+                .paperSet(paperSet)
+                .questionNumber(questionNumber)
+                .seoUrl(seoUrl)
+                .subjectSlug(subjectSlug)
                 .subjectId(question.getSubject() != null ? question.getSubject().getId() : null)
-                .subjectName(question.getSubject() != null ? question.getSubject().getName() : null)
+                .subjectName(subjectName)
                 .topicId(question.getTopic() != null ? question.getTopic().getId() : null)
                 .topicName(question.getTopic() != null ? question.getTopic().getName() : null)
                 .isCommunityVerified(question.getIsCommunityVerified())

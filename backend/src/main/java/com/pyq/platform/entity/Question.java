@@ -47,6 +47,17 @@ public class Question {
     @Column(nullable = false)
     private Integer year;
 
+    @Builder.Default
+    @Column(length = 20)
+    private String branch = "cse";
+
+    @Builder.Default
+    @Column(name = "paper_set")
+    private Integer paperSet = 1;
+
+    @Column(name = "question_number")
+    private Integer questionNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", nullable = false)
     private Subject subject;
@@ -158,6 +169,12 @@ public class Question {
         this.createdAt = LocalDateTime.now();
         if (this.isCommunityVerified == null) {
             this.isCommunityVerified = false;
+        }
+        if (this.branch == null || this.branch.isBlank()) {
+            this.branch = "cse";
+        }
+        if (this.paperSet == null) {
+            this.paperSet = 1;
         }
     }
 }

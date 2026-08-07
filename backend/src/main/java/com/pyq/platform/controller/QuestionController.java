@@ -37,8 +37,11 @@ import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import javax.imageio.ImageIO;
 
+import com.pyq.platform.util.SubjectSlugUtils;
+
 @RestController
 @RequestMapping("/api/questions")
+@CrossOrigin(origins = "*", maxAge = 3600)
 @Slf4j
 public class QuestionController {
 
@@ -124,6 +127,84 @@ public class QuestionController {
                     .body(new MessageResponse("Error: Question not found with ID: " + id));
         }
         return ResponseEntity.ok(convertToDTO(questionOpt.get()));
+    }
+
+    @GetMapping("/resolve/gate/{branch}/{year}/{setStr}/{qNumStr}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> resolveGateQuestion(
+            @PathVariable("branch") String branch,
+            @PathVariable("year") Integer year,
+            @PathVariable("setStr") String setStr,
+            @PathVariable("qNumStr") String qNumStr) {
+        
+        int setNum = 1;
+        try {
+            setNum = Integer.parseInt(setStr.toLowerCase().replace("set-", "").replace("set", "").trim());
+        } catch (Exception ignored) {}
+
+        int qNum = 1;
+        try {
+            qNum = Integer.parseInt(qNumStr.toLowerCase().replace("q", "").trim());
+        } catch (Exception ignored) {}
+
+        Optional<Question> qOpt = questionRepository.findFirstByBranchAndYearAndPaperSetAndQuestionNumber(
+                branch.toLowerCase().trim(), year, setNum, qNum);
+        
+        if (qOpt.isEmpty()) {
+            qOpt = questionRepository.findFirstByQuestionNumber(qNum);
+        }
+
+        if (qOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found for GATE " + branch + " " + year + " Set-" + setNum + " Q" + qNum));
+        }
+
+        return ResponseEntity.ok(convertToDTO(qOpt.get()));
+    }
+
+    @GetMapping("/resolve/practice/{subjectSlug}/{qNumStr}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> resolvePracticeQuestion(
+            @PathVariable("subjectSlug") String subjectSlug,
+            @PathVariable("qNumStr") String qNumStr) {
+        
+        int qNum = 1;
+        try {
+            qNum = Integer.parseInt(qNumStr.toLowerCase().replace("q", "").trim());
+        } catch (Exception ignored) {}
+
+        String canonicalSubjectName = SubjectSlugUtils.toCanonicalSubjectName(subjectSlug);
+        Optional<Question> qOpt = Optional.empty();
+
+        if (canonicalSubjectName != null) {
+            Optional<Subject> subOpt = subjectRepository.findByName(canonicalSubjectName);
+            if (subOpt.isPresent()) {
+                qOpt = questionRepository.findFirstBySubjectIdAndQuestionNumber(subOpt.get().getId(), qNum);
+            }
+        }
+
+        if (qOpt.isEmpty()) {
+            qOpt = questionRepository.findFirstByQuestionNumber(qNum);
+        }
+
+        if (qOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Practice question not found for " + subjectSlug + " Q" + qNum));
+        }
+
+        return ResponseEntity.ok(convertToDTO(qOpt.get()));
+    }
+
+    @GetMapping("/{id}/redirect-url")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> getRedirectUrl(@PathVariable("id") Long id) {
+        Optional<Question> qOpt = questionRepository.findById(id);
+        if (qOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found with ID: " + id));
+        }
+        QuestionDTO dto = convertToDTO(qOpt.get());
+        return ResponseEntity.ok(Map.of("redirectUrl", dto.getSeoUrl(), "id", id));
     }
 
     @GetMapping("/{id}/user-status")

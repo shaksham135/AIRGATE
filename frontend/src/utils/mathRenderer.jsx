@@ -123,11 +123,13 @@ export const sanitizeLatexString = (str) => {
          }
        });
 
-  // 1. Repair matrix environments where backslashes were stripped by JSON parsing
+  // 1. Repair matrix environments where backslashes were stripped or typed as single backslash
   // e.g. \begin{bmatrix}2&0&0\0&3&0\0&0&4\end{bmatrix} -> \begin{bmatrix}2&0&0 \\ 0&3&0 \\ 0&0&4 \end{bmatrix}
+  // e.g. 1_{21} inside L matrix -> l_{21}
   s = s.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, (match, env, content) => {
     let clean = content;
-    clean = clean.replace(/([0-9a-zA-Z\)\}])\s*\\(?=[0-9a-zA-Z\-\+\(\{])/g, '$1 \\\\ ');
+    clean = clean.replace(/1_\{([0-9]{2})\}/g, 'l_{$1}'); // Fix 1_{21} -> l_{21}
+    clean = clean.replace(/([0-9a-zA-Z\)\}])\s*\\(?![\\&])(?=[0-9a-zA-Z\-\+\(\{l_])/g, '$1 \\\\ ');
     clean = clean.replace(/&\s*\\(?=[0-9a-zA-Z])/g, '& ');
     return `\\begin{${env}}${clean}\\end{${env}}`;
   });

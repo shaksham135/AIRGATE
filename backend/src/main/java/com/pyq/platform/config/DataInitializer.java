@@ -239,6 +239,51 @@ public class DataInitializer implements CommandLineRunner {
             if (updatedCount > 0) {
                 log.info("🔧 Self-Healing DB: Aligned {} questions with their correct canonical topic subjects!", updatedCount);
             }
+
+            // Self-Healing DB: Assign branch, paperSet, questionNumber for SEO URLs
+            List<Question> unnumbered = questionRepository.findAll();
+            int assignedCount = 0;
+            java.util.Map<String, Integer> gateCounter = new java.util.HashMap<>();
+            java.util.Map<Long, Integer> practiceCounter = new java.util.HashMap<>();
+
+            for (Question q : unnumbered) {
+                boolean changed = false;
+                if (q.getBranch() == null || q.getBranch().isBlank()) {
+                    q.setBranch("cse");
+                    changed = true;
+                }
+                if (q.getPaperSet() == null) {
+                    q.setPaperSet(1);
+                    changed = true;
+                }
+                if (q.getQuestionNumber() == null) {
+                    String pdfSource = q.getPdfSourceName();
+                    boolean isAiPractice = pdfSource != null && (
+                            pdfSource.toLowerCase().startsWith("ai_nightly") ||
+                            pdfSource.toLowerCase().startsWith("ai_generated") ||
+                            pdfSource.toLowerCase().contains("practice")
+                    );
+                    if (isAiPractice) {
+                        Long subId = q.getSubject() != null ? q.getSubject().getId() : 0L;
+                        int nextNum = practiceCounter.getOrDefault(subId, 0) + 1;
+                        practiceCounter.put(subId, nextNum);
+                        q.setQuestionNumber(nextNum);
+                    } else {
+                        String key = q.getBranch() + "_" + (q.getYear() != null ? q.getYear() : 2025) + "_" + q.getPaperSet();
+                        int nextNum = gateCounter.getOrDefault(key, 0) + 1;
+                        gateCounter.put(key, nextNum);
+                        q.setQuestionNumber(nextNum);
+                    }
+                    changed = true;
+                }
+                if (changed) {
+                    questionRepository.save(q);
+                    assignedCount++;
+                }
+            }
+            if (assignedCount > 0) {
+                log.info("🔧 Self-Healing DB: Assigned SEO branch/paperSet/questionNumber for {} questions!", assignedCount);
+            }
         } catch (Exception e) {
             log.warn("Failed to run topic self-healing check: {}", e.getMessage());
         }

@@ -25,6 +25,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const ContactSupport = lazy(() => import('./pages/ContactSupport'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const QuestionRedirector = lazy(() => import('./components/QuestionRedirector'));
 import ErrorBoundary from './components/ErrorBoundary';
 import { Analytics } from '@vercel/analytics/react';
 import { FiHome, FiUpload, FiLock, FiLogOut, FiFolder, FiGrid, FiUser, FiCheckSquare, FiMenu, FiChevronLeft, FiChevronRight, FiClock, FiList, FiStar, FiCpu } from 'react-icons/fi';
@@ -494,7 +495,19 @@ function AppRoutes() {
       {/* Dashboard wrapped routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/explore" element={<DashboardLayout><Explorer /></DashboardLayout>} />
+
+      {/* 🚀 New SEO Hierarchy Routes for GATE PYQs */}
+      <Route path="/gate" element={<DashboardLayout><Explorer /></DashboardLayout>} />
+      <Route path="/gate/:branch" element={<DashboardLayout><Explorer /></DashboardLayout>} />
+      <Route path="/gate/:branch/:year" element={<DashboardLayout><Explorer /></DashboardLayout>} />
+      <Route path="/gate/:branch/:year/:set" element={<DashboardLayout><Explorer /></DashboardLayout>} />
+      <Route path="/gate/:branch/:year/:set/:qNum" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
+
+      {/* 🚀 New SEO Hierarchy Routes for Practice Questions */}
       <Route path="/practice" element={<DashboardLayout><PracticeArena /></DashboardLayout>} />
+      <Route path="/practice/:subjectSlug" element={<DashboardLayout><PracticeArena /></DashboardLayout>} />
+      <Route path="/practice/:subjectSlug/:qNum" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
+
       <Route path="/admin/questions/new" element={<ProtectedAdminRoute><DashboardLayout><AdminQuestionEditor /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/questions/:id/edit" element={<ProtectedAdminRoute><DashboardLayout><AdminQuestionEditor /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/panel" element={<ProtectedAdminRoute><DashboardLayout><AdminPanel /></DashboardLayout></ProtectedAdminRoute>} />
@@ -506,7 +519,11 @@ function AppRoutes() {
       <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
       <Route path="/simulator" element={<DashboardLayout><ExamSimulator /></DashboardLayout>} />
       <Route path="/simulator/history" element={<DashboardLayout><MockHistory /></DashboardLayout>} />
-      <Route path="/questions/:id" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
+      
+      {/* Backward-compatibility 301 / Client Redirects */}
+      <Route path="/questions/:id" element={<QuestionRedirector type="gate" />} />
+      <Route path="/question/:id" element={<QuestionRedirector type="gate" />} />
+
       <Route path="/premium" element={<DashboardLayout><PremiumPage /></DashboardLayout>} />
       <Route path="/pricing" element={<DashboardLayout><PremiumPage /></DashboardLayout>} />
       <Route path="/upgrade" element={<DashboardLayout><PremiumPage /></DashboardLayout>} />

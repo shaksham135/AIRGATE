@@ -14,8 +14,10 @@ import {
 } from 'react-icons/fi';
 
 
+import { getQuestionUrl, getSubjectSlug, getSubjectNameFromSlug } from '../utils/urlUtils';
+
 export default function QuestionDetail() {
-  const { id } = useParams();
+  const { id, branch, year, set, qNum, subjectSlug } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state || {};
@@ -32,7 +34,7 @@ export default function QuestionDetail() {
   const [copiedShare, setCopiedShare] = useState(false);
 
   const handleShareQuestion = async () => {
-    const shareUrl = `${window.location.origin}/questions/${id}`;
+    const shareUrl = `${window.location.origin}${getQuestionUrl(question || { id })}`;
     const shareTitle = question ? `GATE CSE ${question.year || ''} - ${question.topicName || 'Question'} | AIRGATE` : 'AIRGATE Question';
 
     if (navigator.share) {
@@ -148,14 +150,17 @@ export default function QuestionDetail() {
   }, [question]);
 
   const loadQuestionData = async () => {
-    // 1. Instant RAM Cache Check (0ms response on back/forth navigation)
-    const cachedQ = CacheService.get(`qd_${id}`);
-    const cachedSimilar = CacheService.get(`similar_${id}`);
+    const routeKey = branch && year && set && qNum 
+      ? `gate_${branch}_${year}_${set}_${qNum}`
+      : subjectSlug && qNum
+      ? `practice_${subjectSlug}_${qNum}`
+      : `id_${id}`;
+
+    const cachedQ = CacheService.get(`qd_${routeKey}`);
 
     if (cachedQ) {
       setQuestion(cachedQ);
-      document.title = `GATE CSE ${cachedQ.year || ''} - ${cachedQ.topicName || ''} | AIRGATE`;
-      if (cachedSimilar) setSuggestedNextQuestion(cachedSimilar);
+      document.title = `${cachedQ.year ? 'GATE ' + (cachedQ.branch || 'CSE').toUpperCase() + ' ' + cachedQ.year : 'Practice'} - ${cachedQ.topicName || cachedQ.subjectName || ''} | AIRGATE`;
       setLoading(false);
     } else {
       setLoading(true);
@@ -163,18 +168,40 @@ export default function QuestionDetail() {
 
     setError('');
     try {
-      const qRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}`);
-      setQuestion(qRes.data);
-      CacheService.set(`qd_${id}`, qRes.data, 300000); // 5 minutes TTL
-      document.title = `GATE CSE ${qRes.data.year || ''} - ${qRes.data.topicName || ''} | AIRGATE`;
-      
-      // 🚀 Priority #1: Render question stem, options, and KaTeX math immediately!
+      let endpoint = `${API_CONFIG.BASE_URL}/api/questions/${id}`;
+      if (branch && year && set && qNum) {
+        endpoint = `${API_CONFIG.BASE_URL}/api/questions/resolve/gate/${branch}/${year}/${set}/${qNum}`;
+      } else if (subjectSlug && qNum) {
+        endpoint = `${API_CONFIG.BASE_URL}/api/questions/resolve/practice/${subjectSlug}/${qNum}`;
+      }
+
+      const qRes = await axios.get(endpoint);
+      const qData = qRes.data;
+      setQuestion(qData);
+      CacheService.set(`qd_${routeKey}`, qData, 300000); // 5 minutes TTL
+
+      // Set Page Title & Meta Description & Canonical URL
+      const titleStr = qData.year 
+        ? `GATE ${(qData.branch || 'CSE').toUpperCase()} ${qData.year} Set-${qData.paperSet || 1} Q${qData.questionNumber || qData.id} - ${qData.subjectName || ''} | AIRGATE`
+        : `Practice ${qData.subjectName || 'Question'} Q${qData.questionNumber || qData.id} | AIRGATE`;
+      document.title = titleStr;
+
+      let canonicalEl = document.querySelector('link[rel="canonical"]');
+      if (!canonicalEl) {
+        canonicalEl = document.createElement('link');
+        canonicalEl.rel = 'canonical';
+        document.head.appendChild(canonicalEl);
+      }
+      const fullSeoUrl = `${window.location.origin}${getQuestionUrl(qData)}`;
+      canonicalEl.href = fullSeoUrl;
+
+      // Priority #1: Render question stem immediately!
       setLoading(false);
 
       // Async Background Calls (user-status, similar recommendations, comments)
-      if (currentUser) {
+      if (currentUser && qData.id) {
         const headers = AuthService.getAuthHeader();
-        axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/user-status`, { headers })
+        axios.get(`${API_CONFIG.BASE_URL}/api/questions/${qData.id}/user-status`, { headers })
           .then(statusRes => {
             const { isBookmarked: bm, isSolved: sol, selectedOption: opt } = statusRes.data || {};
             setIsBookmarked(!!bm);
@@ -183,7 +210,7 @@ export default function QuestionDetail() {
               setSelectedOption(lockedOpt);
               if (opt && opt.trim()) {
                 setNatInput(opt);
-                if (qRes.data?.questionType === 'MSQ') {
+                if (qData.questionType === 'MSQ') {
                   const letters = opt.toUpperCase().replace(/[^A-D]/g, '').split('');
                   setTempSelectedMsq(letters);
                 }
@@ -193,19 +220,18 @@ export default function QuestionDetail() {
           .catch(e => console.error('Failed to load user question status', e));
       }
 
-      if (!cachedSimilar) {
-        axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/similar`)
+      if (qData.id) {
+        axios.get(`${API_CONFIG.BASE_URL}/api/questions/${qData.id}/similar`)
           .then(similarRes => {
             if (similarRes.data && similarRes.data.length > 0) {
               setSuggestedNextQuestion(similarRes.data[0]);
-              CacheService.set(`similar_${id}`, similarRes.data[0], 300000);
             }
           })
           .catch(e => console.error('Failed to load similar suggestions', e));
       }
 
       // Load comments in background
-      loadComments();
+      loadComments(qData.id);
     } catch (e) {
       console.error('Failed to load question details', e);
       setError('Question not found or server is unreachable.');
@@ -245,10 +271,12 @@ export default function QuestionDetail() {
     }
   };
 
-  const loadComments = async () => {
+  const loadComments = async (targetQuestionId) => {
+    const qIdToUse = targetQuestionId || question?.id || id;
+    if (!qIdToUse) return;
     try {
       const headers = currentUser ? AuthService.getAuthHeader() : {};
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${id}/comments`, { headers });
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/${qIdToUse}/comments`, { headers });
       setComments(response.data);
     } catch (e) {
       console.error('Failed to load comments', e);
@@ -630,6 +658,33 @@ export default function QuestionDetail() {
           </div>
         )}
       </div>
+
+      {/* SEO Breadcrumbs Hierarchy */}
+      <nav aria-label="breadcrumb" style={{ marginBottom: '16px', fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <Link to="/" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Home</Link>
+        <span>/</span>
+        {question.year ? (
+          <>
+            <Link to="/gate" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>GATE</Link>
+            <span>/</span>
+            <Link to={`/gate/${(question.branch || 'cse').toLowerCase()}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>{(question.branch || 'CSE').toUpperCase()}</Link>
+            <span>/</span>
+            <Link to={`/gate/${(question.branch || 'cse').toLowerCase()}/${question.year}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>{question.year}</Link>
+            <span>/</span>
+            <Link to={`/gate/${(question.branch || 'cse').toLowerCase()}/${question.year}/set-${question.paperSet || 1}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Set-{question.paperSet || 1}</Link>
+            <span>/</span>
+            <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Q{question.questionNumber || question.id}</span>
+          </>
+        ) : (
+          <>
+            <Link to="/practice" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Practice</Link>
+            <span>/</span>
+            <Link to={`/practice/${getSubjectSlug(question.subjectName)}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>{question.subjectName || 'Subject'}</Link>
+            <span>/</span>
+            <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Q{question.questionNumber || question.id}</span>
+          </>
+        )}
+      </nav>
 
       {/* Detail Card Container */}
       <div className="question-card">
@@ -1023,7 +1078,7 @@ export default function QuestionDetail() {
           </div>
           <button 
             className="btn btn-primary" 
-            onClick={() => navigate(`/questions/${suggestedNextQuestion.id}`)}
+            onClick={() => navigate(getQuestionUrl(suggestedNextQuestion))}
             style={{ padding: '10px 24px', borderRadius: '8px', whiteSpace: 'nowrap' }}
           >
             Practice Next →

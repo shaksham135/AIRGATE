@@ -19,6 +19,11 @@ public class QuestionDTO {
     private Integer marks;
     private Double negativeMarks;
     private Integer year;
+    private String branch;
+    private Integer paperSet;
+    private Integer questionNumber;
+    private String seoUrl;
+    private String subjectSlug;
     private Long subjectId;
     private String subjectName;
     private Long topicId;
