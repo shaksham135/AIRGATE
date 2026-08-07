@@ -341,11 +341,11 @@ public class AdminActionController {
         metrics.put("pdfCompilationsTotal", pdfCompilationsTotal);
 
         // 3. Revenue Metrics
-        Double totalRevenue = paymentRepository.findTotalRevenue();
-        Double revenueToday = paymentRepository.findRevenueSince(startOfToday);
+        java.math.BigDecimal totalRevenue = paymentRepository.findTotalRevenue();
+        java.math.BigDecimal revenueToday = paymentRepository.findRevenueSince(startOfToday);
 
-        metrics.put("totalRevenue", totalRevenue != null ? totalRevenue : 0.0);
-        metrics.put("revenueToday", revenueToday != null ? revenueToday : 0.0);
+        metrics.put("totalRevenue", totalRevenue != null ? totalRevenue : java.math.BigDecimal.ZERO);
+        metrics.put("revenueToday", revenueToday != null ? revenueToday : java.math.BigDecimal.ZERO);
 
         // 4. Trend lines (last 7 days)
         java.util.List<Map<String, Object>> dailyTrends = new java.util.ArrayList<>();
@@ -356,12 +356,15 @@ public class AdminActionController {
             String dateLabel = dayStart.toLocalDate().toString();
 
             long signups = userRepository.countNewSignupsSince(dayStart) - userRepository.countNewSignupsSince(dayEnd);
-            Double rev = paymentRepository.findRevenueSince(dayStart) - paymentRepository.findRevenueSince(dayEnd);
+            java.math.BigDecimal revStart = paymentRepository.findRevenueSince(dayStart);
+            java.math.BigDecimal revEnd = paymentRepository.findRevenueSince(dayEnd);
+            java.math.BigDecimal rev = (revStart != null ? revStart : java.math.BigDecimal.ZERO)
+                    .subtract(revEnd != null ? revEnd : java.math.BigDecimal.ZERO);
 
             Map<String, Object> trendItem = new java.util.HashMap<>();
             trendItem.put("date", dateLabel);
             trendItem.put("signups", Math.max(0, signups));
-            trendItem.put("revenue", Math.max(0.0, rev != null ? rev : 0.0));
+            trendItem.put("revenue", rev.compareTo(java.math.BigDecimal.ZERO) > 0 ? rev : java.math.BigDecimal.ZERO);
             dailyTrends.add(trendItem);
         }
         metrics.put("dailyTrends", dailyTrends);

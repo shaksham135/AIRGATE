@@ -15,6 +15,8 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashMap;
@@ -74,9 +76,9 @@ public class PaymentController {
         }
         return ResponseEntity.ok(Map.of(
                 "enabled", enabled,
-                "tier1", Map.of("price", 99.0, "duration", 1, "offer", "Best for quick revisions"),
-                "tier2", Map.of("price", 249.0, "duration", 3, "offer", "Save 15% - Most Popular"),
-                "tier3", Map.of("price", 449.0, "duration", 6, "offer", "Save 25% - Complete Prep")
+                "tier1", Map.of("price", BigDecimal.valueOf(99.00), "duration", 1, "offer", "Best for quick revisions"),
+                "tier2", Map.of("price", BigDecimal.valueOf(249.00), "duration", 3, "offer", "Save 15% - Most Popular"),
+                "tier3", Map.of("price", BigDecimal.valueOf(449.00), "duration", 6, "offer", "Save 25% - Complete Prep")
         ));
     }
 
@@ -89,28 +91,36 @@ public class PaymentController {
 
         User user = userRepository.findById(userDetails.getId()).orElseThrow();
 
-        // Dynamically fetch pricing configuration from settings
-        double amountInRupees = 99.0;
+        // Dynamically fetch pricing configuration from settings using BigDecimal
+        BigDecimal amountInRupees = BigDecimal.valueOf(99.00);
         try {
             com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
             if (settings != null) {
-                if (durationMonths == 1 || durationMonths == settings.getTier1DurationMonths()) {
-                    amountInRupees = settings.getTier1PriceInr();
-                } else if (durationMonths == 3 || durationMonths == settings.getTier2DurationMonths()) {
-                    amountInRupees = settings.getTier2PriceInr();
-                } else if (durationMonths == 6 || durationMonths == settings.getTier3DurationMonths()) {
-                    amountInRupees = settings.getTier3PriceInr();
+                Integer t1Dur = settings.getTier1DurationMonths();
+                Integer t2Dur = settings.getTier2DurationMonths();
+                Integer t3Dur = settings.getTier3DurationMonths();
+
+                if (durationMonths == 1 || (t1Dur != null && durationMonths == t1Dur)) {
+                    amountInRupees = settings.getTier1PriceInr() != null ? settings.getTier1PriceInr() : BigDecimal.valueOf(99.00);
+                } else if (durationMonths == 3 || (t2Dur != null && durationMonths == t2Dur)) {
+                    amountInRupees = settings.getTier2PriceInr() != null ? settings.getTier2PriceInr() : BigDecimal.valueOf(249.00);
+                } else if (durationMonths == 6 || (t3Dur != null && durationMonths == t3Dur)) {
+                    amountInRupees = settings.getTier3PriceInr() != null ? settings.getTier3PriceInr() : BigDecimal.valueOf(449.00);
                 } else {
-                    // fallback proportional calculation
-                    amountInRupees = (settings.getTier1PriceInr() / settings.getTier1DurationMonths()) * durationMonths;
+                    // Fallback proportional calculation using BigDecimal division
+                    BigDecimal t1Price = settings.getTier1PriceInr() != null ? settings.getTier1PriceInr() : BigDecimal.valueOf(99.00);
+                    int baseDuration = (t1Dur != null && t1Dur > 0) ? t1Dur : 1;
+                    amountInRupees = t1Price
+                            .divide(BigDecimal.valueOf(baseDuration), 2, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(durationMonths));
                 }
             } else {
-                if (durationMonths == 3) amountInRupees = 249.0;
-                else if (durationMonths == 6) amountInRupees = 449.0;
+                if (durationMonths == 3) amountInRupees = BigDecimal.valueOf(249.00);
+                else if (durationMonths == 6) amountInRupees = BigDecimal.valueOf(449.00);
             }
         } catch (Exception e) {
-            if (durationMonths == 3) amountInRupees = 249.0;
-            else if (durationMonths == 6) amountInRupees = 449.0;
+            if (durationMonths == 3) amountInRupees = BigDecimal.valueOf(249.00);
+            else if (durationMonths == 6) amountInRupees = BigDecimal.valueOf(449.00);
         }
 
         // Apply Coupon Discount if couponCode provided
@@ -118,15 +128,17 @@ public class PaymentController {
             try {
                 com.pyq.platform.dto.CouponValidateRequest vReq = new com.pyq.platform.dto.CouponValidateRequest();
                 vReq.setCode(couponCode.trim());
-                vReq.setOriginalPrice(java.math.BigDecimal.valueOf(amountInRupees));
+                vReq.setOriginalPrice(amountInRupees);
                 com.pyq.platform.dto.CouponValidateResponse vRes = couponService.validateCoupon(vReq, user.getId());
                 if (vRes != null && vRes.isValid() && vRes.getFinalPrice() != null) {
-                    amountInRupees = vRes.getFinalPrice().doubleValue();
+                    amountInRupees = vRes.getFinalPrice();
                 }
             } catch (Exception cEx) {
                 log.warn("Failed to apply coupon [{}] to order creation: {}", couponCode, cEx.getMessage());
             }
         }
+
+        long amountInPaise = amountInRupees.multiply(BigDecimal.valueOf(100)).longValue();
 
         // Sandbox check: if Razorpay keys are not configured, return a mock order
         if (keyId == null || keyId.isBlank() || keyId.equals("placeholder")) {
@@ -144,7 +156,7 @@ public class PaymentController {
 
             return ResponseEntity.ok(Map.of(
                     "orderId", mockOrderId,
-                    "amount", amountInRupees * 100, // paise
+                    "amount", amountInPaise,
                     "currency", "INR",
                     "keyId", "sandbox_key",
                     "isMock", true
@@ -162,7 +174,7 @@ public class PaymentController {
             headers.set("Authorization", "Basic " + encodedAuth);
 
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("amount", (int) (amountInRupees * 100)); // amount in paise
+            requestBody.put("amount", amountInPaise);
             requestBody.put("currency", "INR");
             requestBody.put("receipt", "receipt_" + System.currentTimeMillis());
 
@@ -184,7 +196,7 @@ public class PaymentController {
 
                 return ResponseEntity.ok(Map.of(
                         "orderId", razorpayOrderId,
-                        "amount", amountInRupees * 100,
+                        "amount", amountInPaise,
                         "currency", "INR",
                         "keyId", keyId,
                         "isMock", false
@@ -199,6 +211,7 @@ public class PaymentController {
                     .body(Map.of("error", "Error contacting payment gateway: " + e.getMessage()));
         }
     }
+
 
     @PostMapping("/verify")
     @PreAuthorize("isAuthenticated()")

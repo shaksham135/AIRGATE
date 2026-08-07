@@ -7,6 +7,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/admin/settings")
@@ -25,17 +26,17 @@ public class SystemSettingsController {
                 .orElseGet(() -> {
                     SystemSettings defaultSettings = SystemSettings.builder()
                             .id(1)
-                            .premiumPriceInr(299.0)
+                            .premiumPriceInr(BigDecimal.valueOf(299.00))
                             .premiumDurationMonths(3)
                             .aiDailyLimitPremium(100)
                             .isMaintenanceMode(false)
-                            .tier1PriceInr(199.0)
+                            .tier1PriceInr(BigDecimal.valueOf(199.00))
                             .tier1DurationMonths(1)
                             .tier1SpecialOffer("Starter Pass")
-                            .tier2PriceInr(299.0)
+                            .tier2PriceInr(BigDecimal.valueOf(299.00))
                             .tier2DurationMonths(3)
                             .tier2SpecialOffer("Save 15% - Most Popular")
-                            .tier3PriceInr(449.0)
+                            .tier3PriceInr(BigDecimal.valueOf(449.00))
                             .tier3DurationMonths(6)
                             .tier3SpecialOffer("Save 25% - Complete Prep")
                             .seoSiteTitle("AIRGATE – Gateway to Top All India Ranks | GATE PYQs & AI Tutor")

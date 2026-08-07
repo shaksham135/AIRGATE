@@ -2,6 +2,7 @@ package com.pyq.platform.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "system_settings")
@@ -15,7 +16,7 @@ public class SystemSettings {
     private Integer id; // Always 1 for singleton configuration
 
     @Column(name = "premium_price_inr", nullable = false)
-    private Double premiumPriceInr;
+    private BigDecimal premiumPriceInr;
 
     @Column(name = "premium_duration_months", nullable = false)
     private Integer premiumDurationMonths;
@@ -28,7 +29,7 @@ public class SystemSettings {
 
     // Dynamic Multi-Tier Pricing Packages
     @Column(name = "tier1_price_inr", nullable = false)
-    private Double tier1PriceInr;
+    private BigDecimal tier1PriceInr;
 
     @Column(name = "tier1_duration_months", nullable = false)
     private Integer tier1DurationMonths;
@@ -37,7 +38,7 @@ public class SystemSettings {
     private String tier1SpecialOffer;
 
     @Column(name = "tier2_price_inr", nullable = false)
-    private Double tier2PriceInr;
+    private BigDecimal tier2PriceInr;
 
     @Column(name = "tier2_duration_months", nullable = false)
     private Integer tier2DurationMonths;
@@ -46,7 +47,7 @@ public class SystemSettings {
     private String tier2SpecialOffer;
 
     @Column(name = "tier3_price_inr", nullable = false)
-    private Double tier3PriceInr;
+    private BigDecimal tier3PriceInr;
 
     @Column(name = "tier3_duration_months", nullable = false)
     private Integer tier3DurationMonths;
