@@ -32,6 +32,7 @@ export default function PremiumPage() {
   const [screenshotUrlInput, setScreenshotUrlInput] = useState('');
   const [submittingUpi, setSubmittingUpi] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [modalError, setModalError] = useState('');
   const [myVerification, setMyVerification] = useState(null);
 
   // Dynamic Multi-Tier Pricing state
@@ -71,8 +72,8 @@ export default function PremiumPage() {
     };
     fetchTiers();
 
+    // Fetch user's pending verification status & user premium status from DB
     if (AuthService.getCurrentUser()) {
-      // Sync real database isPremium status from backend
       axios.get(`${API_CONFIG.BASE_URL}/api/users/me`, {
         headers: AuthService.getAuthHeader()
       }).then(res => {
@@ -914,34 +915,38 @@ export default function PremiumPage() {
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px'
           }}>
             <div style={{
               backgroundColor: 'var(--bg-card)', border: '1px solid rgba(139, 92, 246, 0.4)',
-              borderRadius: '24px', maxWidth: '460px', width: '100%', padding: '28px',
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(139, 92, 246, 0.2)',
+              borderRadius: '24px', maxWidth: '460px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+              padding: '24px', boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(139, 92, 246, 0.2)',
               position: 'relative'
             }}>
               {/* Close Button */}
               <button 
-                onClick={() => setShowUpiModal(false)}
+                onClick={() => {
+                  setShowUpiModal(false);
+                  setModalError('');
+                }}
                 style={{
-                  position: 'absolute', top: '18px', right: '18px', background: 'none',
-                  border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem'
+                  position: 'sticky', top: '0px', float: 'right', background: 'rgba(255,255,255,0.08)',
+                  border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.1rem', padding: '6px',
+                  borderRadius: '50%', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}
               >
                 <FiX />
               </button>
 
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px', clear: 'both' }}>
                 <span style={{
                   background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-                  color: '#fff', fontSize: '0.75rem', fontWeight: 800, padding: '4px 14px',
+                  color: '#fff', fontSize: '0.72rem', fontWeight: 800, padding: '4px 14px',
                   borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.06em'
                 }}>
                   ⚡ Founder's VIP Beta Access
                 </span>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#fff', marginTop: '10px', marginBottom: '4px' }}>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', marginTop: '8px', marginBottom: '4px' }}>
                   Scan & Pay via UPI App
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
@@ -951,16 +956,16 @@ export default function PremiumPage() {
 
               {/* QR Code Container */}
               <div style={{
-                backgroundColor: '#fff', padding: '16px', borderRadius: '16px', textOverflow: 'ellipsis',
+                backgroundColor: '#fff', padding: '12px', borderRadius: '16px',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                maxWidth: '220px', margin: '0 auto 20px auto', boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+                maxWidth: '200px', margin: '0 auto 16px auto', boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
               }}>
                 <img 
                   src={betaDetails.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${betaDetails.upiId}&pn=AIRGATE&am=${selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price}&cu=INR`)}`}
                   alt="AIRGATE UPI Payment QR Code"
-                  style={{ width: '180px', height: '180px', borderRadius: '8px' }}
+                  style={{ width: '150px', height: '150px', borderRadius: '8px' }}
                 />
-                <span style={{ fontSize: '0.7rem', color: '#666', fontWeight: 700, marginTop: '8px' }}>
+                <span style={{ fontSize: '0.68rem', color: '#666', fontWeight: 700, marginTop: '6px' }}>
                   GPay • PhonePe • Paytm • BHIM
                 </span>
               </div>
@@ -969,13 +974,13 @@ export default function PremiumPage() {
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)',
-                borderRadius: '12px', padding: '10px 14px', marginBottom: '20px'
+                borderRadius: '12px', padding: '10px 14px', marginBottom: '16px'
               }}>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
                     Official UPI ID
                   </span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace' }}>
                     {betaDetails.upiId}
                   </span>
                 </div>
@@ -986,7 +991,7 @@ export default function PremiumPage() {
                     backgroundColor: copiedUpi ? '#10b981' : 'rgba(139, 92, 246, 0.2)',
                     border: `1px solid ${copiedUpi ? '#10b981' : 'var(--color-primary)'}`,
                     color: copiedUpi ? '#fff' : 'var(--color-primary)',
-                    padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700,
+                    padding: '6px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700,
                     cursor: 'pointer', transition: 'all 0.2s'
                   }}
                 >
@@ -994,10 +999,29 @@ export default function PremiumPage() {
                 </button>
               </div>
 
+              {/* Inline Modal Error Message */}
+              {modalError && (
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  marginBottom: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <FiX size={16} /> {modalError}
+                </div>
+              )}
+
               {/* Payment Proof Submission Form */}
               <form onSubmit={handleUpiSubmit}>
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '6px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
                     Enter 12-Digit UTR / Ref No. <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
@@ -1005,17 +1029,20 @@ export default function PremiumPage() {
                     required
                     placeholder="e.g. 421890123456"
                     value={utrInput}
-                    onChange={e => setUtrInput(e.target.value)}
+                    onChange={e => {
+                      setUtrInput(e.target.value);
+                      if (modalError) setModalError('');
+                    }}
                     style={{
-                      width: '100%', padding: '12px 14px', borderRadius: '10px',
+                      width: '100%', padding: '10px 14px', borderRadius: '10px',
                       border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)',
                       color: '#fff', fontSize: '0.9rem', fontFamily: 'monospace', fontWeight: 700
                     }}
                   />
                 </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '6px' }}>
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
                     Payment Screenshot URL (Optional)
                   </label>
                   <input
@@ -1036,7 +1063,7 @@ export default function PremiumPage() {
                   disabled={submittingUpi || !utrInput.trim()}
                   className="btn btn-primary"
                   style={{
-                    width: '100%', padding: '14px', fontSize: '0.95rem', fontWeight: 800,
+                    width: '100%', padding: '12px', fontSize: '0.92rem', fontWeight: 800,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                   }}
                 >
