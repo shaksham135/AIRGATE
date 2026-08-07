@@ -68,6 +68,22 @@ export default function PremiumPage() {
     fetchTiers();
 
     if (AuthService.getCurrentUser()) {
+      // Sync real database isPremium status from backend
+      axios.get(`${API_CONFIG.BASE_URL}/api/users/me`, {
+        headers: AuthService.getAuthHeader()
+      }).then(res => {
+        if (res.data) {
+          const isPrem = !!res.data.isPremium;
+          setUpgraded(isPrem);
+          const currentUser = AuthService.getCurrentUser();
+          if (currentUser) {
+            currentUser.isPremium = isPrem;
+            currentUser.premiumExpiresAt = res.data.premiumExpiresAt;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+          }
+        }
+      }).catch(e => console.error("Failed to sync user status from DB:", e));
+
       axios.get(`${API_CONFIG.BASE_URL}/api/payments/my-verification`, {
         headers: AuthService.getAuthHeader()
       }).then(res => {
@@ -246,6 +262,35 @@ export default function PremiumPage() {
 
   return (
     <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto', width: '100%', fontFamily: 'var(--font-main)' }}>
+
+      {/* 🚀 Founder's VIP Beta Highlight Banner */}
+      {isBetaMode && !upgraded && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(139,92,246,0.18) 100%)',
+          border: '1px solid rgba(236,72,153,0.4)',
+          borderRadius: '20px',
+          padding: '20px 28px',
+          marginBottom: '36px',
+          textAlign: 'center',
+          boxShadow: '0 10px 40px rgba(236,72,153,0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <span style={{
+            background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+            color: '#fff', fontSize: '0.78rem', fontWeight: 800, padding: '4px 16px',
+            borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'inline-block', marginBottom: '8px'
+          }}>
+            ⚡ Limited Founder's VIP Beta Offer
+          </span>
+          <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#fff', margin: '4px 0 6px 0' }}>
+            Get Full Aspirant Pro Access at Only ₹49/month or ₹249 for 6 Months!
+          </h3>
+          <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.85)', margin: 0, fontWeight: 500 }}>
+            🔥 Direct UPI QR Payment Special • First 100 Aspirants Only • <strong style={{ color: '#ec4899' }}>{betaDetails.spotsRemaining} / 100 Spots Remaining</strong>
+          </p>
+        </div>
+      )}
+
       {/* Hero Header */}
       <div style={{ textAlign: 'center', marginBottom: '48px' }}>
         <span style={{
@@ -451,7 +496,31 @@ export default function PremiumPage() {
             
             {/* Plan Duration Tabs */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-              {[
+              {isBetaMode ? [
+                { months: 1, label: `1 Month (₹${betaDetails.tier1Price})` },
+                { months: 6, label: `6 Months (₹${betaDetails.tier2Price})` }
+              ].map(opt => (
+                <button
+                  key={opt.months}
+                  onClick={() => setSelectedDuration(opt.months)}
+                  disabled={upgraded}
+                  style={{
+                    flex: 1,
+                    padding: '10px 6px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: selectedDuration === opt.months ? 'var(--color-primary)' : 'transparent',
+                    color: selectedDuration === opt.months ? '#fff' : 'var(--text-secondary)',
+                    cursor: upgraded ? 'default' : 'pointer',
+                    transition: 'all 0.2s',
+                    opacity: upgraded && selectedDuration !== opt.months ? 0.5 : 1
+                  }}
+                >
+                  {opt.label}
+                </button>
+              )) : [
                 { months: tiers.tier1.duration, label: `${tiers.tier1.duration} Month${tiers.tier1.duration > 1 ? 's' : ''}` },
                 { months: tiers.tier2.duration, label: `${tiers.tier2.duration} Months` },
                 { months: tiers.tier3.duration, label: `${tiers.tier3.duration} Months` }
@@ -481,26 +550,38 @@ export default function PremiumPage() {
 
             {/* Plan Price amount and Duration */}
             {(() => {
-              const t1 = tiers?.tier1 || { price: 99.0, duration: 1, offer: 'Best for quick revisions' };
-              const t2 = tiers?.tier2 || { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' };
-              const t3 = tiers?.tier3 || { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' };
+              let currentPrice = 99.0;
+              let currentDuration = selectedDuration;
+              let currentOffer = 'Best for GATE revision';
 
-              let currentPrice = t1.price;
-              let currentDuration = t1.duration;
-              let currentOffer = t1.offer;
-              
-              if (selectedDuration === t1.duration) {
-                currentPrice = t1.price;
-                currentDuration = t1.duration;
-                currentOffer = t1.offer;
-              } else if (selectedDuration === t2.duration) {
-                currentPrice = t2.price;
-                currentDuration = t2.duration;
-                currentOffer = t2.offer;
-              } else if (selectedDuration === t3.duration) {
-                currentPrice = t3.price;
-                currentDuration = t3.duration;
-                currentOffer = t3.offer;
+              if (isBetaMode) {
+                if (selectedDuration === 6) {
+                  currentPrice = betaDetails.tier2Price;
+                  currentDuration = 6;
+                  currentOffer = '🔥 6-Month Season Pass — Save 75%!';
+                } else {
+                  currentPrice = betaDetails.tier1Price;
+                  currentDuration = 1;
+                  currentOffer = '⚡ 1-Month Founder Pass — Save 75%!';
+                }
+              } else {
+                const t1 = tiers?.tier1 || { price: 99.0, duration: 1, offer: 'Best for quick revisions' };
+                const t2 = tiers?.tier2 || { price: 249.0, duration: 3, offer: 'Save 15% - Most Popular' };
+                const t3 = tiers?.tier3 || { price: 449.0, duration: 6, offer: 'Save 25% - Complete Prep' };
+
+                if (selectedDuration === t1.duration) {
+                  currentPrice = t1.price;
+                  currentDuration = t1.duration;
+                  currentOffer = t1.offer;
+                } else if (selectedDuration === t2.duration) {
+                  currentPrice = t2.price;
+                  currentDuration = t2.duration;
+                  currentOffer = t2.offer;
+                } else if (selectedDuration === t3.duration) {
+                  currentPrice = t3.price;
+                  currentDuration = t3.duration;
+                  currentOffer = t3.offer;
+                }
               }
 
               // Dynamic proportional coupon calculation per tier
