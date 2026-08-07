@@ -24,7 +24,7 @@ import java.util.Optional;
 public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSpecificationExecutor<Question> {
 
     @Override
-    @EntityGraph(attributePaths = {"subject", "topic", "options"})
+    @EntityGraph(attributePaths = {"subject", "topic"})
     @NonNull
     Page<Question> findAll(
         @Nullable Specification<Question> spec,
@@ -87,14 +87,14 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @Query("SELECT COUNT(q) FROM Question q WHERE q.pdfSourceName IS NULL OR (q.pdfSourceName NOT LIKE 'AI_GENERATED%' AND q.pdfSourceName NOT LIKE '%AI Generator%' AND q.pdfSourceName NOT LIKE '%PRACTICE%')")
     long countOfficialPyqsTotal();
 
-    @Query("SELECT q FROM Question q WHERE q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%'")
+    @Query("SELECT q FROM Question q WHERE q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%' OR q.pdfSourceName LIKE '%AI Generator%' OR q.pdfSourceName LIKE '%PRACTICE%'")
     List<Question> findAllAiGeneratedQuestions();
 
     @Query("SELECT q.subject.name, COUNT(q), " +
            "SUM(CASE WHEN q.status IN ('PENDING_REVIEW', 'PENDING') THEN 1 ELSE 0 END), " +
            "SUM(CASE WHEN q.status = 'APPROVED' OR q.isCommunityVerified = true THEN 1 ELSE 0 END) " +
            "FROM Question q " +
-           "WHERE q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%' " +
+           "WHERE q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%' OR q.pdfSourceName LIKE '%AI Generator%' OR q.pdfSourceName LIKE '%PRACTICE%' " +
            "GROUP BY q.subject.name")
     List<Object[]> getAiQuestionSubjectSummaries();
 

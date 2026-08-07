@@ -52,7 +52,9 @@ public class AdminAiGeneratorController {
             
             jakarta.persistence.criteria.Predicate isAiNightly = cb.like(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
             jakarta.persistence.criteria.Predicate isAiGenerated = cb.like(cb.lower(root.get("pdfSourceName")), "ai_generated%");
-            predicates.add(cb.or(isAiNightly, isAiGenerated));
+            jakarta.persistence.criteria.Predicate isAiGenerator = cb.like(cb.lower(root.get("pdfSourceName")), "%ai generator%");
+            jakarta.persistence.criteria.Predicate isPractice = cb.like(cb.lower(root.get("pdfSourceName")), "%practice%");
+            predicates.add(cb.or(isAiNightly, isAiGenerated, isAiGenerator, isPractice));
 
             if (subjectId != null) {
                 predicates.add(cb.equal(root.get("subject").get("id"), subjectId));

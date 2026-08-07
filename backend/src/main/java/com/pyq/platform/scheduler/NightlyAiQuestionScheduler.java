@@ -72,14 +72,18 @@ public class NightlyAiQuestionScheduler {
                 }
 
                 attemptCount++;
-                boolean success = generatorService.generateAndVerifySingleQuestion();
-                if (success) {
-                    acceptedCount++;
+                try {
+                    boolean success = generatorService.generateAndVerifySingleQuestion();
+                    if (success) {
+                        acceptedCount++;
+                    }
+                } catch (Exception e) {
+                    log.error("⚠️ Exception during nightly AI question generation attempt #{}: {}", attemptCount, e.getMessage(), e);
                 }
 
-                // Pacing delay (20 seconds between calls = 3 questions/min, staying safely within 6,000 TPM on a single API key)
+                // Pacing delay (35 seconds between calls staying safely within 6,000 TPM across multi-keys)
                 try {
-                    Thread.sleep(20000);
+                    Thread.sleep(35000);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;

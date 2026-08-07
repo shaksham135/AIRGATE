@@ -37,6 +37,7 @@ public class QuestionService {
     private final UserAnswerRepository userAnswerRepository;
     private final MockAttemptAnswerRepository mockAttemptAnswerRepository;
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #status, #userId, #solvedStatus, #bookmarked, #pageable.pageNumber, #pageable.pageSize)")
     public Page<Question> searchQuestions(String query, Long subjectId, Long topicId, Integer year, String questionType,
             String tagName, String status, Long userId, String solvedStatus, Boolean bookmarked, Pageable pageable) {

@@ -38,9 +38,9 @@ public class SystemSettingsController {
                             .tier3PriceInr(449.0)
                             .tier3DurationMonths(6)
                             .tier3SpecialOffer("Save 25% - Complete Prep")
-                            .seoSiteTitle("AIRGATE – Gateway to All India Rank | GATE PYQs & AI Tutor")
-                            .seoMetaDescription("Ace GATE 2026 with AIRGATE. Solve 20+ years of CS/IT GATE previous year question papers with step-by-step AI tutor solutions & mock test series.")
-                            .seoKeywords("GATE 2026, AIRGATE, GATE CS PYQ, Previous Year Questions, GATE Operating Systems, GATE Mock Test, AI GATE Tutor")
+                            .seoSiteTitle("AIRGATE – Gateway to Top All India Ranks | GATE PYQs & AI Tutor")
+                            .seoMetaDescription("Ace GATE 2027 exam with AIRGATE. Solve 20+ years of GATE previous year question papers (PYQs) with step-by-step AI tutor solutions, subject-wise analytics, and dynamic mock tests.")
+                            .seoKeywords("GATE 2027, AIRGATE, GATE CS PYQ, Previous Year Questions, GATE Operating Systems, GATE Mock Test, AI GATE Tutor")
                             .googleSiteVerification("google-site-verification-placeholder")
                             .build();
                     return systemSettingsRepository.save(defaultSettings);
@@ -55,16 +55,16 @@ public class SystemSettingsController {
         SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
         if (settings == null) {
             return ResponseEntity.ok(java.util.Map.of(
-                "seoSiteTitle", "AIRGATE – Gateway to All India Rank",
-                "seoMetaDescription", "Ace GATE with AIRGATE AI-Powered PYQ Platform",
-                "seoKeywords", "GATE PYQ, AIRGATE, GATE Prep",
+                "seoSiteTitle", "AIRGATE – Gateway to Top All India Ranks | GATE PYQs & AI Tutor",
+                "seoMetaDescription", "Ace GATE 2027 exam with AIRGATE. Solve 20+ years of GATE previous year question papers (PYQs) with step-by-step AI tutor solutions, subject-wise analytics, and dynamic mock tests.",
+                "seoKeywords", "GATE 2027, GATE PYQ, AIRGATE, GATE Prep",
                 "googleSiteVerification", ""
             ));
         }
         return ResponseEntity.ok(java.util.Map.of(
-            "seoSiteTitle", settings.getSeoSiteTitle() != null ? settings.getSeoSiteTitle() : "AIRGATE – Gateway to All India Rank",
-            "seoMetaDescription", settings.getSeoMetaDescription() != null ? settings.getSeoMetaDescription() : "Ace GATE with AIRGATE AI-Powered PYQ Platform",
-            "seoKeywords", settings.getSeoKeywords() != null ? settings.getSeoKeywords() : "GATE PYQ, AIRGATE, GATE Prep",
+            "seoSiteTitle", settings.getSeoSiteTitle() != null ? settings.getSeoSiteTitle() : "AIRGATE – Gateway to Top All India Ranks | GATE PYQs & AI Tutor",
+            "seoMetaDescription", settings.getSeoMetaDescription() != null ? settings.getSeoMetaDescription() : "Ace GATE 2027 exam with AIRGATE. Solve 20+ years of GATE previous year question papers (PYQs) with step-by-step AI tutor solutions, subject-wise analytics, and dynamic mock tests.",
+            "seoKeywords", settings.getSeoKeywords() != null ? settings.getSeoKeywords() : "GATE 2027, GATE PYQ, AIRGATE, GATE Prep",
             "googleSiteVerification", settings.getGoogleSiteVerification() != null ? settings.getGoogleSiteVerification() : "",
             "umamiWebsiteId", settings.getUmamiWebsiteId() != null ? settings.getUmamiWebsiteId() : "",
             "supportEmail", settings.getSupportEmail() != null ? settings.getSupportEmail() : "support@airgate.in",

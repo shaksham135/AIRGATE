@@ -496,11 +496,11 @@ export default function AiGeneratorHub() {
   const subjectNamesList = Object.keys(subjectsMap);
 
   const filteredQuestions = questions.filter(q => {
-    const subName = q.subjectName || q.subject?.name || 'General CS';
+    const subName = (q.subjectName || q.subject?.name || 'General CS').trim();
     const topName = q.topicName || q.topic?.name || '';
     const qText = q.text || q.questionText || '';
 
-    const matchesSubject = selectedSubjectFilter === 'ALL' || (subName === selectedSubjectFilter);
+    const matchesSubject = selectedSubjectFilter === 'ALL' || (subName.toLowerCase() === selectedSubjectFilter.trim().toLowerCase());
     const matchesSearch = !searchTerm || qText.toLowerCase().includes(searchTerm.toLowerCase()) || topName.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSubject && matchesSearch;
   });
@@ -795,7 +795,7 @@ export default function AiGeneratorHub() {
                   onClick={() => {
                     setSelectedSubjectFilter(subName);
                     setActiveSubjectModal(subName);
-                    setPageSize(100);
+                    setPageSize(500);
                     setPage(0);
                   }}
                   style={{

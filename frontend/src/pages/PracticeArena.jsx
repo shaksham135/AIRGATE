@@ -423,7 +423,7 @@ export default function PracticeArena() {
               <FiZap size={14} style={{ color: '#fff' }} />
             </div>
             <h1 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#fff', letterSpacing: '-0.01em' }}>
-              Conceptual Practice Arena
+              Practice Arena
             </h1>
           </div>
 
@@ -592,10 +592,10 @@ export default function PracticeArena() {
       {/* ── QUESTION FEED ─────────────────────────────────────────────────── */}
       <div id="practice-questions-start"></div>
       {loading ? (
-        <AIRGATELoader text="Loading Conceptual Practice Questions..." />
+        <AIRGATELoader text="Loading Practice Questions..." />
       ) : questions.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-          <h3>No Conceptual Questions Found</h3>
+          <h3>No Questions Found</h3>
           <p style={{ color: 'var(--text-muted)' }}>Try resetting your subject/topic or difficulty filters.</p>
         </div>
       ) : (

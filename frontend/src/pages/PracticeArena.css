@@ -110,21 +110,52 @@
 
 /* Responsive Mobile Layout Override */
 @media (max-width: 640px) {
+  html, body {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
   .practice-arena-container {
-    padding: 16px 10px !important;
+    padding: 12px 8px !important;
+  }
+
+  .practice-top-banner {
+    padding: 8px 12px !important;
+    margin-bottom: 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .practice-filters-box {
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
   }
 
   .practice-filter-grid {
     grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    gap: 8px !important;
   }
 
   .practice-hero-title {
-    font-size: 1.35rem !important;
+    font-size: 1.15rem !important;
   }
 
-  .practice-question-card {
-    padding: 18px 14px !important;
-    border-radius: 14px !important;
+  .practice-question-card, .practice-card-box {
+    padding: 14px 12px !important;
+    border-radius: 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .practice-header-actions {
+    gap: 4px !important;
+  }
+
+  .practice-action-btn {
+    padding: 4px 8px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .practice-badge-qno, .practice-badge-diff, .practice-badge-type {
+    font-size: 0.68rem !important;
+    padding: 2px 6px !important;
   }
 }

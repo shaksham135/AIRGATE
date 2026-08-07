@@ -3,7 +3,7 @@ import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
 import { useNavigate } from 'react-router-dom';
-import { FiClock, FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiGrid, FiList, FiCpu, FiPlus } from 'react-icons/fi';
+import { FiClock, FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiGrid, FiList, FiCpu, FiPlus, FiMonitor } from 'react-icons/fi';
 import { formatMathText, renderQuestionText, renderOptionContent, getAssetUrl } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
 import LoginGate from '../components/LoginGate';
@@ -118,40 +118,66 @@ function MockTestArena() {
     setLoading(true);
     try {
       const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/simulator`);
-      if (res.data.length === 0) {
+      if (!res.data || res.data.length === 0) {
         alert("The database is currently empty. Please ask the administrator to upload exam papers before starting mock tests.");
         setLoading(false);
         return;
       }
 
       let finalQuestions = res.data;
+
+      const isAiGeneratedQuestion = (q) => {
+        if (!q || !q.pdfSourceName) return false;
+        const src = q.pdfSourceName.toLowerCase();
+        return src.startsWith('ai_nightly') || src.startsWith('ai_generated') || src.includes('ai generator');
+      };
+
       if (activeTab === 'standard') {
         // Mode 1: 100% Official PYQs
-        const pyqOnly = finalQuestions.filter(q => q.pdfSourceName !== 'AI_NIGHTLY_GENERATOR');
+        const pyqOnly = finalQuestions.filter(q => !isAiGeneratedQuestion(q));
         if (pyqOnly.length > 0) finalQuestions = pyqOnly;
       } else if (activeTab === 'hybrid') {
         // Mode 2: Smart Hybrid Mock (70% Double-Verified + 30% PYQ)
-        const doubleVerified = finalQuestions.filter(q => q.pdfSourceName === 'AI_NIGHTLY_GENERATOR');
-        const officialPyqs = finalQuestions.filter(q => q.pdfSourceName !== 'AI_NIGHTLY_GENERATOR');
+        const doubleVerified = finalQuestions.filter(q => isAiGeneratedQuestion(q));
+        const officialPyqs = finalQuestions.filter(q => !isAiGeneratedQuestion(q));
         
         if (doubleVerified.length > 0) {
-          // Shuffle function
-          const shuffle = arr => arr.sort(() => Math.random() - 0.5);
+          const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
           const targetVerified = Math.min(doubleVerified.length, Math.floor(finalQuestions.length * 0.7));
-          const targetPyq = finalQuestions.length - targetVerified;
+          const targetPyq = Math.max(0, finalQuestions.length - targetVerified);
 
           const pickedVerified = shuffle(doubleVerified).slice(0, targetVerified);
           const pickedPyq = shuffle(officialPyqs).slice(0, targetPyq);
           finalQuestions = shuffle([...pickedVerified, ...pickedPyq]);
         }
       } else if (activeTab === 'custom' && selectedSubject) {
-        // Mode 3: Subject Practice Mock
-        finalQuestions = finalQuestions.filter(q => q.subjectName === selectedSubject);
-        if (finalQuestions.length === 0) {
-          alert(`No approved questions found for subject "${selectedSubject}" in database. Starting standard full syllabus mock instead.`);
-          finalQuestions = res.data;
-        } else {
-          finalQuestions = finalQuestions.slice(0, customQuestionCount);
+        // Mode 3: Subject Practice Mock — fetch questions specifically for this subject
+        try {
+          const subRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions`, {
+            params: {
+              query: selectedSubject,
+              page: 0,
+              size: Math.max(20, customQuestionCount * 2)
+            }
+          });
+          const subQs = subRes.data?.content || [];
+          if (subQs.length > 0) {
+            const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+            finalQuestions = shuffle(subQs).slice(0, customQuestionCount);
+          } else {
+            // Fallback to client-side filter
+            const subFiltered = finalQuestions.filter(q => 
+              q.subjectName && q.subjectName.toLowerCase().includes(selectedSubject.toLowerCase())
+            );
+            if (subFiltered.length > 0) {
+              finalQuestions = subFiltered.slice(0, customQuestionCount);
+            }
+          }
+        } catch (e) {
+          const subFiltered = finalQuestions.filter(q => 
+            q.subjectName && q.subjectName.toLowerCase().includes(selectedSubject.toLowerCase())
+          );
+          if (subFiltered.length > 0) finalQuestions = subFiltered.slice(0, customQuestionCount);
         }
       }
 
@@ -609,6 +635,43 @@ function MockTestArena() {
   if (!examStarted && !examSubmitted) {
     return (
       <div className="mock-arena-container">
+        
+        {/* Desktop Recommendation Notice Banner */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%)',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          borderRadius: '16px',
+          padding: '12px 18px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)'
+        }}>
+          <div style={{
+            fontSize: '1.4rem',
+            background: 'rgba(56, 189, 248, 0.15)',
+            width: '42px',
+            height: '42px',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#38bdf8',
+            flexShrink: 0
+          }}>
+            <FiMonitor size={22} />
+          </div>
+          <div style={{ textAlign: 'left', flex: 1 }}>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              RECOMMENDED: USE DESKTOP / LAPTOP FOR MOCK TESTS
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px', lineHeight: 1.45 }}>
+              GATE is an official Computer-Based Test (CBT). Taking mock exams on a PC or Laptop provides full-screen examination view, GATE scientific calculator, side navigation palette, and authentic exam environment.
+            </div>
+          </div>
+        </div>
+
         <div className="mock-arena-card">
           <div className="mock-header-icon">
             <FiClock size={32} />

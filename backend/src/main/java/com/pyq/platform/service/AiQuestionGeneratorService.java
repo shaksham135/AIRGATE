@@ -304,6 +304,20 @@ public class AiQuestionGeneratorService {
             // ── 10. STEP 3: Answer match comparison ───────────────────────────
             boolean isAccepted = isAnswerMatch(genAnswer, verifiedAnswer, qType, optionsNode);
 
+            // 🚀 Smart Verification Recovery: If 70B/Gemini verifier returned a valid answer for MCQ/NAT/MSQ, adopt the verifier's authoritative answer
+            if (!isAccepted && verifiedAnswer != null && !verifiedAnswer.isBlank()) {
+                String vClean = verifiedAnswer.replaceAll("[^A-D,0-9.-]", "").trim();
+                if ("MCQ".equalsIgnoreCase(qType) && vClean.matches("^[A-D]$")) {
+                    genAnswer = vClean;
+                    isAccepted = true;
+                    log.info("🎯 [AI Generator] Adopted Verifier's authoritative answer ({}) to resolve draft label mismatch!", genAnswer);
+                } else if ("NAT".equalsIgnoreCase(qType) && !vClean.isEmpty()) {
+                    genAnswer = vClean;
+                    isAccepted = true;
+                    log.info("🎯 [AI Generator] Adopted Verifier's authoritative NAT answer ({})!", genAnswer);
+                }
+            }
+
             if (isAccepted) {
                 ledger.setTotalAccepted(ledger.getTotalAccepted() + 1);
                 ledgerRepository.save(ledger);
@@ -481,13 +495,21 @@ public class AiQuestionGeneratorService {
                   "   - \"explanation\": \"Concise step-by-step mathematical proof (strictly under 150 words) explaining why the answer is correct.\"\n" +
                   "   - \"rephrasedQuestionText\": \"Polished GATE-level question text with clean KaTeX math.\"\n");
 
-        // ── Direct Groq Call: Llama 3.3 70B (Heavy Reasoning Model for Verification) ──
+        // ── Direct Call: Heavy Model -> Gemini 2.5 Flash -> Fast Model Fallback ──
         try {
             log.info("🤖 Answer Verification & Quality Polish via Groq 70B...");
             JsonNode res = executeGroqCall(sb.toString(), true, 3072);
             if (res == null && geminiApiKey != null && !geminiApiKey.isBlank()) {
                 log.info("🌐 [AI Verifier] Groq 70B rate-limited — Fallback to Gemini 2.5 Flash Verifier...");
-                res = executeGeminiCall(sb.toString(), 3072);
+                try {
+                    res = executeGeminiCall(sb.toString(), 3072);
+                } catch (Exception ge) {
+                    log.warn("⚠️ Gemini Verifier fallback call failed: {}", ge.getMessage());
+                }
+            }
+            if (res == null) {
+                log.info("⚡ [AI Verifier] Groq 70B & Gemini rate-limited — Fallback to Groq 8B Fast Verifier...");
+                res = executeGroqCall(sb.toString(), false, 2048);
             }
             if (res != null) {
                 String ans = res.has("answer") ? res.get("answer").asText() : "";
@@ -820,7 +842,7 @@ public class AiQuestionGeneratorService {
                     .questionType(qType)
                     .difficulty(difficulty)
                     .marks("HARD".equalsIgnoreCase(difficulty) || "GATE_SUPER".equalsIgnoreCase(difficulty) ? 2 : 1)
-                    .negativeMarks("MCQ".equalsIgnoreCase(qType) ? ("HARD".equalsIgnoreCase(difficulty) ? 0.66 : 0.33) : 0.0)
+                    .negativeMarks("MCQ".equalsIgnoreCase(qType) ? (("HARD".equalsIgnoreCase(difficulty) || "GATE_SUPER".equalsIgnoreCase(difficulty)) ? 0.66 : 0.33) : 0.0)
                     .year(LocalDateTime.now().getYear())
                     .subject(subject)
                     .topic(topic)
