@@ -20,11 +20,16 @@ public interface PaymentVerificationRepository extends JpaRepository<PaymentVeri
 
     Page<PaymentVerification> findByStatusOrderByCreatedAtDesc(PaymentVerification.Status status, Pageable pageable);
 
+    // Eagerly JOIN FETCH user to prevent LazyInitializationException in admin listing
+    @Query(value = "SELECT pv FROM PaymentVerification pv LEFT JOIN FETCH pv.user ORDER BY pv.createdAt DESC",
+           countQuery = "SELECT COUNT(pv) FROM PaymentVerification pv")
     Page<PaymentVerification> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    @Query(value = "SELECT pv FROM PaymentVerification pv ORDER BY CASE WHEN pv.status = com.pyq.platform.entity.PaymentVerification.Status.PENDING THEN 0 ELSE 1 END, pv.createdAt DESC",
+    // Eagerly JOIN FETCH user + sort PENDING first
+    @Query(value = "SELECT pv FROM PaymentVerification pv LEFT JOIN FETCH pv.user ORDER BY CASE WHEN pv.status = com.pyq.platform.entity.PaymentVerification.Status.PENDING THEN 0 ELSE 1 END, pv.createdAt DESC",
            countQuery = "SELECT COUNT(pv) FROM PaymentVerification pv")
     Page<PaymentVerification> findAllOrderedByPendingFirst(Pageable pageable);
 
     boolean existsByUtrNumber(String utrNumber);
 }
+
