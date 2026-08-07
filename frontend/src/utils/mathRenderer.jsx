@@ -134,8 +134,8 @@ export const sanitizeLatexString = (str) => {
     return `\\begin{${env}}${clean}\\end{${env}}`;
   });
 
-  // 1b. Auto-wrap unwrapped \begin{matrix}... if NOT inside $ or $$
-  s = s.replace(/(?<!\$)\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}(?!\$)/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
+  // 1b. Convert single-dollar wrapped matrices or unwrapped matrices into double-dollar block matrices
+  s = s.replace(/(?:\$)?\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}(?:\$)?/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
 
   // 2. Convert \[ ... \] to $$ ... $$ and \( ... \) to $ ... $
   s = s.replace(/\\\[([\s\S]*?)\\\]/g, ' $$ $1 $$ ');
