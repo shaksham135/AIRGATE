@@ -1,13 +1,35 @@
 -- ⚡ Ultra Fast Database Performance Indexes for Sub-20ms Question & Practice Queries
 
--- 1. Index for User Question Solves subquery (solves N+1 and full table scans on /api/questions & /api/practice/questions)
-CREATE INDEX IF NOT EXISTS idx_uqs_user_question ON user_question_solves(user_id, question_id);
+DROP PROCEDURE IF EXISTS add_idx_if_not_exists;
 
--- 2. Index for Practice Arena Feed (pdf_source_name + status + id)
-CREATE INDEX IF NOT EXISTS idx_q_pdf_status_id ON questions(pdf_source_name, status, id DESC);
+DELIMITER //
+CREATE PROCEDURE add_idx_if_not_exists(
+    IN tbl_name VARCHAR(64),
+    IN idx_name VARCHAR(64),
+    IN col_list VARCHAR(255)
+)
+BEGIN
+    DECLARE idx_cnt INT;
+    SELECT COUNT(*) INTO idx_cnt 
+    FROM INFORMATION_SCHEMA.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = tbl_name 
+      AND INDEX_NAME = idx_name;
 
--- 3. Composite Indexes for Question Filtering (subject, topic, difficulty, type, status)
-CREATE INDEX IF NOT EXISTS idx_q_status_subject ON questions(status, subject_id);
-CREATE INDEX IF NOT EXISTS idx_q_status_topic ON questions(status, topic_id);
-CREATE INDEX IF NOT EXISTS idx_q_status_diff ON questions(status, difficulty);
-CREATE INDEX IF NOT EXISTS idx_q_status_type ON questions(status, question_type);
+    IF idx_cnt = 0 THEN
+        SET @sql = CONCAT('CREATE INDEX ', idx_name, ' ON ', tbl_name, '(', col_list, ')');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END //
+DELIMITER ;
+
+CALL add_idx_if_not_exists('user_question_solves', 'idx_uqs_user_question', 'user_id, question_id');
+CALL add_idx_if_not_exists('questions', 'idx_q_pdf_status_id', 'pdf_source_name, status, id DESC');
+CALL add_idx_if_not_exists('questions', 'idx_q_status_subject', 'status, subject_id');
+CALL add_idx_if_not_exists('questions', 'idx_q_status_topic', 'status, topic_id');
+CALL add_idx_if_not_exists('questions', 'idx_q_status_diff', 'status, difficulty');
+CALL add_idx_if_not_exists('questions', 'idx_q_status_type', 'status, question_type');
+
+DROP PROCEDURE IF EXISTS add_idx_if_not_exists;
