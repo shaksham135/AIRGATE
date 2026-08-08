@@ -392,12 +392,20 @@ public class DataInitializer implements CommandLineRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
 
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pv_utr ON payment_verifications(utr_number)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pv_status_created ON payment_verifications(status, created_at DESC)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pv_user_status ON payment_verifications(user_id, status, created_at DESC)");
-            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_q_seo_routing ON questions(branch, year, paper_set, question_number)");
+            addIndexSafely("payment_verifications", "idx_pv_utr", "utr_number");
+            addIndexSafely("payment_verifications", "idx_pv_status_created", "status, created_at");
+            addIndexSafely("payment_verifications", "idx_pv_user_status", "user_id, status, created_at");
+            addIndexSafely("questions", "idx_q_seo_routing", "branch, year, paper_set, question_number");
         } catch (Exception e) {
-            log.warn("Schema Migration Note: payment_verifications table/indexes creation: {}", e.getMessage());
+            log.warn("Schema Migration Note: payment_verifications table creation: {}", e.getMessage());
+        }
+    }
+
+    private void addIndexSafely(String table, String indexName, String columns) {
+        try {
+            jdbcTemplate.execute("CREATE INDEX " + indexName + " ON " + table + "(" + columns + ")");
+        } catch (Exception ignored) {
+            // Index already exists or created by Flyway migration
         }
     }
 
