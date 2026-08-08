@@ -147,16 +147,18 @@ public class QuestionController {
             qNum = Integer.parseInt(qNumStr.toLowerCase().replace("q", "").trim());
         } catch (Exception ignored) {}
 
-        Optional<Question> qOpt = questionRepository.findFirstByBranchAndYearAndPaperSetAndQuestionNumber(
-                branch.toLowerCase().trim(), year, setNum, qNum);
+        // Priority 1: Check by direct Primary Key ID (qNum in clean URLs is q.id)
+        Optional<Question> qOpt = questionRepository.findById((long) qNum);
+
+        // Priority 2: Check by exact branch + year + paperSet + questionNumber
+        if (qOpt.isEmpty()) {
+            qOpt = questionRepository.findFirstByBranchAndYearAndPaperSetAndQuestionNumber(
+                    branch.toLowerCase().trim(), year, setNum, qNum);
+        }
         
+        // Priority 3: Check by questionNumber
         if (qOpt.isEmpty()) {
             qOpt = questionRepository.findFirstByQuestionNumber(qNum);
-        }
-
-        // Fallback: if qNum is large it may actually be a question database ID (urlUtils uses q.id when questionNumber is null)
-        if (qOpt.isEmpty() && qNum > 200) {
-            qOpt = questionRepository.findById((long) qNum);
         }
 
         if (qOpt.isEmpty()) {
@@ -178,23 +180,23 @@ public class QuestionController {
             qNum = Integer.parseInt(qNumStr.toLowerCase().replace("q", "").trim());
         } catch (Exception ignored) {}
 
-        String canonicalSubjectName = SubjectSlugUtils.toCanonicalSubjectName(subjectSlug);
-        Optional<Question> qOpt = Optional.empty();
+        // Priority 1: Check by direct Primary Key ID (qNum in clean URLs is q.id)
+        Optional<Question> qOpt = questionRepository.findById((long) qNum);
 
-        if (canonicalSubjectName != null) {
-            Optional<Subject> subOpt = subjectRepository.findByName(canonicalSubjectName);
-            if (subOpt.isPresent()) {
-                qOpt = questionRepository.findFirstBySubjectIdAndQuestionNumber(subOpt.get().getId(), qNum);
+        // Priority 2: Check by subject + questionNumber
+        if (qOpt.isEmpty()) {
+            String canonicalSubjectName = SubjectSlugUtils.toCanonicalSubjectName(subjectSlug);
+            if (canonicalSubjectName != null) {
+                Optional<Subject> subOpt = subjectRepository.findByName(canonicalSubjectName);
+                if (subOpt.isPresent()) {
+                    qOpt = questionRepository.findFirstBySubjectIdAndQuestionNumber(subOpt.get().getId(), qNum);
+                }
             }
         }
 
+        // Priority 3: Check by questionNumber
         if (qOpt.isEmpty()) {
             qOpt = questionRepository.findFirstByQuestionNumber(qNum);
-        }
-
-        // Fallback: if qNum is large it may actually be a question database ID (urlUtils uses q.id when questionNumber is null)
-        if (qOpt.isEmpty() && qNum > 200) {
-            qOpt = questionRepository.findById((long) qNum);
         }
 
         if (qOpt.isEmpty()) {

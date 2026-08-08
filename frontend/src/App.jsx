@@ -48,7 +48,7 @@ function ProtectedAdminRoute({ children }) {
 let publicMetaCache = null;
 
 function DashboardLayout({ children }) {
-  const currentUser = AuthService.getCurrentUser();
+  const [currentUser, setCurrentUser] = React.useState(AuthService.getCurrentUser());
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -57,6 +57,48 @@ function DashboardLayout({ children }) {
   const [showPremiumModal, setShowPremiumModal] = React.useState(false);
   const [autoCoupon, setAutoCoupon] = React.useState('');
   const [showBugModal, setShowBugModal] = React.useState(false);
+
+  // Sync state whenever auth status changes or window receives focus
+  React.useEffect(() => {
+    const handleAuthChange = () => {
+      setCurrentUser(AuthService.getCurrentUser());
+    };
+
+    window.addEventListener('authChange', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    
+    const handleFocus = () => {
+      if (AuthService.getCurrentUser()) {
+        AuthService.checkAndRefreshUserStatus(true).then(u => {
+          if (u) setCurrentUser(u);
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('authChange', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Periodic 10-second real-time status sync (detects admin approvals instantly without page reload)
+  React.useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => {
+      AuthService.checkAndRefreshUserStatus(true).then(updated => {
+        if (updated) {
+          setCurrentUser(updated);
+          if (updated.isBanned) {
+            handleLogout();
+          }
+        }
+      }).catch(() => {});
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Pre-fetch admin route chunks in background for zero-delay sidebar navigation
   React.useEffect(() => {
@@ -141,20 +183,6 @@ function DashboardLayout({ children }) {
       }
     }
   };
-
-  React.useEffect(() => {
-    if (currentUser) {
-      AuthService.checkAndRefreshUserStatus(true)
-        .then(updated => {
-          if (updated && updated.isBanned) {
-            handleLogout();
-          }
-        })
-        .catch(err => {
-          console.error("Failed to sync user status from dashboard layout:", err);
-        });
-    }
-  }, [location.pathname]);
 
   const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/uploads');
 

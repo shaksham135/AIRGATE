@@ -371,6 +371,7 @@ public class DataInitializer implements CommandLineRunner {
         addMissingColumn("system_settings", "beta_tier1_offer", "VARCHAR(255)");
         addMissingColumn("system_settings", "beta_tier2_offer", "VARCHAR(255)");
         addMissingColumn("system_settings", "beta_tier3_offer", "VARCHAR(255)");
+        addMissingColumn("system_settings", "frontend_base_url", "VARCHAR(255) DEFAULT 'https://airgate.in'");
 
         // Create payment_verifications table if missing
         try {
@@ -390,8 +391,13 @@ public class DataInitializer implements CommandLineRunner {
                     CONSTRAINT fk_payment_verifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
+
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pv_utr ON payment_verifications(utr_number)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pv_status_created ON payment_verifications(status, created_at DESC)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pv_user_status ON payment_verifications(user_id, status, created_at DESC)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_q_seo_routing ON questions(branch, year, paper_set, question_number)");
         } catch (Exception e) {
-            log.warn("Schema Migration Note: payment_verifications table creation: {}", e.getMessage());
+            log.warn("Schema Migration Note: payment_verifications table/indexes creation: {}", e.getMessage());
         }
     }
 

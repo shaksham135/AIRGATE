@@ -93,6 +93,10 @@ public class SystemSettings {
     @Column(name = "support_phone")
     private String supportPhone = "+91 (800) AIR-GATE";
 
+    @Builder.Default
+    @Column(name = "frontend_base_url")
+    private String frontendBaseUrl = "https://airgate.in";
+
     // Dynamic Automated Email Workflow Controls
     @Builder.Default
     @Column(name = "auto_welcome_email_enabled", nullable = false)

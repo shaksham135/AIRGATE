@@ -3092,10 +3092,10 @@ export default function AdminPanel() {
                 📬 Customer Support & Help Desk Contact Info
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Support Email Address (Shown in Contact Us Modal)
+                    Support Email (Receives VIP Beta Alerts)
                   </label>
                   <input 
                     type="email"
@@ -3108,7 +3108,7 @@ export default function AdminPanel() {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Help Line / Phone Number (Shown in Contact Us Modal)
+                    Help Line / Phone Number
                   </label>
                   <input 
                     type="text"
@@ -3118,6 +3118,44 @@ export default function AdminPanel() {
                     style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
                   />
                 </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.8rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+                    🌐 Frontend Base Domain URL (Email Link Control)
+                  </label>
+                  <input 
+                    type="url"
+                    value={settings.frontendBaseUrl || ''}
+                    onChange={e => setSettings(prev => ({ ...prev, frontendBaseUrl: e.target.value }))}
+                    placeholder="e.g. https://airgate.in or https://airgate-zc3y.onrender.com"
+                    style={{ width: '100%', padding: '10px 12px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  💡 Test if your Brevo API / SMTP email delivery works by sending a diagnostic test email.
+                </span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const testEmail = prompt("Enter email address to send diagnostic test email to:", settings.supportEmail || "admin@airgate.in");
+                    if (!testEmail) return;
+                    try {
+                      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/email/test`, { email: testEmail.trim() }, {
+                        headers: AuthService.getAuthHeader()
+                      });
+                      alert(res.data.message || "Test email dispatched successfully!");
+                    } catch (err) {
+                      alert("Email test failed: " + (err.response?.data?.error || err.message));
+                    }
+                  }}
+                  className="btn btn-outline"
+                  style={{ padding: '8px 16px', fontSize: '0.82rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <FiSend size={13} /> 🧪 Send Test Email
+                </button>
               </div>
             </div>
 

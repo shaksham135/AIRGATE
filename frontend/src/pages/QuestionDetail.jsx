@@ -96,7 +96,7 @@ export default function QuestionDetail() {
 
   useEffect(() => {
     loadQuestionData();
-  }, [id]);
+  }, [id, branch, year, set, qNum, subjectSlug, location.pathname]);
 
   // 🚀 Dynamic Google SEO JSON-LD Rich Snippet Generator
   useEffect(() => {
@@ -150,6 +150,17 @@ export default function QuestionDetail() {
   }, [question]);
 
   const loadQuestionData = async () => {
+    // Reset state for new question
+    setSelectedOption(locationState.preselectedOption || null);
+    setTempSelectedMsq([]);
+    setNatInput('');
+    setShowAnswer(false);
+    setShowDetailedSolution(false);
+    setExplanationError('');
+    setSuggestedNextQuestion(null);
+    setIsAiTutorOpen(false);
+    setAiChatMessages([]);
+
     const routeKey = branch && year && set && qNum 
       ? `gate_${branch}_${year}_${set}_${qNum}`
       : subjectSlug && qNum

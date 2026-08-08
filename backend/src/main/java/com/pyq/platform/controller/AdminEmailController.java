@@ -43,6 +43,21 @@ public class AdminEmailController {
         ));
     }
 
+    @PostMapping("/test")
+    public ResponseEntity<?> sendTestEmail(@RequestBody Map<String, String> body) {
+        String targetEmail = body.get("email");
+        if (targetEmail == null || targetEmail.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Target email address is required."));
+        }
+
+        boolean sent = emailService.sendTestEmail(targetEmail.trim());
+        if (sent) {
+            return ResponseEntity.ok(Map.of("success", true, "message", "Test email successfully dispatched to " + targetEmail));
+        } else {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to send test email. Please check server logs and Brevo API Key / SMTP settings."));
+        }
+    }
+
     @GetMapping("/logs")
     public ResponseEntity<?> getEmailLogs() {
         List<EmailLog> logs = emailLogRepository.findTop50ByOrderBySentAtDesc();

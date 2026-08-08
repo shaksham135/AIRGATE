@@ -88,23 +88,24 @@ export function getQuestionUrl(q) {
     return q.seoUrl;
   }
 
+  const qId = q.id || q.questionId;
+  if (!qId) return '/gate/cse';
+
   const pdfSource = q.pdfSourceName || '';
   const isAiPractice = pdfSource.toLowerCase().includes('ai_nightly') ||
                        pdfSource.toLowerCase().includes('ai_generated') ||
                        pdfSource.toLowerCase().includes('practice');
 
-  const qNum = q.questionNumber || q.id;
-
   if (isAiPractice) {
     const subSlug = getSubjectSlug(q.subjectName || q.subject);
-    return `/practice/${subSlug}/q${qNum}`;
+    return `/practice/${subSlug}/q${qId}`;
   }
 
   const branch = (q.branch || 'cse').toLowerCase();
   const year = q.year || 2025;
   const setNum = q.paperSet || 1;
 
-  return `/gate/${branch}/${year}/set-${setNum}/q${qNum}`;
+  return `/gate/${branch}/${year}/set-${setNum}/q${qId}`;
 }
 
 /**

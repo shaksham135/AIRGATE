@@ -65,12 +65,19 @@ class AuthService {
     return true;
   }
 
+  notifyAuthChange() {
+    try {
+      window.dispatchEvent(new Event('authChange'));
+    } catch (e) {}
+  }
+
   // Call after a successful upgrade to refresh localStorage without re-login
   updatePremiumStatus(isPremium, premiumExpiresAt) {
     const user = this.getCurrentUser();
     if (user) {
       const updated = { ...user, isPremium, premiumExpiresAt: premiumExpiresAt || null };
       localStorage.setItem('user', JSON.stringify(updated));
+      this.notifyAuthChange();
     }
   }
 
@@ -79,8 +86,8 @@ class AuthService {
     if (!user || !user.token) return null;
 
     const now = Date.now();
-    // Return cached user if checked within the last 60 seconds (unless forced)
-    if (!force && this.lastCheckedTime && (now - this.lastCheckedTime < 60000)) {
+    // Return cached user if checked within the last 10 seconds (unless forced)
+    if (!force && this.lastCheckedTime && (now - this.lastCheckedTime < 10000)) {
       return user;
     }
 
@@ -113,6 +120,7 @@ class AuthService {
           user.isBanned !== updatedUser.isBanned
         ) {
           localStorage.setItem('user', JSON.stringify(updatedUser));
+          this.notifyAuthChange();
           return updatedUser;
         }
         return user;
@@ -120,6 +128,7 @@ class AuthService {
         console.error('Failed to sync user status from server:', e);
         if (e.response && (e.response.status === 401 || e.response.status === 403)) {
           this.logout();
+          this.notifyAuthChange();
           window.location.reload();
         }
         throw e;

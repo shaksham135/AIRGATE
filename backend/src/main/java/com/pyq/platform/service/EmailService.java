@@ -14,6 +14,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -41,6 +42,17 @@ public class EmailService {
 
     @Value("${brevo.api.key:}")
     private String brevoApiKey;
+
+    public String getEffectiveFrontendUrl() {
+        try {
+            com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+            if (settings != null && settings.getFrontendBaseUrl() != null && !settings.getFrontendBaseUrl().isBlank()) {
+                String url = settings.getFrontendBaseUrl().trim();
+                return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+            }
+        } catch (Exception ignored) {}
+        return (frontendUrl != null && !frontendUrl.isBlank()) ? (frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl) : "https://airgate.in";
+    }
 
     /**
      * Send raw HTML email helper via Direct Brevo REST API (Primary) with optional SMTP fallback
@@ -298,7 +310,7 @@ public class EmailService {
         </div>
         <p>Stay consistent, keep practicing, and remember: Every question solved brings you closer to your dream IISc / IIT!</p>
         <p>Warm regards,<br><strong>Team AIRGATE Mentors</strong></p>
-        """.replace("%s", frontendUrl);
+        """.replace("%s", getEffectiveFrontendUrl());
         return buildBrandedLayout(username, body);
     }
 
@@ -315,7 +327,7 @@ public class EmailService {
           <a href="%s/simulator" class="cta-btn">🎯 Try a Smart Mock Exam</a>
         </div>
         <p>Keep pushing your limits!</p>
-        """.replace("%s", frontendUrl);
+        """.replace("%s", getEffectiveFrontendUrl());
         return buildBrandedLayout(username, body);
     }
 
@@ -338,8 +350,112 @@ public class EmailService {
         """
         .replace("{ORDER_ID}", payment.getOrderId() != null ? payment.getOrderId() : "")
         .replace("{DURATION}", String.valueOf(payment.getDurationMonths()))
-        .replace("{FRONTEND_URL}", frontendUrl);
+        .replace("{FRONTEND_URL}", getEffectiveFrontendUrl());
         return buildBrandedLayout(username, body);
+    }
+
+    /**
+     * Trigger F: Payment Verification Approved Email to User
+     */
+    @Async
+    public void sendPaymentApprovalConfirmationEmail(User user, String planType, int durationMonths, BigDecimal amount, LocalDateTime expiresAt) {
+        String subject = "🎉 Payment Verified! Your AIRGATE Aspirant Pro is Active!";
+        String formattedExpiry = expiresAt != null ? expiresAt.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy")) : "Active";
+        String body = """
+        <div style="background-color: rgba(16, 185, 129, 0.12); border: 1px solid #10b981; border-radius: 16px; padding: 24px; margin-bottom: 24px; text-align: center;">
+          <div style="font-size: 40px; margin-bottom: 8px;">✅</div>
+          <h2 style="color: #10b981; margin: 0 0 8px 0; font-size: 22px; font-weight: 800;">Payment Verification Successful!</h2>
+          <p style="margin: 0; color: #a7f3d0; font-size: 14px;">Plan: {PLAN_TYPE} ({DURATION} Month/s) | Amount: ₹{AMOUNT}</p>
+          <p style="margin: 6px 0 0 0; color: #ffffff; font-weight: 700; font-size: 14px;">Valid Until: {EXPIRY_DATE}</p>
+        </div>
+
+        <p>Hi <strong>{USERNAME}</strong>,</p>
+        <p>Great news! Your payment proof has been verified by our team, and your <strong>AIRGATE Aspirant Pro Membership</strong> is now active!</p>
+
+        <p>Here is what is unlocked for you right now:</p>
+        <ul style="padding-left: 20px;">
+          <li><strong>⚡ High Daily AI Limit:</strong> Ask AI Tutor deep doubts without restrictions.</li>
+          <li><strong>🧠 Full Step-by-Step Solutions:</strong> Complete mathematical proofs for all GATE questions.</li>
+          <li><strong>🎯 Smart Timed Mocks:</strong> Unlimited exam simulator attempts.</li>
+        </ul>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="{FRONTEND_URL}/explore" class="cta-btn">🚀 Start Practicing Pro Features →</a>
+        </div>
+
+        <p>Good luck with your preparation!</p>
+        <p>Best regards,<br><strong>Team AIRGATE Mentors</strong></p>
+        """
+        .replace("{USERNAME}", user.getUsername() != null ? user.getUsername() : "Aspirant")
+        .replace("{PLAN_TYPE}", planType != null ? planType : "Aspirant Pro Pass")
+        .replace("{DURATION}", String.valueOf(durationMonths))
+        .replace("{AMOUNT}", amount != null ? amount.toString() : "49.00")
+        .replace("{EXPIRY_DATE}", formattedExpiry)
+        .replace("{FRONTEND_URL}", getEffectiveFrontendUrl());
+
+        String html = buildBrandedLayout(user.getUsername(), body);
+        sendHtmlEmail(user.getEmail(), subject, html, "PAYMENT_VERIFICATION_APPROVED");
+    }
+
+    /**
+     * Trigger G: Payment Verification Rejected Email to User
+     */
+    @Async
+    public void sendPaymentRejectionNoticeEmail(User user, String utrNumber, String reason) {
+        String subject = "⚠️ Payment Verification Update - UTR #" + (utrNumber != null ? utrNumber : "");
+        String body = """
+        <div style="background-color: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 16px; padding: 24px; margin-bottom: 24px; text-align: center;">
+          <div style="font-size: 40px; margin-bottom: 8px;">⚠️</div>
+          <h2 style="color: #ef4444; margin: 0 0 8px 0; font-size: 20px; font-weight: 800;">Payment Verification Unsuccessful</h2>
+          <p style="margin: 0; color: #fca5a5; font-size: 14px;">UTR Ref: {UTR}</p>
+        </div>
+
+        <p>Hi <strong>{USERNAME}</strong>,</p>
+        <p>Our verification team reviewed your payment submission, but could not confirm the transaction due to the following reason:</p>
+
+        <div style="background-color: rgba(255,255,255,0.05); border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin: 20px 0; color: #f8fafc; font-size: 14px;">
+          <strong>Reason from Moderator:</strong><br>
+          {REASON}
+        </div>
+
+        <p>Don't worry! You can easily resubmit a clear screenshot or corrected 12-digit UTR transaction reference on our VIP Beta payment page:</p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="{FRONTEND_URL}/premium" class="cta-btn" style="background: linear-gradient(135deg, #ef4444, #8b5cf6);">🔁 Re-submit Payment Proof →</a>
+        </div>
+
+        <p>If you believe this was an error, please reply to this email with your payment receipt attached.</p>
+        <p>Best regards,<br><strong>AIRGATE Support Team</strong></p>
+        """
+        .replace("{USERNAME}", user.getUsername() != null ? user.getUsername() : "Aspirant")
+        .replace("{UTR}", utrNumber != null ? utrNumber : "N/A")
+        .replace("{REASON}", reason != null ? reason : "Transaction UTR or payment proof could not be verified.")
+        .replace("{FRONTEND_URL}", getEffectiveFrontendUrl());
+
+        String html = buildBrandedLayout(user.getUsername(), body);
+        sendHtmlEmail(user.getEmail(), subject, html, "PAYMENT_VERIFICATION_REJECTED");
+    }
+
+    /**
+     * Admin Email Test Dispatcher
+     */
+    public boolean sendTestEmail(String toEmail) {
+        String subject = "🧪 AIRGATE Email System Diagnostic Test";
+        String body = """
+        <div style="background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(59,130,246,0.15)); border: 1px solid rgba(16,185,129,0.4); border-radius: 16px; padding: 24px; margin-bottom: 24px; text-align: center;">
+          <div style="font-size: 40px; margin-bottom: 8px;">✅</div>
+          <h2 style="color: #ffffff; margin: 0 0 8px 0; font-size: 22px; font-weight: 800;">Email Integration Operational!</h2>
+          <p style="color: #cbd5e1; font-size: 14px; margin: 0;">This test email verifies that your Brevo API / SMTP settings are configured correctly.</p>
+        </div>
+        <p>Current Dynamic Frontend Domain: <strong style="color: #38bdf8;">{FRONTEND_URL}</strong></p>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="{FRONTEND_URL}" class="cta-btn">🌐 Test Site Link</a>
+        </div>
+        """
+        .replace("{FRONTEND_URL}", getEffectiveFrontendUrl());
+
+        String html = buildBrandedLayout("Admin", body);
+        return sendHtmlEmail(toEmail, subject, html, "ADMIN_TEST_EMAIL");
     }
 
     /**
@@ -386,6 +502,8 @@ public class EmailService {
                 log.warn("Could not fetch supportEmail from settings: {}", e.getMessage());
             }
 
+            String currentBaseUrl = getEffectiveFrontendUrl();
+
             String subject = "⚡ NEW VIP Beta Payment Submitted - UTR #" + pv.getUtrNumber();
             String body = """
             <div style="background: linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(236,72,153,0.4); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
@@ -415,11 +533,11 @@ public class EmailService {
             .replace("{AMOUNT}", String.valueOf(pv.getAmount()))
             .replace("{UTR_NUMBER}", pv.getUtrNumber() != null ? pv.getUtrNumber() : "N/A")
             .replace("{SCREENSHOT_URL}", (pv.getScreenshotUrl() != null && !pv.getScreenshotUrl().isBlank()) ? ("<a href='" + pv.getScreenshotUrl() + "' style='color: #38bdf8;'>View Screenshot</a>") : "None Provided")
-            .replace("{FRONTEND_URL}", frontendUrl);
+            .replace("{FRONTEND_URL}", currentBaseUrl);
 
             String html = buildBrandedLayout("Admin", body);
             sendHtmlEmail(adminEmail, subject, html, "ADMIN_PAYMENT_VERIFICATION_ALERT");
-            log.info("📩 Notification email sent to admin [{}] for payment verification UTR {}", adminEmail, pv.getUtrNumber());
+            log.info("宿 Notification email sent to admin [{}] for payment verification UTR {}", adminEmail, pv.getUtrNumber());
         } catch (Exception e) {
             log.error("Failed to send admin payment verification email alert: {}", e.getMessage(), e);
         }

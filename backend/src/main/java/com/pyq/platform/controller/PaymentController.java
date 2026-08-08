@@ -340,22 +340,34 @@ public class PaymentController {
     }
 
     private void upgradeUserPremium(User user, Payment payment) {
-        user.setIsPremium(true);
-        int durationMonths = payment != null ? payment.getDurationMonths() : 1;
-        LocalDateTime currentExpiry = user.getPremiumExpiresAt();
-        LocalDateTime newExpiry = (currentExpiry != null && currentExpiry.isAfter(LocalDateTime.now()))
-                ? currentExpiry.plusMonths(durationMonths)
-                : LocalDateTime.now().plusMonths(durationMonths);
-        user.setPremiumExpiresAt(newExpiry);
-        userRepository.save(user);
-        log.info("Upgraded user {} to premium until {}", user.getUsername(), newExpiry);
-
+        int duration = (payment != null && payment.getDurationMonths() != null) ? payment.getDurationMonths() : 1;
+        String planName = "Aspirant Pro Pass";
+        BigDecimal amount = (payment != null && payment.getAmount() != null) ? payment.getAmount() : new BigDecimal("49.00");
+        upgradeUserPremium(user, duration, planName, amount);
         if (payment != null) {
             try {
                 emailService.sendPaymentSuccessEmail(user, payment);
             } catch (Exception e) {
                 log.warn("Failed to send payment confirmation email to {}: {}", user.getEmail(), e.getMessage());
             }
+        }
+    }
+
+    private void upgradeUserPremium(User user, int durationMonths, String planName, BigDecimal amount) {
+        user.setIsPremium(true);
+        int validDuration = durationMonths > 0 ? durationMonths : 1;
+        LocalDateTime currentExpiry = user.getPremiumExpiresAt();
+        LocalDateTime newExpiry = (currentExpiry != null && currentExpiry.isAfter(LocalDateTime.now()))
+                ? currentExpiry.plusMonths(validDuration)
+                : LocalDateTime.now().plusMonths(validDuration);
+        user.setPremiumExpiresAt(newExpiry);
+        userRepository.save(user);
+        log.info("✅ Upgraded user {} to premium until {} ({} months)", user.getUsername(), newExpiry, validDuration);
+
+        try {
+            emailService.sendPaymentApprovalConfirmationEmail(user, planName != null ? planName : "Aspirant Pro Pass", validDuration, amount != null ? amount : new BigDecimal("49.00"), newExpiry);
+        } catch (Exception e) {
+            log.warn("Failed to send payment confirmation email to {}: {}", user.getEmail(), e.getMessage());
         }
     }
 
@@ -490,6 +502,10 @@ public class PaymentController {
         com.pyq.platform.entity.PaymentVerification pv = paymentVerificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Verification request not found with ID: " + id));
 
+        if (pv.getStatus() == com.pyq.platform.entity.PaymentVerification.Status.APPROVED) {
+            return ResponseEntity.badRequest().body(Map.of("error", "This payment verification request has already been approved."));
+        }
+
         pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.APPROVED);
         if (body != null && body.containsKey("notes")) {
             pv.setAdminNotes(body.get("notes").toString());
@@ -498,7 +514,8 @@ public class PaymentController {
 
         User user = pv.getUser();
         if (user != null) {
-            upgradeUserPremium(user, null);
+            int durationMonths = pv.getDurationMonths() != null ? pv.getDurationMonths() : 1;
+            upgradeUserPremium(user, durationMonths, pv.getPlanType(), pv.getAmount());
         }
 
         // Decrement VIP spots remaining in settings if > 0
@@ -508,7 +525,7 @@ public class PaymentController {
             systemSettingsRepository.save(settings);
         }
 
-        log.info("✅ Admin approved VIP Beta payment ID {} for user {}", id, user != null ? user.getUsername() : "null");
+        log.info("✅ Admin approved VIP Beta payment ID {} ({} months) for user {}", id, pv.getDurationMonths(), user != null ? user.getUsername() : "null");
 
         return ResponseEntity
                 .ok(Map.of("message", "VIP Beta payment approved and Premium access activated successfully!"));
@@ -523,17 +540,30 @@ public class PaymentController {
         com.pyq.platform.entity.PaymentVerification pv = paymentVerificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Verification request not found with ID: " + id));
 
-        pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.REJECTED);
-        if (body != null && body.containsKey("notes")) {
-            pv.setAdminNotes(body.get("notes").toString());
-        } else {
-            pv.setAdminNotes("Transaction UTR or payment proof could not be verified.");
+        if (pv.getStatus() == com.pyq.platform.entity.PaymentVerification.Status.REJECTED) {
+            return ResponseEntity.badRequest().body(Map.of("error", "This payment verification request has already been rejected."));
         }
+
+        pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.REJECTED);
+        String notes = "Transaction UTR or payment proof could not be verified.";
+        if (body != null && body.containsKey("notes") && body.get("notes") != null && !body.get("notes").toString().isBlank()) {
+            notes = body.get("notes").toString().trim();
+        }
+        pv.setAdminNotes(notes);
         paymentVerificationRepository.save(pv);
+
+        User user = pv.getUser();
+        if (user != null) {
+            try {
+                emailService.sendPaymentRejectionNoticeEmail(user, pv.getUtrNumber(), notes);
+            } catch (Exception e) {
+                log.warn("Failed to send payment rejection email to {}: {}", user.getEmail(), e.getMessage());
+            }
+        }
 
         log.info("❌ Admin rejected VIP Beta payment ID {}", id);
 
-        return ResponseEntity.ok(Map.of("message", "Payment verification request rejected."));
+        return ResponseEntity.ok(Map.of("message", "Payment verification request rejected. User notified via email."));
     }
 
     @PostMapping("/admin/settings/beta")

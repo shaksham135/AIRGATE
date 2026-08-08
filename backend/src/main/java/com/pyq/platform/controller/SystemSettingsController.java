@@ -159,6 +159,9 @@ public class SystemSettingsController {
         if (newSettings.getSupportPhone() != null) {
             settings.setSupportPhone(newSettings.getSupportPhone());
         }
+        if (newSettings.getFrontendBaseUrl() != null) {
+            settings.setFrontendBaseUrl(newSettings.getFrontendBaseUrl());
+        }
 
         // Map Email Automation Settings
         if (newSettings.getAutoWelcomeEmailEnabled() != null) {
