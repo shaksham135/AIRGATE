@@ -154,6 +154,11 @@ public class QuestionController {
             qOpt = questionRepository.findFirstByQuestionNumber(qNum);
         }
 
+        // Fallback: if qNum is large it may actually be a question database ID (urlUtils uses q.id when questionNumber is null)
+        if (qOpt.isEmpty() && qNum > 200) {
+            qOpt = questionRepository.findById((long) qNum);
+        }
+
         if (qOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new MessageResponse("Error: Question not found for GATE " + branch + " " + year + " Set-" + setNum + " Q" + qNum));
@@ -185,6 +190,11 @@ public class QuestionController {
 
         if (qOpt.isEmpty()) {
             qOpt = questionRepository.findFirstByQuestionNumber(qNum);
+        }
+
+        // Fallback: if qNum is large it may actually be a question database ID (urlUtils uses q.id when questionNumber is null)
+        if (qOpt.isEmpty() && qNum > 200) {
+            qOpt = questionRepository.findById((long) qNum);
         }
 
         if (qOpt.isEmpty()) {
