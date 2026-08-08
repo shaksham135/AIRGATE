@@ -115,14 +115,13 @@ public class Question {
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
-    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
     @org.hibernate.annotations.BatchSize(size = 30)
     @OrderBy("optionLabel ASC")
     @Builder.Default
     private List<QuestionOption> options = new ArrayList<>();
 
     @OneToMany(mappedBy = "question", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
+    @org.hibernate.annotations.BatchSize(size = 30)
     @Builder.Default
     private List<QuestionAIAnalysis> aiAnalyses = new ArrayList<>();
 
