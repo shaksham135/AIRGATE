@@ -134,8 +134,8 @@ export const sanitizeLatexString = (str) => {
     return `\\begin{${env}}${clean}\\end{${env}}`;
   });
 
-  // 1b. Convert unwrapped matrices into double-dollar block matrices ONLY if not already inside $ or $$
-  s = s.replace(/(?<!\$)\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}(?!\$)/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
+  // 1b. Convert single-dollar ($ ... $) or unwrapped matrices into double-dollar block matrices ($$ ... $$)
+  s = s.replace(/\$?\s*\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}\s*\$?/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
 
   // Clean up any double-stacked dollar sign artifacts
   s = s.replace(/\$\$\s*\$\$/g, '$$');
@@ -163,8 +163,8 @@ export const sanitizeLatexString = (str) => {
     return fullMatch;
   });
 
-  // 5. Split string into already-wrapped math vs plain text segments (inline $...$ cannot cross newlines)
-  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\\n]|\\.){1,300}?\$)/g;
+  // 5. Split string into already-wrapped math vs plain text segments (allow inline $...$ across newlines)
+  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,500}?\$)/g;
   const parts = [];
   let lastIndex = 0;
   let match;
