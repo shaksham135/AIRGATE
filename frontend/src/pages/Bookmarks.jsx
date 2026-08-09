@@ -598,8 +598,6 @@ function BookmarksContent() {
 
       questionsToCompile.forEach((q, idx) => {
         const questionHtml = formatMathTextToHtml(q.text || '');
-        const answerHtml = formatMathTextToHtml(q.aiSuggestedAnswer || 'Not available');
-        const explanationHtml = formatMathTextToHtml(q.aiSuggestedExplanation || 'Not available');
 
         let optionsList = [];
         if (q.options && Array.isArray(q.options) && q.options.length > 0) {
@@ -634,6 +632,10 @@ function BookmarksContent() {
           htmlContent += `</div>`;
         }
 
+        const ansText = q.aiSuggestedAnswer || q.correctAnswer || q.answer || '';
+        const answerHtml = ansText ? formatMathTextToHtml(ansText) : 'Not available';
+        const expText = q.aiSuggestedExplanation || q.explanation || q.solution || '';
+
         if (pdfOptions.includeAnswer) {
           htmlContent += `
             <div class="ans-box">
@@ -642,7 +644,8 @@ function BookmarksContent() {
           `;
         }
 
-        if (pdfOptions.includeExplanation && q.aiSuggestedExplanation) {
+        if (pdfOptions.includeExplanation && expText) {
+          const explanationHtml = formatMathTextToHtml(expText);
           htmlContent += `
             <div class="exp-box">
               <div class="exp-title">💡 Step-by-Step KaTeX Explanation:</div>

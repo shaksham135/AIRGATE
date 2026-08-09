@@ -144,9 +144,10 @@ export const sanitizeLatexString = (str) => {
   s = s.replace(/\\\[([\s\S]*?)\\\]/g, ' $$ $1 $$ ');
   s = s.replace(/\\\(([\s\S]*?)\\\)/g, ' $ $1 $ ');
 
-  // 3. Auto-wrap unwrapped \frac{...}{...} and \sqrt{...} if not enclosed in $
+  // 3. Auto-wrap unwrapped \frac{...}{...}, \sqrt{...}, \cdot, etc. if not enclosed in $
   s = s.replace(/(?<!\$)\\frac\{([^{}]+|\{[^{}]*\})\}\{([^{}]+|\{[^{}]*\})\}(?!\$)/gi, ' $\\frac{$1}{$2}$ ');
-  s = s.replace(/(?<!\$)([-+]?[0-9]*\.?[0-9]*\s*\\sqrt\{[^{}]+\})(?!\$)/gi, (m, p1) => ` $${p1}$ `);
+  s = s.replace(/(?<!\$)\\sqrt\{([^{}]+|\{[^{}]*\})\}(?!\$)/gi, ' $\\sqrt{$1}$ ');
+  s = s.replace(/(?<!\$)\\sqrt([0-9a-zA-Z]+)(?!\$)/gi, ' $\\sqrt{$1}$ ');
 
   // 4. Fix stashed words & commands (e.g. cdot(-1) -> \cdot (-1), det(A) -> \det(A))
   s = s.replace(/\bcdot([^\s])/g, ' \\cdot $1');
@@ -184,13 +185,19 @@ export const sanitizeLatexString = (str) => {
     if (part.type === 'math') return part.value;
     let t = part.value;
 
-    // Match specific unwrapped LaTeX tokens like \lambda, \sum (requires \ backslash for commands) or b_3, b_0
-    t = t.replace(/(?<!\$)(\\(?:lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|det|tr)\b|(?<![a-zA-Z])[a-zA-Z]_[0-9a-zA-Z{}]+)(?!\$)/gi, (token) => {
+    // Auto-wrap unwrapped LaTeX commands like \frac, \sqrt, \cdot, \times, \lambda, \sum, etc.
+    t = t.replace(/(?<!\$)(\\(?:frac|sqrt|cdot|times|div|pm|mp|le|ge|neq|equiv|approx|infty|forall|exists|in|notin|subset|cap|cup|vee|wedge|neg|rightarrow|left|right|lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|iint|iiint|det|tr|gcd|lcm|rank)\b[^\$\n]*?)(?!\$)/gi, (m, token) => {
       let trimmed = token.trim();
-      if (trimmed && !/^(and|the|where|if|is|are|with|matrix|eigenvalues|vectors|trace|minor|determinant)$/i.test(trimmed)) {
+      if (trimmed && !/^\$(.*)\$$/.test(trimmed)) {
         return ` $${trimmed}$ `;
       }
       return token;
+    });
+
+    // Auto-wrap subscripts (e.g. b_3, x_{12}) and superscripts (e.g. a^2 + b^2 = c^2, s\sqrt{2})
+    t = t.replace(/(?<!\$)((?<![a-zA-Z])[a-zA-Z]_[0-9a-zA-Z{}]+|(?<![a-zA-Z])[a-zA-Z]\^\{[^{}]+\}|(?<![a-zA-Z])[a-zA-Z]\^[0-9a-zA-Z])(?!\$)/gi, (m, token) => {
+      let trimmed = token.trim();
+      return ` $${trimmed}$ `;
     });
 
     return t;
