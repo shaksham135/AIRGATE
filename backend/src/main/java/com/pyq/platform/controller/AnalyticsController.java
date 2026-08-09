@@ -21,20 +21,41 @@ public class AnalyticsController {
     private final TopicRepository topicRepository;
     private final com.pyq.platform.repository.EmailLogRepository emailLogRepository;
     private final com.pyq.platform.service.QuestionService questionService;
+    private final com.pyq.platform.mapper.QuestionMapper questionMapper;
+    private final com.pyq.platform.repository.UserRepository userRepository;
 
     public AnalyticsController(QuestionRepository questionRepository, 
                                TopicRepository topicRepository,
                                com.pyq.platform.repository.EmailLogRepository emailLogRepository,
-                               com.pyq.platform.service.QuestionService questionService) {
+                               com.pyq.platform.service.QuestionService questionService,
+                               com.pyq.platform.mapper.QuestionMapper questionMapper,
+                               com.pyq.platform.repository.UserRepository userRepository) {
         this.questionRepository = questionRepository;
         this.topicRepository = topicRepository;
         this.emailLogRepository = emailLogRepository;
         this.questionService = questionService;
+        this.questionMapper = questionMapper;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/analytics/pdf-download")
     @Transactional
-    public ResponseEntity<?> trackPdfDownload(@RequestBody(required = false) Map<String, String> body) {
+    public ResponseEntity<?> trackPdfDownload(
+            @RequestBody(required = false) Map<String, String> body,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.pyq.platform.security.UserDetailsImpl userDetails) {
+        
+        if (userDetails != null) {
+            com.pyq.platform.entity.User user = userRepository.findById(userDetails.getId()).orElse(null);
+            if (user != null && !Boolean.TRUE.equals(user.getIsPremium())) {
+                if (Boolean.TRUE.equals(user.getHasUsedPdfTrial())) {
+                    return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                            .body(Map.of("error", "PDF_TRIAL_EXHAUSTED", "message", "You have already used your 1-time free PDF trial sample! Upgrade to Aspirant Pro for unlimited Revision PDFs."));
+                }
+                user.setHasUsedPdfTrial(true);
+                userRepository.save(user);
+            }
+        }
+
         String userEmail = (body != null && body.containsKey("email")) ? body.get("email") : "aspirant@airgate.in";
         EmailLog log = EmailLog.builder()
                 .recipientEmail(userEmail)
@@ -44,7 +65,7 @@ public class AnalyticsController {
                 .sentAt(java.time.LocalDateTime.now())
                 .build();
         emailLogRepository.save(log);
-        return ResponseEntity.ok(Map.of("success", true));
+        return ResponseEntity.ok(Map.of("success", true, "hasUsedPdfTrial", true));
     }
 
     // Dynamic yearly frequency count for a topic (Cached in RAM for sub-1ms load)
@@ -79,7 +100,7 @@ public class AnalyticsController {
         return ResponseEntity.ok(result);
     }
 
-    // Related questions listing based on same topic (Cached for sub-5ms response)
+    // Related questions listing based on same topic and question category (Cached for sub-5ms response)
     @GetMapping("/questions/{id}/similar")
     @org.springframework.cache.annotation.Cacheable(value = "similarQuestions", key = "#id")
     public ResponseEntity<?> getSimilarQuestions(@PathVariable("id") Long id) {
@@ -90,14 +111,35 @@ public class AnalyticsController {
         }
 
         Question source = questionOpt.get();
-        Set<String> sourceTagNames = source.getTags().stream().map(Tag::getName).collect(Collectors.toSet());
+        String pdfSource = source.getPdfSourceName();
+        boolean isAiPractice = pdfSource != null && (
+                pdfSource.toLowerCase().startsWith("ai_nightly") ||
+                pdfSource.toLowerCase().startsWith("ai_generated") ||
+                pdfSource.toLowerCase().contains("practice")
+        );
 
-        // Find matches via indexed topic query
-        List<Question> similar = questionRepository.findTop5ByTopicIdAndStatusAndIdNot(
-                source.getTopic().getId(), "APPROVED", source.getId());
+        Long topicId = source.getTopic() != null ? source.getTopic().getId() : null;
+        Long subjectId = source.getSubject() != null ? source.getSubject().getId() : null;
+
+        List<Question> similar = new ArrayList<>();
+        if (isAiPractice) {
+            if (topicId != null) {
+                similar = questionRepository.findTop5AiPracticeQuestionsByTopicId(topicId, source.getId());
+            }
+            if (similar.isEmpty() && subjectId != null) {
+                similar = questionRepository.findTop5AiPracticeQuestionsBySubjectId(subjectId, source.getId());
+            }
+        } else {
+            if (topicId != null) {
+                similar = questionRepository.findTop5OfficialPyqsByTopicId(topicId, source.getId());
+            }
+            if (similar.isEmpty() && subjectId != null) {
+                similar = questionRepository.findTop5OfficialPyqsBySubjectId(subjectId, source.getId());
+            }
+        }
 
         List<QuestionDTO> dtos = similar.stream()
-                .map(this::convertToDTO)
+                .map(questionMapper::convertToDTO)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);

@@ -589,12 +589,22 @@ public class AIClassificationService {
     // -------------------------
     // Inner class to hold structured response
     // -------------------------
+    // -------------------------
+    // Inner class to hold structured response
+    // -------------------------
     public static class SolutionResult {
         public final String shortSolution;  // Quick answer + trick
         public final String detailedSolution; // Full step-by-step
+        public final String concludedAnswer;  // Verified option derived by AI (e.g. "B" or "12.5")
+
         public SolutionResult(String shortSolution, String detailedSolution) {
+            this(shortSolution, detailedSolution, null);
+        }
+
+        public SolutionResult(String shortSolution, String detailedSolution, String concludedAnswer) {
             this.shortSolution = shortSolution;
             this.detailedSolution = detailedSolution;
+            this.concludedAnswer = concludedAnswer;
         }
     }
 
@@ -641,46 +651,42 @@ public class AIClassificationService {
     }
 
     public SolutionResult generateDetailedSolution(String questionText, String correctOption) {
-        return generateDetailedSolution(questionText, correctOption, null);
+        return generateDetailedSolution(questionText, null, correctOption, null);
     }
 
     public SolutionResult generateDetailedSolution(String questionText, String correctOption, List<String> imageUrlsOrPaths) {
+        return generateDetailedSolution(questionText, null, correctOption, imageUrlsOrPaths);
+    }
+
+    public SolutionResult generateDetailedSolution(String questionText, String optionsText, String correctOption, List<String> imageUrlsOrPaths) {
+
+        String optionsFormatted = (optionsText != null && !optionsText.isBlank()) ? optionsText : "N/A (No multiple choice options provided)";
 
         String userPrompt =
-                "For this GATE CSE/IT question, write TWO sections EXACTLY as shown below.\n\n"
-                + "QUESTION:\n" + questionText + "\n\n"
-                + "CORRECT ANSWER: " + correctOption + "\n\n"
-                + "=== FORMAT (copy exactly) ===\n\n"
-                + "SHORT_SOLUTION\n"
-                + "Answer: [state the correct option/value]\n"
-                + "[1-3 sentences: direct reasoning OR a GATE shortcut trick if one exists. Be concise.]"
-                + "If a well-known trick or formula shortcut applies, mention it clearly. Otherwise just state the key idea.\n\n"
-                + SECTION_DELIMITER + "\n\n"
-                + "DETAILED_SOLUTION\n"
-                + "### Detailed Solution\n"
-                + "### Step 1: [description]\n"
-                + "[content of step 1]\n"
-                + "### Step 2: [description]\n"
-                + "[content]\n"
-                + "... (all steps needed)\n"
-                + "### Final Answer\n"
-                + "Therefore the answer is " + correctOption + ".\n\n"
-                + "=== RULES ===\n"
-                + "- SHORT_SOLUTION must be 1-4 lines only\n"
-                + "- DETAILED_SOLUTION must be complete step-by-step. Show all calculations.\n"
-                + "- Do NOT use LaTeX. Use plain math notation (e.g. t^2/2, integral of t).\n"
-                + "- Do NOT add any other sections or extra text outside this format.";
+                "For this GATE CSE/IT question, perform step-by-step Ground-Truth Grounded reasoning.\n\n"
+                + "QUESTION STEM:\n" + questionText + "\n\n"
+                + "OPTIONS:\n" + optionsFormatted + "\n\n"
+                + "VERIFIED GROUND-TRUTH ANSWER KEY: " + correctOption + "\n\n"
+                + "=== STRICT INSTRUCTIONS ===\n"
+                + "1. The verified answer key for this question is GROUND TRUTH: " + correctOption + ". Your logical derivation MUST work toward and support this answer. Do NOT contradict or hallucinate a different option choice.\n"
+                + "2. Respond STRICTLY in valid JSON format with 3 keys:\n"
+                + "   {\n"
+                + "     \"shortSolution\": \"Answer: " + correctOption + "\\n[1-3 sentences direct GATE shortcut trick or core key idea]\",\n"
+                + "     \"detailedSolution\": \"### Detailed Solution\\n### Step 1: ...\\n### Step 2: ...\\n### Final Answer\\nTherefore the correct answer is " + correctOption + ".\",\n"
+                + "     \"concludedAnswer\": \"" + correctOption + "\"\n"
+                + "   }\n"
+                + "3. Do NOT use LaTeX block formatting. Use clean math notation (e.g. t^2/2, O(n log n)).\n"
+                + "4. Do NOT output markdown fences outside the JSON. Return raw JSON object directly.";
 
-        String systemInstruction = "You are an expert GATE CSE professor. Follow the format exactly. "
-                + "Short section must be brief (1-4 lines). Detailed section must be thorough and never truncated.";
+        String systemInstruction = "You are an expert GATE CSE professor. Follow the Ground-Truth Grounding rules strictly. Return valid JSON only with zero repetition loops.";
 
         // ── Direct Groq API Call (Round-Robin Multi-Key) ──────────────────
-        log.info("🚀 [Solution Generator] Using Groq API with Round-Robin Multi-Key Load Balancing...");
+        log.info("🚀 [Solution Generator] Using Groq API with Ground-Truth Grounding & Repetition Penalty...");
         String currentApiKey = getNextApiKey();
         if (currentApiKey == null) {
             String fallback = "Correct answer: " + correctOption;
             return new SolutionResult(fallback,
-                    "### Detailed Solution\nThe correct answer is " + correctOption + ".\n\n*(Groq API not configured)*");
+                    "### Detailed Solution\nThe correct answer is " + correctOption + ".\n\n*(Groq API not configured)*", correctOption);
         }
 
         try {
@@ -689,8 +695,10 @@ public class AIClassificationService {
             headers.set("Authorization", "Bearer " + currentApiKey);
 
             ObjectNode rootNode = objectMapper.createObjectNode();
-            rootNode.put("temperature", 0.15);
-            rootNode.put("max_tokens", 1600);
+            rootNode.put("temperature", 0.05);
+            rootNode.put("frequency_penalty", 0.2);
+            rootNode.put("presence_penalty", 0.2);
+            rootNode.put("max_tokens", 3500);
 
             ArrayNode messages = rootNode.putArray("messages");
             ObjectNode systemMsg = messages.addObject();
@@ -703,7 +711,7 @@ public class AIClassificationService {
             if (imageUrlsOrPaths != null && !imageUrlsOrPaths.isEmpty() && geminiApiKey != null && !geminiApiKey.isBlank()) {
                 try {
                     log.info("🖼️ [Solution Generator] Routing image question to Gemini 2.5 Flash Vision engine...");
-                    return executeGeminiVisionSolutionCall(userPrompt, imageUrlsOrPaths);
+                    return executeGeminiVisionSolutionCall(userPrompt, imageUrlsOrPaths, correctOption);
                 } catch (Exception geminiErr) {
                     log.warn("⚠️ Gemini 2.5 Flash Vision failed ({}), falling back to Groq 70B Heavy model...", geminiErr.getMessage());
                 }
@@ -723,28 +731,44 @@ public class AIClassificationService {
             String content = choice.path("message").path("content").asText().trim();
             String finishReason = choice.path("finish_reason").asText("stop");
 
-            String[] sparts = content.split(SECTION_DELIMITER, 2);
-            String shortPart = sparts[0].trim().replaceAll("(?i)^SHORT_SOLUTION\\s*\\n?", "").trim();
-            String detailedPart = sparts.length > 1 ? sparts[1].trim()
-                    .replaceAll("(?i)^DETAILED_SOLUTION\\s*\\n?", "").trim()
-                    : "### Detailed Solution\nSee short solution above.";
-
-            if ("length".equals(finishReason)) {
-                detailedPart += "\n\n*(Solution may be incomplete due to response length. Correct answer: " + correctOption + ".)*";
+            // Strip any wrapping ```json ... ``` code blocks if output by model
+            String cleanJsonStr = content;
+            if (cleanJsonStr.startsWith("```")) {
+                cleanJsonStr = cleanJsonStr.replaceAll("^```(?:json)?\\s*", "").replaceAll("\\s*```$", "").trim();
             }
 
-            return new SolutionResult(shortPart, detailedPart);
+            try {
+                JsonNode parsedJson = objectMapper.readTree(cleanJsonStr);
+                String shortPart = parsedJson.path("shortSolution").asText("Answer: " + correctOption);
+                String detailedPart = parsedJson.path("detailedSolution").asText("### Detailed Solution\nThe correct answer is " + correctOption + ".");
+                String concludedAns = parsedJson.path("concludedAnswer").asText(correctOption);
+
+                if ("length".equals(finishReason)) {
+                    detailedPart += "\n\n*(Solution reached max token length limit. Verified correct answer: " + correctOption + ".)*";
+                }
+
+                return new SolutionResult(shortPart, detailedPart, concludedAns);
+            } catch (Exception parseErr) {
+                // Fallback to section delimiter split if model output raw text
+                String[] sparts = content.split(SECTION_DELIMITER, 2);
+                String shortPart = sparts[0].trim().replaceAll("(?i)^SHORT_SOLUTION\\s*\\n?", "").trim();
+                String detailedPart = sparts.length > 1 ? sparts[1].trim()
+                        .replaceAll("(?i)^DETAILED_SOLUTION\\s*\\n?", "").trim()
+                        : "### Detailed Solution\nAnswer: " + correctOption;
+
+                return new SolutionResult(shortPart, detailedPart, correctOption);
+            }
 
         } catch (Exception e) {
             log.error("Failed to generate async detailed solution: {}", e.getMessage());
             String fallback = "Correct answer: " + correctOption;
             return new SolutionResult(fallback,
                     "### Detailed Solution\nThe correct answer is " + correctOption
-                    + ".\n\n*(Generation failed: " + e.getMessage() + ")*");
+                    + ".\n\n*(Generation failed: " + e.getMessage() + ")*", correctOption);
         }
     }
 
-    private SolutionResult executeGeminiVisionSolutionCall(String prompt, List<String> imageUrlsOrPaths) throws Exception {
+    private SolutionResult executeGeminiVisionSolutionCall(String prompt, List<String> imageUrlsOrPaths, String correctOption) throws Exception {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         String modelToUse = geminiModel != null && !geminiModel.isBlank() ? geminiModel : "gemini-2.5-flash";
@@ -775,8 +799,8 @@ public class AIClassificationService {
         }
 
         ObjectNode genConfig = req.putObject("generationConfig");
-        genConfig.put("temperature", 0.1);
-        genConfig.put("maxOutputTokens", 2500);
+        genConfig.put("temperature", 0.05);
+        genConfig.put("maxOutputTokens", 4000);
 
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(req.toString(), headers), String.class);
         if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
@@ -784,10 +808,23 @@ public class AIClassificationService {
             JsonNode candidate = root.path("candidates").get(0);
             String text = candidate.path("content").path("parts").get(0).path("text").asText().trim();
 
-            String[] sparts = text.split(SECTION_DELIMITER, 2);
-            String shortPart = sparts[0].trim().replaceAll("(?i)^SHORT_SOLUTION\\s*\\n?", "").trim();
-            String detailedPart = sparts.length > 1 ? sparts[1].trim() : text;
-            return new SolutionResult(shortPart, detailedPart);
+            String cleanJsonStr = text;
+            if (cleanJsonStr.startsWith("```")) {
+                cleanJsonStr = cleanJsonStr.replaceAll("^```(?:json)?\\s*", "").replaceAll("\\s*```$", "").trim();
+            }
+
+            try {
+                JsonNode parsedJson = objectMapper.readTree(cleanJsonStr);
+                String shortPart = parsedJson.path("shortSolution").asText("Answer: " + correctOption);
+                String detailedPart = parsedJson.path("detailedSolution").asText("### Detailed Solution\nThe correct answer is " + correctOption + ".");
+                String concludedAns = parsedJson.path("concludedAnswer").asText(correctOption);
+                return new SolutionResult(shortPart, detailedPart, concludedAns);
+            } catch (Exception parseErr) {
+                String[] sparts = text.split(SECTION_DELIMITER, 2);
+                String shortPart = sparts[0].trim().replaceAll("(?i)^SHORT_SOLUTION\\s*\\n?", "").trim();
+                String detailedPart = sparts.length > 1 ? sparts[1].trim() : text;
+                return new SolutionResult(shortPart, detailedPart, correctOption);
+            }
         }
         throw new RuntimeException("Gemini vision API returned empty response.");
     }

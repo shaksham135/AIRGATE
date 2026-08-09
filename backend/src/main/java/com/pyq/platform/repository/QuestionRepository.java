@@ -79,6 +79,23 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findTop5ByTopicIdAndStatusAndIdNot(Long topicId, String status, Long excludeId);
 
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @Query("SELECT q FROM Question q WHERE q.topic.id = :topicId AND q.status = 'APPROVED' AND q.id <> :excludeId AND (q.pdfSourceName IS NULL OR (q.pdfSourceName NOT LIKE 'AI_NIGHTLY%' AND q.pdfSourceName NOT LIKE 'AI_GENERATED%' AND q.pdfSourceName NOT LIKE '%AI Generator%' AND q.pdfSourceName NOT LIKE '%PRACTICE%')) ORDER BY q.id DESC")
+    List<Question> findTop5OfficialPyqsByTopicId(@Param("topicId") Long topicId, @Param("excludeId") Long excludeId);
+
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @Query("SELECT q FROM Question q WHERE q.subject.id = :subjectId AND q.status = 'APPROVED' AND q.id <> :excludeId AND (q.pdfSourceName IS NULL OR (q.pdfSourceName NOT LIKE 'AI_NIGHTLY%' AND q.pdfSourceName NOT LIKE 'AI_GENERATED%' AND q.pdfSourceName NOT LIKE '%AI Generator%' AND q.pdfSourceName NOT LIKE '%PRACTICE%')) ORDER BY q.id DESC")
+    List<Question> findTop5OfficialPyqsBySubjectId(@Param("subjectId") Long subjectId, @Param("excludeId") Long excludeId);
+
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @Query("SELECT q FROM Question q WHERE q.topic.id = :topicId AND q.status = 'APPROVED' AND q.id <> :excludeId AND (q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%' OR q.pdfSourceName LIKE '%AI Generator%' OR q.pdfSourceName LIKE '%PRACTICE%') ORDER BY q.id DESC")
+    List<Question> findTop5AiPracticeQuestionsByTopicId(@Param("topicId") Long topicId, @Param("excludeId") Long excludeId);
+
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @Query("SELECT q FROM Question q WHERE q.subject.id = :subjectId AND q.status = 'APPROVED' AND q.id <> :excludeId AND (q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%' OR q.pdfSourceName LIKE '%AI Generator%' OR q.pdfSourceName LIKE '%PRACTICE%') ORDER BY q.id DESC")
+    List<Question> findTop5AiPracticeQuestionsBySubjectId(@Param("subjectId") Long subjectId, @Param("excludeId") Long excludeId);
+
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findTop50ByTopicIdOrderByIdDesc(Long topicId);
 
     @EntityGraph(attributePaths = {"options", "subject", "topic"})
@@ -96,6 +113,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     @Query("SELECT COUNT(q) FROM Question q WHERE q.pdfSourceName IS NULL OR (q.pdfSourceName NOT LIKE 'AI_GENERATED%' AND q.pdfSourceName NOT LIKE '%AI Generator%' AND q.pdfSourceName NOT LIKE '%PRACTICE%')")
     long countOfficialPyqsTotal();
 
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
     @Query("SELECT q FROM Question q WHERE q.pdfSourceName LIKE 'AI_NIGHTLY%' OR q.pdfSourceName LIKE 'AI_GENERATED%' OR q.pdfSourceName LIKE '%AI Generator%' OR q.pdfSourceName LIKE '%PRACTICE%'")
     List<Question> findAllAiGeneratedQuestions();
 

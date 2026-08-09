@@ -99,8 +99,8 @@ public class QuestionMapper {
         );
 
         String seoUrl = isAiPractice
-                ? "/practice/" + subjectSlug + "/q" + questionNumber
-                : "/gate/" + branch + "/" + (question.getYear() != null ? question.getYear() : 2025) + "/set-" + paperSet + "/q" + questionNumber;
+                ? "/practice/" + subjectSlug + "/q" + question.getId()
+                : "/gate/" + branch + "/" + (question.getYear() != null ? question.getYear() : 2025) + "/set-" + paperSet + "/q" + question.getId();
 
         return QuestionDTO.builder()
                 .id(question.getId())

@@ -23,10 +23,12 @@ public class UserDetailsImpl implements UserDetails {
 
     private boolean isBanned;
     private boolean isPremium;
+    private boolean hasUsedPdfTrial;
     private java.time.LocalDateTime premiumExpiresAt;
 
     public UserDetailsImpl(Long id, String username, String email, String password,
                            Collection<? extends GrantedAuthority> authorities, boolean isBanned, boolean isPremium,
+                           boolean hasUsedPdfTrial,
                            java.time.LocalDateTime premiumExpiresAt) {
         this.id = id;
         this.username = username;
@@ -35,6 +37,7 @@ public class UserDetailsImpl implements UserDetails {
         this.authorities = authorities;
         this.isBanned = isBanned;
         this.isPremium = isPremium;
+        this.hasUsedPdfTrial = hasUsedPdfTrial;
         this.premiumExpiresAt = premiumExpiresAt;
     }
 
@@ -48,12 +51,17 @@ public class UserDetailsImpl implements UserDetails {
                 Collections.singletonList(authority),
                 Boolean.TRUE.equals(user.getIsBanned()),
                 Boolean.TRUE.equals(user.getIsPremium()),
+                Boolean.TRUE.equals(user.getHasUsedPdfTrial()),
                 user.getPremiumExpiresAt()
         );
     }
 
     public boolean isPremium() {
         return isPremium;
+    }
+
+    public boolean isHasUsedPdfTrial() {
+        return hasUsedPdfTrial;
     }
 
     public boolean isBanned() {

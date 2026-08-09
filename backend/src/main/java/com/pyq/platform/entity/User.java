@@ -33,6 +33,10 @@ public class User {
     @Builder.Default
     private Boolean isPremium = false;
 
+    @Column(name = "has_used_pdf_trial", nullable = false)
+    @Builder.Default
+    private Boolean hasUsedPdfTrial = false;
+
     @Column(name = "premium_expires_at")
     private LocalDateTime premiumExpiresAt;
 

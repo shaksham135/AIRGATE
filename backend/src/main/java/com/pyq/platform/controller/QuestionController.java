@@ -10,6 +10,7 @@ import com.pyq.platform.repository.TopicRepository;
 import com.pyq.platform.repository.UserQuestionSolveRepository;
 import com.pyq.platform.repository.UserRepository;
 import com.pyq.platform.security.UserDetailsImpl;
+import com.pyq.platform.service.AIClassificationService;
 import com.pyq.platform.service.CloudinaryService;
 import com.pyq.platform.service.QuestionService;
 import com.pyq.platform.mapper.QuestionMapper;
@@ -55,6 +56,7 @@ public class QuestionController {
     private final QuestionMapper questionMapper;
     private final BookmarkRepository bookmarkRepository;
     private final UserQuestionSolveRepository solveRepository;
+    private final AIClassificationService aiClassificationService;
 
     public QuestionController(QuestionService questionService, QuestionRepository questionRepository,
             SubjectRepository subjectRepository,
@@ -63,7 +65,8 @@ public class QuestionController {
             CloudinaryService cloudinaryService,
             QuestionMapper questionMapper,
             BookmarkRepository bookmarkRepository,
-            UserQuestionSolveRepository solveRepository) {
+            UserQuestionSolveRepository solveRepository,
+            AIClassificationService aiClassificationService) {
         this.questionService = questionService;
         this.questionRepository = questionRepository;
         this.subjectRepository = subjectRepository;
@@ -74,6 +77,7 @@ public class QuestionController {
         this.questionMapper = questionMapper;
         this.bookmarkRepository = bookmarkRepository;
         this.solveRepository = solveRepository;
+        this.aiClassificationService = aiClassificationService;
     }
 
     // Public search with filters (anonymous access mapped in SecurityConfig)
@@ -136,16 +140,18 @@ public class QuestionController {
             @PathVariable("year") Integer year,
             @PathVariable("setStr") String setStr,
             @PathVariable("qNumStr") String qNumStr) {
-        
+
         int setNum = 1;
         try {
             setNum = Integer.parseInt(setStr.toLowerCase().replace("set-", "").replace("set", "").trim());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         int qNum = 1;
         try {
             qNum = Integer.parseInt(qNumStr.toLowerCase().replace("q", "").trim());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         // Priority 1: Check by direct Primary Key ID (qNum in clean URLs is q.id)
         Optional<Question> qOpt = questionRepository.findById((long) qNum);
@@ -155,7 +161,7 @@ public class QuestionController {
             qOpt = questionRepository.findFirstByBranchAndYearAndPaperSetAndQuestionNumber(
                     branch.toLowerCase().trim(), year, setNum, qNum);
         }
-        
+
         // Priority 3: Check by questionNumber
         if (qOpt.isEmpty()) {
             qOpt = questionRepository.findFirstByQuestionNumber(qNum);
@@ -163,7 +169,8 @@ public class QuestionController {
 
         if (qOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new MessageResponse("Error: Question not found for GATE " + branch + " " + year + " Set-" + setNum + " Q" + qNum));
+                    .body(new MessageResponse("Error: Question not found for GATE " + branch + " " + year + " Set-"
+                            + setNum + " Q" + qNum));
         }
 
         return ResponseEntity.ok(convertToDTO(qOpt.get()));
@@ -174,11 +181,12 @@ public class QuestionController {
     public ResponseEntity<?> resolvePracticeQuestion(
             @PathVariable("subjectSlug") String subjectSlug,
             @PathVariable("qNumStr") String qNumStr) {
-        
+
         int qNum = 1;
         try {
             qNum = Integer.parseInt(qNumStr.toLowerCase().replace("q", "").trim());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         // Priority 1: Check by direct Primary Key ID (qNum in clean URLs is q.id)
         Optional<Question> qOpt = questionRepository.findById((long) qNum);
@@ -782,7 +790,9 @@ public class QuestionController {
             Map<String, Object> map = new HashMap<>();
             map.put("batchName", batchName);
             map.put("totalQuestions", qList.size());
-            map.put("pendingCount", qList.stream().filter(q -> "PENDING_REVIEW".equalsIgnoreCase(q.getStatus()) || "PENDING".equalsIgnoreCase(q.getStatus())).count());
+            map.put("pendingCount", qList.stream().filter(
+                    q -> "PENDING_REVIEW".equalsIgnoreCase(q.getStatus()) || "PENDING".equalsIgnoreCase(q.getStatus()))
+                    .count());
             map.put("approvedCount", qList.stream().filter(q -> "APPROVED".equalsIgnoreCase(q.getStatus())).count());
             result.add(map);
         });
@@ -800,7 +810,8 @@ public class QuestionController {
                 .collect(Collectors.toList());
 
         if (aiQuestions.isEmpty()) {
-            return ResponseEntity.ok(Map.of("message", "No questions found for batch: " + batchName, "deletedCount", 0));
+            return ResponseEntity
+                    .ok(Map.of("message", "No questions found for batch: " + batchName, "deletedCount", 0));
         }
 
         List<Long> qIds = aiQuestions.stream().map(Question::getId).collect(Collectors.toList());
@@ -808,6 +819,72 @@ public class QuestionController {
         questionRepository.deleteQuestionsBulk(qIds);
 
         log.info("🗑️ [Admin] Batch deleted! Purged {} questions from batch: {}", qIds.size(), batchName);
-        return ResponseEntity.ok(Map.of("message", "Successfully purged AI batch: " + batchName, "deletedCount", qIds.size()));
+        return ResponseEntity
+                .ok(Map.of("message", "Successfully purged AI batch: " + batchName, "deletedCount", qIds.size()));
+    }
+
+    @PostMapping("/{id}/regenerate-explanation")
+    @PreAuthorize("isAuthenticated()")
+    @Transactional
+    public ResponseEntity<?> regenerateExplanation(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        Optional<Question> qOpt = questionRepository.findById(id);
+        if (qOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found!"));
+        }
+
+        Question question = qOpt.get();
+        QuestionAIAnalysis aiAnalysis = aiAnalysisRepository.findFirstByQuestionIdOrderByCreatedAtDesc(id).orElse(null);
+        String correctOption = aiAnalysis != null && aiAnalysis.getSuggestedAnswer() != null
+                ? aiAnalysis.getSuggestedAnswer()
+                : "A";
+
+        StringBuilder optsSb = new StringBuilder();
+        if (question.getOptions() != null && !question.getOptions().isEmpty()) {
+            for (QuestionOption opt : question.getOptions()) {
+                optsSb.append("Option ").append(opt.getOptionLabel()).append(": ").append(opt.getOptionText())
+                        .append("\n");
+            }
+        }
+
+        List<String> images = new ArrayList<>();
+        if (question.getImagePath() != null && !question.getImagePath().isBlank()) {
+            images.add(question.getImagePath());
+        }
+
+        AIClassificationService.SolutionResult result = aiClassificationService.generateDetailedSolution(
+                question.getText(),
+                optsSb.toString(),
+                correctOption,
+                images);
+
+        if (aiAnalysis == null) {
+            aiAnalysis = QuestionAIAnalysis.builder()
+                    .question(question)
+                    .suggestedAnswer(correctOption)
+                    .modelName("llama-3.3-70b-comprehensive")
+                    .build();
+        }
+
+        aiAnalysis.setMentorInsights(result.shortSolution);
+        aiAnalysis.setSuggestedExplanation(result.detailedSolution);
+        aiAnalysis.setModelName("llama-3.3-70b-comprehensive");
+        aiAnalysisRepository.save(aiAnalysis);
+
+        // Verification Gate
+        if (result.concludedAnswer != null && correctOption != null) {
+            String cleanConcluded = result.concludedAnswer.trim().toUpperCase().replaceAll("[^A-Z0-9\\.]", "");
+            String cleanExpected = correctOption.trim().toUpperCase().replaceAll("[^A-Z0-9\\.]", "");
+
+            boolean matched = cleanConcluded.equalsIgnoreCase(cleanExpected) || cleanConcluded.contains(cleanExpected)
+                    || cleanExpected.contains(cleanConcluded);
+            question.setIsCommunityVerified(matched);
+            questionRepository.save(question);
+        }
+
+        return ResponseEntity.ok(convertToDTO(question));
     }
 }

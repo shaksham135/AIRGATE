@@ -348,14 +348,19 @@ function BookmarksContent() {
   };
 
   const handleCompilePDF = () => {
-    if (!AuthService.isPremium()) {
-      setShowPremiumModal(true);
-      return;
-    }
+    const isPremium = AuthService.isPremium();
+    const hasUsedTrial = AuthService.hasUsedPdfTrial();
+
     if (bookmarks.length === 0) {
       alert('You have no bookmarked questions to compile. Bookmark some questions first!');
       return;
     }
+
+    if (!isPremium && hasUsedTrial) {
+      setShowPremiumModal(true);
+      return;
+    }
+
     setShowPdfModal(true);
   };
 
@@ -363,252 +368,319 @@ function BookmarksContent() {
     setShowPdfModal(false);
     setPdfCompiling(true);
 
+    const isPremium = AuthService.isPremium();
+    const hasUsedTrial = AuthService.hasUsedPdfTrial();
+
+    if (!isPremium && hasUsedTrial) {
+      setPdfCompiling(false);
+      setShowPremiumModal(true);
+      return;
+    }
+
+    const isFreeTrial = !isPremium;
+
+    // Free trial users get max 10 questions:
+    const questionsToCompile = isFreeTrial ? bookmarks.slice(0, 10) : bookmarks;
+
     try {
-      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const marginL = 18;
-      const marginR = 18;
-      const usableW = pageW - marginL - marginR;
-      let y = 0;
-
-      const addPage = () => {
-        doc.addPage();
-        y = 20;
-        // Page footer
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(140, 140, 160);
-        doc.text('PYQ Platform — Premium Revision PDF', marginL, pageH - 8);
-        doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageW - marginR, pageH - 8, { align: 'right' });
-      };
-
-      const checkY = (needed) => {
-        if (y + needed > pageH - 18) { addPage(); }
-      };
-
-      const writeText = (text, opts = {}) => {
-        const { size = 10, bold = false, color = [30, 30, 50], indent = 0, lineGap = 2 } = opts;
-        doc.setFontSize(size);
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.setTextColor(...color);
-        const lines = doc.splitTextToSize(text, usableW - indent);
-        for (const line of lines) {
-          checkY(size * 0.4 + lineGap);
-          doc.text(line, marginL + indent, y);
-          y += size * 0.4 + lineGap;
-        }
-      };
-
-      // ── COVER PAGE ────────────────────────────────────────────────────────
-      // Background gradient simulation with a rect
-      doc.setFillColor(15, 15, 30);
-      doc.rect(0, 0, pageW, pageH, 'F');
-
-      // Decorative accent bar
-      doc.setFillColor(99, 102, 241);
-      doc.rect(0, 0, pageW, 4, 'F');
-
-      // Title block
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(28);
-      doc.setTextColor(255, 255, 255);
-      doc.text('AIRGATE', pageW / 2, 65, { align: 'center' });
-
-      doc.setFontSize(16);
-      doc.setTextColor(6, 182, 212);
-      doc.text('GATE CSE Revision Compilation', pageW / 2, 77, { align: 'center' });
-
-      doc.setFontSize(11);
-      doc.setTextColor(160, 160, 200);
-      doc.text(`${bookmarks.length} Premium Revision Questions`, pageW / 2, 92, { align: 'center' });
-      doc.text(`Generated: ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageW / 2, 101, { align: 'center' });
-
-      // Includes legend
-      doc.setFontSize(9);
-      doc.setTextColor(139, 92, 246);
-      const includes = ['Questions & Options'];
-      if (pdfOptions.includeAnswer) includes.push('Answers');
-      if (pdfOptions.includeExplanation) includes.push('Explanations');
-      doc.text(`Includes: ${includes.join(' · ')}`, pageW / 2, 116, { align: 'center' });
-
-      // Bottom branding
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(140, 140, 180);
-      doc.text('AIRGATE — Gateway to All India Rank', pageW / 2, pageH - 12, { align: 'center' });
-
-      // ── QUESTION PAGES ───────────────────────────────────────────────────
-      doc.addPage();
-      y = 20;
-
-      bookmarks.forEach((q, idx) => {
-        const questionText = cleanMarkdown(q.text || '');
-        const answerText = cleanMarkdown(q.aiSuggestedAnswer || 'Not available');
-        const explanationText = cleanMarkdown(q.aiSuggestedExplanation || 'Not available');
-
-        // Extract options array or regex fallback
-        let optionMatches = [];
-        if (q.options && Array.isArray(q.options) && q.options.length > 0) {
-          optionMatches = q.options.map(o => ({
-            label: o.optionLabel ? o.optionLabel.toUpperCase() : '•',
-            text: cleanMarkdown(o.optionText || '')
-          }));
-        } else {
-          const rawText = q.text || '';
-          const optionRegex = /\(?([A-D])\)?[.):]\s*(.+?)(?=\(?[A-D]\)?[.):][^\n]|$)/gsi;
-          let optMatch;
-          while ((optMatch = optionRegex.exec(rawText)) !== null) {
-            optionMatches.push({ label: optMatch[1].toUpperCase(), text: cleanMarkdown(optMatch[2].trim()) });
-          }
-        }
-
-        // Clean question stem
-        let stem = questionText;
-        if (optionMatches.length > 0) {
-          const firstOptIdx = questionText.search(/\(?[A-D]\)?[.):]/i);
-          if (firstOptIdx > 0) stem = questionText.substring(0, firstOptIdx).trim();
-        }
-
-        checkY(30);
-
-        // Question Number Badge area
-        const qNumStr = `Q${idx + 1}`;
-        doc.setFillColor(99, 102, 241);
-        doc.roundedRect(marginL, y - 4, 18, 7, 1.5, 1.5, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(255, 255, 255);
-        doc.text(qNumStr, marginL + 9, y + 0.5, { align: 'center' });
-
-        // Metadata badges inline
-        let badgeX = marginL + 22;
-        const badgeItems = [];
-        if (q.year) badgeItems.push(`GATE ${q.year}`);
-        if (q.subjectName) badgeItems.push(q.subjectName);
-        if (q.topicName) badgeItems.push(q.topicName);
-        if (q.marks) badgeItems.push(`${q.marks} Mark${q.marks > 1 ? 's' : ''}`);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(80, 80, 110);
-        badgeItems.forEach((badge, bi) => {
-          doc.text(badge, badgeX, y + 0.5);
-          badgeX += doc.getTextWidth(badge) + (bi < badgeItems.length - 1 ? 8 : 0);
-          if (bi < badgeItems.length - 1) {
-            doc.setTextColor(180, 180, 200);
-            doc.text('·', badgeX - 4, y + 0.5);
-            doc.setTextColor(80, 80, 110);
-          }
-        });
-
-        y += 10;
-
-        // Separator line
-        doc.setDrawColor(220, 220, 235);
-        doc.setLineWidth(0.3);
-        doc.line(marginL, y, pageW - marginR, y);
-        y += 5;
-
-        // Question text
-        writeText(stem, { size: 10, bold: false, color: [20, 20, 40] });
-        y += 3;
-
-        // Options
-        if (optionMatches.length > 0) {
-          optionMatches.forEach(opt => {
-            checkY(8);
-            doc.setFillColor(238, 242, 255);
-            doc.roundedRect(marginL + 2, y - 3.5, 6, 5.5, 1, 1, 'F');
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(8.5);
-            doc.setTextColor(99, 102, 241);
-            doc.text(opt.label, marginL + 5, y + 0.3, { align: 'center' });
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(40, 40, 70);
-            const optLines = doc.splitTextToSize(opt.text, usableW - 14);
-            optLines.forEach((line, li) => {
-              if (li === 0) {
-                doc.text(line, marginL + 11, y);
-              } else {
-                y += 5;
-                checkY(6);
-                doc.text(line, marginL + 11, y);
-              }
-            });
-            y += 6;
-          });
-        } else {
-          // NAT-type: no options, just question
-          writeText('(Numerical Answer Type Question)', { size: 8.5, color: [150, 100, 50], indent: 2 });
-        }
-
-        // Answer section
-        if (pdfOptions.includeAnswer) {
-          y += 2;
-          checkY(12);
-          doc.setFillColor(230, 255, 240);
-          doc.roundedRect(marginL, y - 3, usableW, 8, 1.5, 1.5, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(16, 150, 80);
-          doc.text('Answer:', marginL + 3, y + 1.5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(20, 100, 60);
-          const ansWidth = doc.getTextWidth('Answer: ');
-          const ansLines = doc.splitTextToSize(answerText, usableW - ansWidth - 6);
-          doc.text(ansLines[0] || '', marginL + 3 + ansWidth + 1, y + 1.5);
-          y += 10;
-          if (ansLines.length > 1) {
-            for (let ai = 1; ai < ansLines.length; ai++) {
-              checkY(6);
-              doc.text(ansLines[ai], marginL + 3 + ansWidth + 1, y);
-              y += 6;
-            }
-          }
-        }
-
-        // Explanation section
-        if (pdfOptions.includeExplanation && q.aiSuggestedExplanation) {
-          y += 2;
-          checkY(16);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8.5);
-          doc.setTextColor(80, 60, 180);
-          doc.text('Explanation:', marginL + 2, y);
-          y += 5;
-          writeText(explanationText, { size: 8.5, color: [60, 60, 100], indent: 2 });
-        }
-
-        // Bottom divider between questions
-        y += 5;
-        checkY(8);
-        doc.setDrawColor(200, 200, 220);
-        doc.setLineWidth(0.2);
-        doc.line(marginL + 10, y, pageW - marginR - 10, y);
-        y += 8;
-      });
-
-      // Page numbers & footers on all pages
-      const totalPages = doc.internal.getNumberOfPages();
-      for (let p = 2; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(120, 120, 150);
-        doc.text('AIRGATE Platform — Premium Revision PDF', marginL, pageH - 7);
-        doc.text(`Page ${p} of ${totalPages}`, pageW - marginR, pageH - 7, { align: 'right' });
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Please allow popups for this site to generate and print your Revision PDF.');
+        setPdfCompiling(false);
+        return;
       }
 
-      doc.save(`GATE_CSE_Bookmarks_Revision_${new Date().toISOString().slice(0, 10)}.pdf`);
+      const formattedDate = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+      
+      let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>AIRGATE Revision Compilation PDF - ${formattedDate}</title>
+          <meta charset="utf-8" />
+          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+            
+            @page {
+              size: A4;
+              margin: 12mm 15mm 15mm 15mm;
+            }
+            
+            body {
+              font-family: 'Inter', system-ui, -apple-system, sans-serif;
+              background: #ffffff;
+              color: #0f172a;
+              line-height: 1.6;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            
+            /* KaTeX Custom Typography for Print */
+            .katex { font-size: 1.05em !important; }
+            .katex .mathnormal { color: #0284c7 !important; font-weight: 600; }
+            .katex .mord, .katex .mbin, .katex .mrel, .katex .mop { color: #0f172a !important; }
+            .katex .mtable { color: #4f46e5 !important; }
+            .katex-display { margin: 0.75rem 0 !important; padding: 8px 12px !important; background: #f8fafc !important; border: 1px solid #cbd5e1 !important; border-radius: 6px !important; }
+            
+            /* Cover Page Header */
+            .cover-header {
+              background: linear-gradient(135deg, #0b0f19 0%, #1e1b4b 50%, #4f46e5 100%);
+              color: #ffffff;
+              padding: 32px 28px;
+              border-radius: 12px;
+              margin-bottom: 28px;
+              page-break-after: avoid;
+            }
+            .cover-title {
+              font-size: 28px;
+              font-weight: 800;
+              letter-spacing: -0.02em;
+              color: #38bdf8;
+              margin: 0 0 6px 0;
+            }
+            .cover-subtitle {
+              font-size: 16px;
+              font-weight: 600;
+              color: #cbd5e1;
+              margin: 0 0 16px 0;
+            }
+            .cover-meta {
+              display: flex;
+              gap: 12px;
+              flex-wrap: wrap;
+              font-size: 12px;
+              font-weight: 600;
+            }
+            .meta-badge {
+              background: rgba(255, 255, 255, 0.12);
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              padding: 4px 10px;
+              border-radius: 20px;
+              color: #f1f5f9;
+            }
+            .trial-badge {
+              background: rgba(245, 158, 11, 0.25) !important;
+              border-color: #f59e0b !important;
+              color: #fbbf24 !important;
+            }
+            
+            /* Question Cards */
+            .q-card {
+              border: 1px solid #e2e8f0;
+              border-radius: 10px;
+              padding: 20px;
+              margin-bottom: 20px;
+              page-break-inside: avoid;
+              background: #ffffff;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            }
+            .q-badge-row {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 12px;
+            }
+            .q-num-badge {
+              background: #4f46e5;
+              color: #ffffff;
+              font-size: 12px;
+              font-weight: 700;
+              padding: 3px 10px;
+              border-radius: 6px;
+            }
+            .tag-pill {
+              font-size: 11px;
+              font-weight: 600;
+              color: #475569;
+              background: #f1f5f9;
+              padding: 2px 8px;
+              border-radius: 4px;
+            }
+            .q-stem {
+              font-size: 14px;
+              font-weight: 500;
+              color: #1e293b;
+              margin-bottom: 14px;
+            }
+            .options-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              margin-bottom: 14px;
+            }
+            .option-box {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 6px;
+              padding: 8px 12px;
+              font-size: 13px;
+              display: flex;
+              align-items: flex-start;
+              gap: 8px;
+            }
+            .option-lbl {
+              font-weight: 700;
+              color: #4f46e5;
+              background: #e0e7ff;
+              width: 20px;
+              height: 20px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              font-size: 11px;
+            }
+            
+            /* Solutions & Answers */
+            .ans-box {
+              background: #f0fdf4;
+              border: 1px solid #bbf7d0;
+              border-radius: 6px;
+              padding: 10px 14px;
+              font-size: 13px;
+              color: #15803d;
+              font-weight: 600;
+              margin-top: 10px;
+            }
+            .exp-box {
+              background: #faf5ff;
+              border: 1px solid #e9d5ff;
+              border-radius: 6px;
+              padding: 12px 14px;
+              font-size: 13px;
+              color: #4c1d95;
+              margin-top: 10px;
+            }
+            .exp-title {
+              font-weight: 700;
+              color: #6b21a8;
+              margin-bottom: 6px;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            }
 
-      // Log PDF compilation telemetry for Admin Portal analytics
+            .page-footer {
+              text-align: center;
+              font-size: 11px;
+              color: #94a3b8;
+              margin-top: 30px;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="cover-header">
+            <h1 class="cover-title">AIRGATE</h1>
+            <div class="cover-subtitle">GATE CSE Revision Compilation</div>
+            <div class="cover-meta">
+              ${isFreeTrial 
+                ? `<span class="meta-badge trial-badge">🎁 1-Time Free Trial (${questionsToCompile.length} Questions) — Upgrade to Aspirant Pro for Unlimited PDFs</span>`
+                : `<span class="meta-badge">📚 ${questionsToCompile.length} Premium Revision Questions</span>`
+              }
+              <span class="meta-badge">📅 ${formattedDate}</span>
+              <span class="meta-badge">⚡ Full KaTeX Typeset</span>
+            </div>
+          </div>
+      `;
+
+      questionsToCompile.forEach((q, idx) => {
+        const questionHtml = formatMathText(q.text || '');
+        const answerHtml = formatMathText(q.aiSuggestedAnswer || 'Not available');
+        const explanationHtml = formatMathText(q.aiSuggestedExplanation || 'Not available');
+
+        let optionsList = [];
+        if (q.options && Array.isArray(q.options) && q.options.length > 0) {
+          optionsList = q.options.map(o => ({
+            label: o.optionLabel ? o.optionLabel.toUpperCase() : '•',
+            html: formatMathText(o.optionText || '')
+          }));
+        }
+
+        htmlContent += `
+          <div class="q-card">
+            <div class="q-badge-row">
+              <span class="q-num-badge">Q${idx + 1}</span>
+              ${q.year ? `<span class="tag-pill">GATE ${q.year}</span>` : ''}
+              ${q.subjectName ? `<span class="tag-pill">${q.subjectName}</span>` : ''}
+              ${q.topicName ? `<span class="tag-pill">${q.topicName}</span>` : ''}
+              ${q.marks ? `<span class="tag-pill">${q.marks} Mark${q.marks > 1 ? 's' : ''}</span>` : ''}
+            </div>
+            <div class="q-stem">${questionHtml}</div>
+        `;
+
+        if (optionsList.length > 0) {
+          htmlContent += `<div class="options-grid">`;
+          optionsList.forEach(opt => {
+            htmlContent += `
+              <div class="option-box">
+                <span class="option-lbl">${opt.label}</span>
+                <div>${opt.html}</div>
+              </div>
+            `;
+          });
+          htmlContent += `</div>`;
+        }
+
+        if (pdfOptions.includeAnswer) {
+          htmlContent += `
+            <div class="ans-box">
+              ✔️ Correct Answer: ${answerHtml}
+            </div>
+          `;
+        }
+
+        if (pdfOptions.includeExplanation && q.aiSuggestedExplanation) {
+          htmlContent += `
+            <div class="exp-box">
+              <div class="exp-title">💡 Step-by-Step KaTeX Explanation:</div>
+              <div>${explanationHtml}</div>
+            </div>
+          `;
+        }
+
+        htmlContent += `</div>`;
+      });
+
+      htmlContent += `
+          <div class="page-footer">
+            AIRGATE — Gateway to All India Rank | Printed on ${formattedDate}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      setPdfCompiling(false);
+
+      // Securely log PDF compilation & lock trial in PostgreSQL DB
       try {
         axios.post(`${API_CONFIG.BASE_URL}/api/analytics/pdf-download`, {
           email: currentUser?.email || 'aspirant@airgate.in'
-        }, { headers: AuthService.getAuthHeader() });
+        }, { headers: AuthService.getAuthHeader() })
+        .then(res => {
+          if (res.data && res.data.hasUsedPdfTrial) {
+            AuthService.updatePdfTrialStatus(true);
+          }
+        })
+        .catch(err => {
+          if (err.response && err.response.status === 403) {
+            AuthService.updatePdfTrialStatus(true);
+          }
+        });
       } catch (ignored) {}
     } catch (err) {
       console.error('PDF generation failed:', err);
@@ -1491,6 +1563,25 @@ function BookmarksContent() {
             </div>
 
             <div style={{ width: '100%', height: '1px', background: 'rgba(99,102,241,0.2)', margin: '20px 0' }} />
+
+            {!AuthService.isPremium() && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '1.3rem' }}>🎁</span>
+                <div style={{ fontSize: '0.8rem', color: '#fef3c7', lineHeight: 1.4 }}>
+                  <strong style={{ color: '#fbbf24', display: 'block', marginBottom: '2px' }}>1-Time Free Trial Active!</strong>
+                  You get 1 free trial export of your first 10 revision questions. Upgrade to <strong>Aspirant Pro</strong> for unlimited PDFs & full question sets.
+                </div>
+              </div>
+            )}
 
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginBottom: '20px', lineHeight: 1.5 }}>
               Select what to include in your PDF. Questions and options are always included.

@@ -1,6 +1,21 @@
 import React, { useMemo } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { sanitizeLatexString } from '../utils/mathRenderer';
+
+const KATEX_MACROS = {
+  "\\tr": "\\operatorname{tr}",
+  "\\det": "\\operatorname{det}",
+  "\\gcd": "\\operatorname{gcd}",
+  "\\lcm": "\\operatorname{lcm}",
+  "\\rank": "\\operatorname{rank}",
+  "\\mod": "\\operatorname{mod}",
+  "\\deg": "\\operatorname{deg}",
+  "\\Pr": "\\operatorname{Pr}",
+  "\\E": "\\operatorname{E}",
+  "\\Var": "\\operatorname{Var}",
+  "\\lg": "\\operatorname{lg}"
+};
 
 /**
  * MathText — renders text containing LaTeX math expressions.
@@ -16,8 +31,7 @@ export default function MathText({ text, className, style }) {
   const rendered = useMemo(() => {
     if (!text) return '';
 
-    // Normalize double-backslash from JSON parsing (\\frac -> \frac)
-    let normalized = text.replace(/\\\\/g, '\\');
+    let normalized = sanitizeLatexString(text);
 
     // Split on math delimiters: $$...$$, $...$, \[...\], \(...\)
     // Process display math first ($$), then inline ($)
@@ -82,7 +96,8 @@ export default function MathText({ text, className, style }) {
             throwOnError: false,
             trust: true,
             strict: false,
-            output: 'html'
+            output: 'html',
+            macros: KATEX_MACROS
           });
         } catch (e) {
           // If KaTeX fails, return the raw LaTeX as text

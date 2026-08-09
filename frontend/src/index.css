@@ -71,10 +71,32 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* High Contrast Math Formula & Question Text for GATE Aspirants */
-.katex, .katex-display, .math-content {
-  color: #ffffff !important;
-  font-weight: 500;
+.katex {
+  font-size: 1.05em;
   letter-spacing: 0.01em;
+}
+
+.katex .mathnormal {
+  color: #38bdf8 !important; /* Glowing Cyan for math variables */
+}
+
+.katex .mord, .katex .mbin, .katex .mrel, .katex .mop {
+  color: #f8fafc !important; /* Crisp white for operators & numbers */
+}
+
+.katex .mord.accent, .katex .mtable {
+  color: #a78bfa !important; /* Soft purple/indigo for matrices & tables */
+}
+
+.katex-display {
+  margin: 1rem 0 !important;
+  padding: 12px 16px !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  border: 1px solid rgba(56, 189, 248, 0.15) !important;
+  border-radius: 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 .question-text-content {

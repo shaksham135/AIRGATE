@@ -81,6 +81,20 @@ class AuthService {
     }
   }
 
+  hasUsedPdfTrial() {
+    const user = this.getCurrentUser();
+    return user && user.hasUsedPdfTrial === true;
+  }
+
+  updatePdfTrialStatus(hasUsedPdfTrial) {
+    const user = this.getCurrentUser();
+    if (user) {
+      const updated = { ...user, hasUsedPdfTrial };
+      localStorage.setItem('user', JSON.stringify(updated));
+      this.notifyAuthChange();
+    }
+  }
+
   async checkAndRefreshUserStatus(force = false) {
     const user = this.getCurrentUser();
     if (!user || !user.token) return null;
@@ -109,6 +123,7 @@ class AuthService {
           ...user,
           role: dbUser.role,
           isPremium: dbUser.isPremium,
+          hasUsedPdfTrial: dbUser.hasUsedPdfTrial,
           premiumExpiresAt: dbUser.premiumExpiresAt,
           isBanned: dbUser.isBanned
         };
@@ -116,6 +131,7 @@ class AuthService {
         if (
           user.role !== updatedUser.role ||
           user.isPremium !== updatedUser.isPremium ||
+          user.hasUsedPdfTrial !== updatedUser.hasUsedPdfTrial ||
           user.premiumExpiresAt !== updatedUser.premiumExpiresAt ||
           user.isBanned !== updatedUser.isBanned
         ) {

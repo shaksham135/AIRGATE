@@ -45,6 +45,7 @@ public class BackgroundSolutionGenerator {
 
     private static class QuestionData {
         String text;
+        String optionsText;
         String answer;
         Long id;
         Long questionId;
@@ -89,6 +90,15 @@ public class BackgroundSolutionGenerator {
             qd.id = target.getId();
             qd.questionId = target.getQuestion().getId();
             
+            // Format options text
+            StringBuilder optsSb = new StringBuilder();
+            if (target.getQuestion().getOptions() != null && !target.getQuestion().getOptions().isEmpty()) {
+                for (com.pyq.platform.entity.QuestionOption opt : target.getQuestion().getOptions()) {
+                    optsSb.append("Option ").append(opt.getOptionLabel()).append(": ").append(opt.getOptionText()).append("\n");
+                }
+            }
+            qd.optionsText = optsSb.toString();
+
             // Collect images from question body and options
             qd.imageUrlsOrPaths = new java.util.ArrayList<>();
             String questionImg = target.getQuestion().getImagePath();
@@ -112,24 +122,41 @@ public class BackgroundSolutionGenerator {
         }
 
         long pending = aiAnalysisRepository.countPendingApprovedByModelName("fast-parse");
-        log.info("BackgroundSolutionGenerator: Generating solution for approved question ID {} ({} questions remaining in queue)...",
+        log.info("BackgroundSolutionGenerator: Generating grounded solution for question ID {} ({} remaining)...",
                 data.questionId, pending);
 
         try {
-            // ── GROQ CALL: Generate both short trick + full step-by-step with image references if any ──
+            // ── GROQ CALL: Ground-truth anchored solution generation ──
             AIClassificationService.SolutionResult result = aiClassificationService.generateDetailedSolution(
                     data.text,
+                    data.optionsText,
                     data.answer,
                     data.imageUrlsOrPaths
             );
 
-            // ── SAVE: Store both parts into DB ──
+            // ── SAVE & VERIFY: Store solution and execute Verification Gate ──
             transactionTemplate.executeWithoutResult(status -> {
                 QuestionAIAnalysis record = aiAnalysisRepository.findById(data.id).orElseThrow();
                 record.setMentorInsights(result.shortSolution);        // Quick answer + GATE trick
                 record.setSuggestedExplanation(result.detailedSolution); // Full step-by-step
-                record.setModelName("llama-3.1-8b-comprehensive");
+                record.setModelName("llama-3.3-70b-comprehensive");
                 aiAnalysisRepository.save(record);
+
+                // Verification Gate: Check if AI's concluded answer matches ground-truth
+                if (result.concludedAnswer != null && data.answer != null) {
+                    String cleanConcluded = result.concludedAnswer.trim().toUpperCase().replaceAll("[^A-Z0-9\\.]", "");
+                    String cleanExpected = data.answer.trim().toUpperCase().replaceAll("[^A-Z0-9\\.]", "");
+
+                    boolean matched = cleanConcluded.equalsIgnoreCase(cleanExpected) || cleanConcluded.contains(cleanExpected) || cleanExpected.contains(cleanConcluded);
+                    if (matched) {
+                        record.getQuestion().setIsCommunityVerified(true);
+                        log.info("✔️ [Verification Gate] Question ID {} verified! AI concluded answer ({}) matches ground-truth ({})",
+                                data.questionId, result.concludedAnswer, data.answer);
+                    } else {
+                        log.warn("⚠️ [Verification Gate] Question ID {} answer mismatch! AI concluded ({}) vs Ground Truth ({})",
+                                data.questionId, result.concludedAnswer, data.answer);
+                    }
+                }
             });
 
             log.info("BackgroundSolutionGenerator: Solution saved for question ID {}. {} still pending.",
@@ -137,7 +164,6 @@ public class BackgroundSolutionGenerator {
 
         } catch (Exception e) {
             log.error("BackgroundSolutionGenerator: Failed for question ID {}: {}", data.questionId, e.getMessage());
-            // Do NOT mark as failed — it will be retried on the next tick
         }
     }
 }

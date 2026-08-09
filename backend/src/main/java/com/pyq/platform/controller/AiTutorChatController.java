@@ -164,23 +164,24 @@ public class AiTutorChatController {
         try {
             String systemPrompt = "You are an expert GATE CSE AI Tutor helping a student understand a specific exam question.\n"
                     + "CRITICAL RULES:\n"
-                    + "1. Be highly concise, direct, and token-efficient. Max 2-3 short bullet points.\n"
-                    + "2. Standard Markdown formatting (bold, inline code, formulas using $...$).\n"
-                    + "3. DIAGRAM RULES: If asked for a diagram or flowchart, wrap the Mermaid definition STRICTLY inside standard backticks code block:\n"
+                    + "1. GROUND-TRUTH ANCHORING: The platform's verified answer key is: " + suggestedAnswer + ". Your logical explanation MUST strictly support and align with " + suggestedAnswer + ". Do NOT contradict or hallucinate a different choice.\n"
+                    + "2. Be clear, direct, and structured step-by-step.\n"
+                    + "3. Standard Markdown formatting (bold, inline code, formulas using $...$).\n"
+                    + "4. DIAGRAM RULES: If asked for a diagram or flowchart, wrap the Mermaid definition STRICTLY inside standard backticks code block:\n"
                     + "   ```mermaid\n"
                     + "   graph LR\n"
                     + "   A --> B\n"
                     + "   ```\n"
                     + "   NEVER print raw 'graph LR' or mermaid text without the ```mermaid backticks fences!\n"
-                    + "4. Answer accurately based on the question context below.\n\n"
+                    + "5. Zero repetition loops: state logic clearly without repeating phrases.\n\n"
                     + "QUESTION CONTEXT:\n"
                     + "- Type: " + questionType + "\n"
                     + "- Subject: " + subjectName + "\n"
                     + "- Topic: " + topicName + "\n"
-                    + "- Question: " + questionText + "\n"
-                    + "- Options: " + optionsText + "\n"
-                    + "- Correct Answer: " + suggestedAnswer + "\n\n"
-                    + "Help the student understand concisely step-by-step.";
+                    + "- Question Stem: " + questionText + "\n"
+                    + "- Options:\n" + optionsText + "\n"
+                    + "- VERIFIED CORRECT ANSWER: " + suggestedAnswer + "\n\n"
+                    + "Help the student understand step-by-step why " + suggestedAnswer + " is correct.";
 
             String reply;
             String model;
@@ -193,8 +194,10 @@ public class AiTutorChatController {
                     log.info("🚀 [AI Tutor] Using DeepSeek / Custom AI Provider ({}) as primary model...", tutorModel);
                     ObjectNode payload = objectMapper.createObjectNode();
                     payload.put("model", tutorModel);
-                    payload.put("temperature", 0.3);
-                    payload.put("max_tokens", 1000);
+                    payload.put("temperature", 0.1);
+                    payload.put("frequency_penalty", 0.2);
+                    payload.put("presence_penalty", 0.2);
+                    payload.put("max_tokens", 2000);
 
                     ArrayNode messages = payload.putArray("messages");
                     messages.addObject().put("role", "system").put("content", systemPrompt);
@@ -265,8 +268,8 @@ public class AiTutorChatController {
                     geminiBody.set("contents", contents);
 
                     ObjectNode genConfig = objectMapper.createObjectNode();
-                    genConfig.put("temperature", 0.3);
-                    genConfig.put("maxOutputTokens", 1000);
+                    genConfig.put("temperature", 0.1);
+                    genConfig.put("maxOutputTokens", 2000);
                     geminiBody.set("generationConfig", genConfig);
 
                     HttpHeaders geminiHeaders = new HttpHeaders();
@@ -295,8 +298,10 @@ public class AiTutorChatController {
             log.info("🔌 [AI Tutor] Executing Groq Multi-Key Fallback...");
             ObjectNode payload = objectMapper.createObjectNode();
             payload.put("model", fastModel);
-            payload.put("temperature", 0.3);
-            payload.put("max_tokens", 800);
+            payload.put("temperature", 0.1);
+            payload.put("frequency_penalty", 0.2);
+            payload.put("presence_penalty", 0.2);
+            payload.put("max_tokens", 2000);
 
             ArrayNode messages = payload.putArray("messages");
             messages.addObject().put("role", "system").put("content", systemPrompt);

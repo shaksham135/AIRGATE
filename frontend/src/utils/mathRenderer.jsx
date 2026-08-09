@@ -229,7 +229,13 @@ const KATEX_OPTIONS_DISPLAY = {
     "\\det": "\\operatorname{det}",
     "\\gcd": "\\operatorname{gcd}",
     "\\lcm": "\\operatorname{lcm}",
-    "\\rank": "\\operatorname{rank}"
+    "\\rank": "\\operatorname{rank}",
+    "\\mod": "\\operatorname{mod}",
+    "\\deg": "\\operatorname{deg}",
+    "\\Pr": "\\operatorname{Pr}",
+    "\\E": "\\operatorname{E}",
+    "\\Var": "\\operatorname{Var}",
+    "\\lg": "\\operatorname{lg}"
   }
 };
 
@@ -245,7 +251,13 @@ const KATEX_OPTIONS_INLINE = {
     "\\det": "\\operatorname{det}",
     "\\gcd": "\\operatorname{gcd}",
     "\\lcm": "\\operatorname{lcm}",
-    "\\rank": "\\operatorname{rank}"
+    "\\rank": "\\operatorname{rank}",
+    "\\mod": "\\operatorname{mod}",
+    "\\deg": "\\operatorname{deg}",
+    "\\Pr": "\\operatorname{Pr}",
+    "\\E": "\\operatorname{E}",
+    "\\Var": "\\operatorname{Var}",
+    "\\lg": "\\operatorname{lg}"
   }
 };
 

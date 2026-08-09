@@ -71,32 +71,29 @@ public class SeoController {
 
         // Dynamically add all approved clean SEO question URLs to sitemap for 100% Google indexing
         try {
-            List<com.pyq.platform.entity.Question> questions = questionRepository.findAll();
+            List<com.pyq.platform.entity.Question> questions = questionRepository.findByStatus("APPROVED");
             for (com.pyq.platform.entity.Question q : questions) {
-                if ("APPROVED".equalsIgnoreCase(q.getStatus()) || Boolean.TRUE.equals(q.getIsCommunityVerified())) {
-                    String pdfSource = q.getPdfSourceName();
-                    boolean isAiPractice = pdfSource != null && (
-                            pdfSource.toLowerCase().startsWith("ai_nightly") ||
-                            pdfSource.toLowerCase().startsWith("ai_generated") ||
-                            pdfSource.toLowerCase().contains("practice")
-                    );
-                    String subName = q.getSubject() != null ? q.getSubject().getName() : null;
-                    String subSlug = com.pyq.platform.util.SubjectSlugUtils.toSlug(subName);
-                    String branch = q.getBranch() != null && !q.getBranch().isBlank() ? q.getBranch() : "cse";
-                    int paperSet = q.getPaperSet() != null ? q.getPaperSet() : 1;
-                    int qNum = q.getQuestionNumber() != null ? q.getQuestionNumber() : (int) (q.getId() % 1000 + 1);
+                String pdfSource = q.getPdfSourceName();
+                boolean isAiPractice = pdfSource != null && (
+                        pdfSource.toLowerCase().startsWith("ai_nightly") ||
+                        pdfSource.toLowerCase().startsWith("ai_generated") ||
+                        pdfSource.toLowerCase().contains("practice")
+                );
+                String subName = q.getSubject() != null ? q.getSubject().getName() : null;
+                String subSlug = com.pyq.platform.util.SubjectSlugUtils.toSlug(subName);
+                String branch = q.getBranch() != null && !q.getBranch().isBlank() ? q.getBranch() : "cse";
+                int paperSet = q.getPaperSet() != null ? q.getPaperSet() : 1;
 
-                    String seoUrl = isAiPractice
-                            ? "/practice/" + subSlug + "/q" + qNum
-                            : "/gate/" + branch + "/" + (q.getYear() != null ? q.getYear() : 2025) + "/set-" + paperSet + "/q" + qNum;
+                String seoUrl = isAiPractice
+                        ? "/practice/" + subSlug + "/q" + q.getId()
+                        : "/gate/" + branch + "/" + (q.getYear() != null ? q.getYear() : 2025) + "/set-" + paperSet + "/q" + q.getId();
 
-                    sb.append("  <url>\n");
-                    sb.append("    <loc>").append(baseUrl).append(seoUrl).append("</loc>\n");
-                    sb.append("    <lastmod>").append(today).append("</lastmod>\n");
-                    sb.append("    <changefreq>weekly</changefreq>\n");
-                    sb.append("    <priority>0.8</priority>\n");
-                    sb.append("  </url>\n");
-                }
+                sb.append("  <url>\n");
+                sb.append("    <loc>").append(baseUrl).append(seoUrl).append("</loc>\n");
+                sb.append("    <lastmod>").append(today).append("</lastmod>\n");
+                sb.append("    <changefreq>weekly</changefreq>\n");
+                sb.append("    <priority>0.8</priority>\n");
+                sb.append("  </url>\n");
             }
         } catch (Exception ignored) {}
 

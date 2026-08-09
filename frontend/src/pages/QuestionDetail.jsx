@@ -93,6 +93,27 @@ export default function QuestionDetail() {
   const [newCommentText, setNewCommentText] = useState('');
   const [replyCommentText, setReplyCommentText] = useState({}); // { commentId: '' }
   const [activeReplyId, setActiveReplyId] = useState(null);
+  const [reGenLoading, setReGenLoading] = useState(false);
+
+  const handleRegenerateExplanation = async () => {
+    if (!AuthService.isAdminOrEditor()) return;
+    if (!window.confirm("Regenerate AI solution using Ground-Truth Grounding & Verification Gate?")) return;
+
+    setReGenLoading(true);
+    try {
+      const headers = AuthService.getAuthHeader();
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${question.id}/regenerate-explanation`, {}, { headers });
+      if (res.data) {
+        setQuestion(res.data);
+        alert("AI Explanation successfully regenerated and verified!");
+      }
+    } catch (err) {
+      console.error("Failed to regenerate explanation:", err);
+      alert(err.response?.data?.message || "Failed to regenerate explanation.");
+    } finally {
+      setReGenLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadQuestionData();
@@ -957,10 +978,27 @@ export default function QuestionDetail() {
       {/* Solution Panel — two-tier: quick by default, detailed on demand */}
       <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '28px', marginTop: '28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1.25rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ fontSize: '1.25rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <FiActivity style={{ color: 'var(--color-primary)' }} /> Solution
+            {question.isCommunityVerified && (
+              <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <FiCheckCircle size={12} /> Verified Solution
+              </span>
+            )}
           </h3>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {AuthService.isAdminOrEditor() && (
+              <button
+                className="btn btn-outline"
+                onClick={handleRegenerateExplanation}
+                disabled={reGenLoading}
+                style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)', fontSize: '0.85rem' }}
+                title="Force fresh AI generation using Ground-Truth Grounding"
+              >
+                {reGenLoading ? '🔄 Regenerating...' : '🔄 Regenerate Solution'}
+              </button>
+            )}
+
             <button 
               className="btn btn-outline" 
               onClick={() => {

@@ -12,5 +12,6 @@ public class JwtResponse {
     private String email;
     private String role;
     private Boolean isPremium;
+    private Boolean hasUsedPdfTrial;
     private java.time.LocalDateTime premiumExpiresAt;
 }

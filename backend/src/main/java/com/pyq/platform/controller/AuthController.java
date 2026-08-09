@@ -96,6 +96,7 @@ public class AuthController {
                     userDetails.getEmail(),
                     role,
                     userDetails.isPremium(),
+                    userDetails.isHasUsedPdfTrial(),
                     userDetails.getPremiumExpiresAt()
             ));
         } catch (org.springframework.security.core.AuthenticationException e) {

@@ -87,6 +87,7 @@ public class UserController {
         response.put("email", userDetails.getEmail());
         response.put("role", roleStr);
         response.put("isPremium", userDetails.isPremium());
+        response.put("hasUsedPdfTrial", userDetails.isHasUsedPdfTrial());
         response.put("premiumExpiresAt", userDetails.getPremiumExpiresAt());
         response.put("isBanned", userDetails.isBanned());
 
