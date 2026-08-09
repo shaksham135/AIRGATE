@@ -14,6 +14,7 @@ export default function UserManagement() {
   // Per-user duration selection for granting premium (default 1 month)
   const [grantDurations, setGrantDurations] = useState({});
   const [inspectUser, setInspectUser] = useState(null);
+  const [inspectLoading, setInspectLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('solves'); // 'solves', 'bookmarks', 'logins'
 
   const fetchUsers = useCallback(async () => {

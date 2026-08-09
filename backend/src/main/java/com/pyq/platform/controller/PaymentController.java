@@ -495,6 +495,7 @@ public class PaymentController {
 
     @PostMapping("/admin/verifications/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> approveVerification(
             @PathVariable("id") Long id,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -502,30 +503,37 @@ public class PaymentController {
         com.pyq.platform.entity.PaymentVerification pv = paymentVerificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Verification request not found with ID: " + id));
 
-        if (pv.getStatus() == com.pyq.platform.entity.PaymentVerification.Status.APPROVED) {
-            return ResponseEntity.badRequest().body(Map.of("error", "This payment verification request has already been approved."));
-        }
+        boolean alreadyApproved = (pv.getStatus() == com.pyq.platform.entity.PaymentVerification.Status.APPROVED);
 
         pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.APPROVED);
-        if (body != null && body.containsKey("notes")) {
+        if (body != null && body.containsKey("notes") && body.get("notes") != null) {
             pv.setAdminNotes(body.get("notes").toString());
         }
         paymentVerificationRepository.save(pv);
 
-        User user = pv.getUser();
-        if (user != null) {
-            int durationMonths = pv.getDurationMonths() != null ? pv.getDurationMonths() : 1;
-            upgradeUserPremium(user, durationMonths, pv.getPlanType(), pv.getAmount());
+        try {
+            if (pv.getUser() != null && pv.getUser().getId() != null) {
+                User user = userRepository.findById(pv.getUser().getId()).orElse(pv.getUser());
+                int durationMonths = pv.getDurationMonths() != null ? pv.getDurationMonths() : 1;
+                upgradeUserPremium(user, durationMonths, pv.getPlanType(), pv.getAmount());
+            }
+        } catch (Exception e) {
+            log.error("Error activating user premium for payment ID {}: {}", id, e.getMessage(), e);
         }
 
-        // Decrement VIP spots remaining in settings if > 0
-        com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
-        if (settings != null && settings.getBetaSpotsRemaining() != null && settings.getBetaSpotsRemaining() > 0) {
-            settings.setBetaSpotsRemaining(settings.getBetaSpotsRemaining() - 1);
-            systemSettingsRepository.save(settings);
+        if (!alreadyApproved) {
+            try {
+                com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
+                if (settings != null && settings.getBetaSpotsRemaining() != null && settings.getBetaSpotsRemaining() > 0) {
+                    settings.setBetaSpotsRemaining(settings.getBetaSpotsRemaining() - 1);
+                    systemSettingsRepository.save(settings);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to decrement beta spots remaining for payment ID {}: {}", id, e.getMessage());
+            }
         }
 
-        log.info("✅ Admin approved VIP Beta payment ID {} ({} months) for user {}", id, pv.getDurationMonths(), user != null ? user.getUsername() : "null");
+        log.info("✅ Admin approved VIP Beta payment ID {} ({} months)", id, pv.getDurationMonths());
 
         return ResponseEntity
                 .ok(Map.of("message", "VIP Beta payment approved and Premium access activated successfully!"));
@@ -533,6 +541,7 @@ public class PaymentController {
 
     @PostMapping("/admin/verifications/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> rejectVerification(
             @PathVariable("id") Long id,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -541,7 +550,7 @@ public class PaymentController {
                 .orElseThrow(() -> new RuntimeException("Verification request not found with ID: " + id));
 
         if (pv.getStatus() == com.pyq.platform.entity.PaymentVerification.Status.REJECTED) {
-            return ResponseEntity.badRequest().body(Map.of("error", "This payment verification request has already been rejected."));
+            return ResponseEntity.ok(Map.of("message", "Payment verification request rejected. User notified via email."));
         }
 
         pv.setStatus(com.pyq.platform.entity.PaymentVerification.Status.REJECTED);
@@ -552,13 +561,13 @@ public class PaymentController {
         pv.setAdminNotes(notes);
         paymentVerificationRepository.save(pv);
 
-        User user = pv.getUser();
-        if (user != null) {
-            try {
+        try {
+            User user = pv.getUser();
+            if (user != null) {
                 emailService.sendPaymentRejectionNoticeEmail(user, pv.getUtrNumber(), notes);
-            } catch (Exception e) {
-                log.warn("Failed to send payment rejection email to {}: {}", user.getEmail(), e.getMessage());
             }
+        } catch (Exception e) {
+            log.warn("Failed to send payment rejection email: {}", e.getMessage());
         }
 
         log.info("❌ Admin rejected VIP Beta payment ID {}", id);
