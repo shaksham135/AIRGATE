@@ -81,15 +81,27 @@ public class UserController {
                 .orElse("ROLE_USER")
                 .replace("ROLE_", "");
 
+        User dbUser = userRepository.findById(userDetails.getId()).orElse(null);
+        boolean isPremium = dbUser != null ? Boolean.TRUE.equals(dbUser.getIsPremium()) : userDetails.isPremium();
+        java.time.LocalDateTime expiresAt = dbUser != null ? dbUser.getPremiumExpiresAt() : userDetails.getPremiumExpiresAt();
+
+        if (isPremium && expiresAt != null && expiresAt.isBefore(java.time.LocalDateTime.now())) {
+            isPremium = false;
+            if (dbUser != null) {
+                dbUser.setIsPremium(false);
+                userRepository.save(dbUser);
+            }
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("id", userDetails.getId());
-        response.put("username", userDetails.getUsername());
-        response.put("email", userDetails.getEmail());
+        response.put("username", dbUser != null ? dbUser.getUsername() : userDetails.getUsername());
+        response.put("email", dbUser != null ? dbUser.getEmail() : userDetails.getEmail());
         response.put("role", roleStr);
-        response.put("isPremium", userDetails.isPremium());
-        response.put("hasUsedPdfTrial", userDetails.isHasUsedPdfTrial());
-        response.put("premiumExpiresAt", userDetails.getPremiumExpiresAt());
-        response.put("isBanned", userDetails.isBanned());
+        response.put("isPremium", isPremium);
+        response.put("hasUsedPdfTrial", dbUser != null ? Boolean.TRUE.equals(dbUser.getHasUsedPdfTrial()) : userDetails.isHasUsedPdfTrial());
+        response.put("premiumExpiresAt", expiresAt);
+        response.put("isBanned", dbUser != null ? Boolean.TRUE.equals(dbUser.getIsBanned()) : userDetails.isBanned());
 
         // Fast light-weight pre-fetch of bookmarked question IDs to avoid separate HTTP
         // request

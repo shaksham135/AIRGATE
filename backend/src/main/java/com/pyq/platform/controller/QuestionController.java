@@ -824,7 +824,7 @@ public class QuestionController {
     }
 
     @PostMapping("/{id}/regenerate-explanation")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EDITOR')")
     @Transactional
     public ResponseEntity<?> regenerateExplanation(
             @PathVariable("id") Long id,

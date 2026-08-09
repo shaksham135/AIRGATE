@@ -35,6 +35,7 @@ public class AdminUserController {
 
     // Grant / Revoke user premium status (admin)
     @PostMapping("/{id}/premium")
+    @org.springframework.cache.annotation.CacheEvict(value = "userDetails", allEntries = true)
     public ResponseEntity<?> togglePremium(
             @PathVariable("id") Long id,
             @RequestParam(name = "duration", defaultValue = "1") int durationMonths) {
@@ -64,6 +65,7 @@ public class AdminUserController {
 
     // Toggle user banned status (penalty/ban)
     @PostMapping("/{id}/ban")
+    @org.springframework.cache.annotation.CacheEvict(value = "userDetails", allEntries = true)
     public ResponseEntity<?> toggleBan(@PathVariable("id") Long id, @AuthenticationPrincipal UserDetailsImpl adminDetails) {
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {

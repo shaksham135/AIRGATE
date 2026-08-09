@@ -261,7 +261,7 @@ const KATEX_OPTIONS_INLINE = {
   }
 };
 
-export const formatMathText = (text) => {
+export const formatMathTextToHtml = (text) => {
   if (!text) return '';
   
   const normalized = sanitizeLatexString(text);
@@ -314,10 +314,16 @@ export const formatMathText = (text) => {
       .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'));
   }
 
+  return parts.join('');
+};
+
+export const formatMathText = (text) => {
+  if (!text) return null;
+  const html = formatMathTextToHtml(text);
   return (
     <span 
       style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }} 
-      dangerouslySetInnerHTML={{ __html: parts.join('') }} 
+      dangerouslySetInnerHTML={{ __html: html }} 
     />
   );
 };

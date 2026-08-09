@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
-import { formatMathText, renderQuestionText, getAssetUrl } from '../utils/mathRenderer';
+import { formatMathText, formatMathTextToHtml, renderQuestionText, getAssetUrl } from '../utils/mathRenderer';
 import { getQuestionUrl } from '../utils/urlUtils';
 import API_CONFIG from '../config/api';
 import LoginGate from '../components/LoginGate';
@@ -383,12 +383,19 @@ function BookmarksContent() {
     const questionsToCompile = isFreeTrial ? bookmarks.slice(0, 10) : bookmarks;
 
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Please allow popups for this site to generate and print your Revision PDF.');
-        setPdfCompiling(false);
-        return;
+      let printFrame = document.getElementById('airgate-pdf-print-iframe');
+      if (printFrame) {
+        printFrame.remove();
       }
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'airgate-pdf-print-iframe';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
 
       const formattedDate = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
       
@@ -590,15 +597,15 @@ function BookmarksContent() {
       `;
 
       questionsToCompile.forEach((q, idx) => {
-        const questionHtml = formatMathText(q.text || '');
-        const answerHtml = formatMathText(q.aiSuggestedAnswer || 'Not available');
-        const explanationHtml = formatMathText(q.aiSuggestedExplanation || 'Not available');
+        const questionHtml = formatMathTextToHtml(q.text || '');
+        const answerHtml = formatMathTextToHtml(q.aiSuggestedAnswer || 'Not available');
+        const explanationHtml = formatMathTextToHtml(q.aiSuggestedExplanation || 'Not available');
 
         let optionsList = [];
         if (q.options && Array.isArray(q.options) && q.options.length > 0) {
           optionsList = q.options.map(o => ({
             label: o.optionLabel ? o.optionLabel.toUpperCase() : '•',
-            html: formatMathText(o.optionText || '')
+            html: formatMathTextToHtml(o.optionText || '')
           }));
         }
 
@@ -651,20 +658,24 @@ function BookmarksContent() {
           <div class="page-footer">
             AIRGATE — Gateway to All India Rank | Printed on ${formattedDate}
           </div>
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 500);
-            };
-          </script>
         </body>
         </html>
       `;
 
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      setPdfCompiling(false);
+      const frameDoc = printFrame.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(htmlContent);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+        } catch (e) {
+          console.error("Frame print failed:", e);
+        }
+        setPdfCompiling(false);
+      }, 600);
 
       // Securely log PDF compilation & lock trial in PostgreSQL DB
       try {
