@@ -124,7 +124,6 @@ export const sanitizeLatexString = (str) => {
        });
 
   // 1. Repair matrix environments where backslashes were stripped or typed as single backslash
-  // e.g. \begin{bmatrix}2&0&0\0&3&0\0&0&4\end{bmatrix} -> \begin{bmatrix}2&0&0 \\ 0&3&0 \\ 0&0&4 \end{bmatrix}
   // e.g. 1_{21} / 1_{31} / 1_{32} inside L matrix -> l_{21}
   s = s.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, (match, env, content) => {
     let clean = content;
@@ -133,12 +132,6 @@ export const sanitizeLatexString = (str) => {
     clean = clean.replace(/&\s*\\(?=[0-9a-zA-Z])/g, '& ');
     return `\\begin{${env}}${clean}\\end{${env}}`;
   });
-
-  // 1b. Convert single-dollar ($ ... $) or unwrapped matrices into double-dollar block matrices ($$ ... $$)
-  s = s.replace(/\$?\s*\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}\s*\$?/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
-
-  // Clean up any double-stacked dollar sign artifacts
-  s = s.replace(/\$\$\s*\$\$/g, '$$');
 
   // 2. Convert \[ ... \] to $$ ... $$ and \( ... \) to $ ... $
   s = s.replace(/\\\[([\s\S]*?)\\\]/g, ' $$ $1 $$ ');
@@ -153,18 +146,8 @@ export const sanitizeLatexString = (str) => {
   s = s.replace(/\bcdot([^\s])/g, ' \\cdot $1');
   s = s.replace(/andtheminor/gi, ' and the minor ');
 
-  // 4b. Auto-repair dollar signs that accidentally wrap English sentences/phrases (e.g. $...and require...units of processing time...$)
-  s = s.replace(/\$(?!\$)([^\$\n]*?)\$/g, (fullMatch, content) => {
-    if (/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/i.test(content)) {
-      let repaired = content.replace(/\b(and require|units of processing time|respectively|given that|is calculated as|completion time|arrival time|where|what is|is true for|because)\b/gi, ' $1 ');
-      repaired = repaired.replace(/(?<!\$)\b([a-zA-Z]_[0-9a-zA-Z{}]+|[a-zA-Z]\^\{[^}]+\}|\\forall\s*[a-zA-Z]|\\exists\s*[a-zA-Z])(?!\$)/g, (m, p1) => ` $${p1}$ `);
-      return repaired;
-    }
-    return fullMatch;
-  });
-
-  // 5. Split string into already-wrapped math vs plain text segments (allow inline $...$ across newlines)
-  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,500}?\$)/g;
+  // 5. Split string into already-wrapped math vs plain text segments
+  const dollarRegex = /(\$\$[\s\S]*?\$\$|\$(?!\$)(?:[^$\\]|\\.){1,1000}?\$)/g;
   const parts = [];
   let lastIndex = 0;
   let match;
@@ -180,10 +163,13 @@ export const sanitizeLatexString = (str) => {
     parts.push({ type: 'text', value: s.slice(lastIndex) });
   }
 
-  // 6. Auto-wrap unwrapped LaTeX math tokens in plain text parts
+  // 6. Process plain text parts only (auto-wrap unwrapped matrices, commands, subscripts)
   s = parts.map(part => {
     if (part.type === 'math') return part.value;
     let t = part.value;
+
+    // Auto-wrap unwrapped matrices found in plain text (e.g. \begin{bmatrix}...\end{bmatrix})
+    t = t.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
 
     // Auto-wrap unwrapped LaTeX commands like \frac, \sqrt, \cdot, \times, \lambda, \sum, etc.
     t = t.replace(/(?<!\$)(\\(?:frac|sqrt|cdot|times|div|pm|mp|le|ge|neq|equiv|approx|infty|forall|exists|in|notin|subset|cap|cup|vee|wedge|neg|rightarrow|left|right|lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|iint|iiint|det|tr|gcd|lcm|rank)\b[^\$\n]*?)(?!\$)/gi, (m, token) => {
@@ -194,7 +180,7 @@ export const sanitizeLatexString = (str) => {
       return token;
     });
 
-    // Auto-wrap subscripts (e.g. b_3, x_{12}) and superscripts (e.g. a^2 + b^2 = c^2, s\sqrt{2})
+    // Auto-wrap subscripts (e.g. b_3, x_{12}) and superscripts
     t = t.replace(/(?<!\$)((?<![a-zA-Z])[a-zA-Z]_[0-9a-zA-Z{}]+|(?<![a-zA-Z])[a-zA-Z]\^\{[^{}]+\}|(?<![a-zA-Z])[a-zA-Z]\^[0-9a-zA-Z])(?!\$)/gi, (m, token) => {
       let trimmed = token.trim();
       return ` $${trimmed}$ `;
