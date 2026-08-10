@@ -4,7 +4,7 @@ import API_CONFIG from '../../config/api';
 import AuthService from '../../services/AuthService';
 import { 
   FiSend, FiRefreshCw, FiCheckCircle, FiXCircle, 
-  FiEye, FiClock, FiSettings, FiCheck
+  FiEye, FiClock, FiSettings, FiCheck, FiUploadCloud, FiTrash2, FiLoader
 } from 'react-icons/fi';
 
 export default function AdminBetaPaymentsTab() {
@@ -13,6 +13,7 @@ export default function AdminBetaPaymentsTab() {
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+  const [qrUploading, setQrUploading] = useState(false);
 
   // VIP Beta Payment Config State
   const [betaConfig, setBetaConfig] = useState({
@@ -76,6 +77,39 @@ export default function AdminBetaPaymentsTab() {
     fetchBetaVerifications();
     fetchPricingConfig();
   }, []);
+
+  const handleQrUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Selected image file exceeds 10MB limit.");
+      return;
+    }
+
+    try {
+      setQrUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/upload-proof`, formData, {
+        headers: {
+          ...AuthService.getAuthHeader(),
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data && res.data.url) {
+        setBetaConfig(prev => ({ ...prev, betaQrImageUrl: res.data.url }));
+        setConfigSuccessMsg("📸 QR Code uploaded to Cloudinary! Click 'Save Payment Settings' to finalize.");
+      }
+    } catch (err) {
+      console.error("Failed to upload QR Code image:", err);
+      alert("Failed to upload QR Code image to Cloudinary: " + (err.response?.data?.error || err.message));
+    } finally {
+      setQrUploading(false);
+    }
+  };
 
   const handleApprove = async (id) => {
     if (!window.confirm("Approve this payment and upgrade user account to Aspirant Pro?")) return;
@@ -296,14 +330,64 @@ export default function AdminBetaPaymentsTab() {
             </div>
 
             <div>
-              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>QR Code Image URL</label>
-              <input 
-                type="text" 
-                placeholder="e.g. /uploads/upi_qr.png" 
-                value={betaConfig.betaQrImageUrl}
-                onChange={e => setBetaConfig({ ...betaConfig, betaQrImageUrl: e.target.value })}
-                className="admin-input"
-              />
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                UPI QR Code Image (Cloudinary Upload)
+              </label>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {betaConfig.betaQrImageUrl && (
+                  <div style={{ position: 'relative', width: '44px', height: '44px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', overflow: 'hidden', flexShrink: 0, backgroundColor: '#fff', padding: '2px' }}>
+                    <img 
+                      src={betaConfig.betaQrImageUrl} 
+                      alt="UPI QR Code Preview" 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ flex: 1 }}>
+                  <input 
+                    type="text" 
+                    placeholder="QR Code Image URL (Auto-fills on upload)" 
+                    value={betaConfig.betaQrImageUrl || ''}
+                    onChange={e => setBetaConfig({ ...betaConfig, betaQrImageUrl: e.target.value })}
+                    className="admin-input"
+                    style={{ fontSize: '0.8rem' }}
+                  />
+                </div>
+
+                <label style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.4)',
+                  color: '#38bdf8', padding: '8px 12px', borderRadius: '8px',
+                  fontSize: '0.78rem', fontWeight: 700, cursor: qrUploading ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap'
+                }}>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleQrUpload} 
+                    disabled={qrUploading}
+                    style={{ display: 'none' }}
+                  />
+                  {qrUploading ? <FiLoader className="spin" size={14} /> : <FiUploadCloud size={14} />}
+                  {qrUploading ? 'Uploading...' : 'Upload QR Image'}
+                </label>
+
+                {betaConfig.betaQrImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setBetaConfig({ ...betaConfig, betaQrImageUrl: '' })}
+                    title="Remove QR Image"
+                    style={{
+                      background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+                      color: '#ef4444', padding: '8px', borderRadius: '8px', cursor: 'pointer'
+                    }}
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>

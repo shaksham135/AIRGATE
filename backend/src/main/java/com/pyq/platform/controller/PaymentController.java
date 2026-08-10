@@ -42,6 +42,7 @@ public class PaymentController {
     private final com.pyq.platform.repository.PaymentVerificationRepository paymentVerificationRepository;
     private final com.pyq.platform.service.EmailService emailService;
     private final com.pyq.platform.service.CouponService couponService;
+    private final com.pyq.platform.service.CloudinaryService cloudinaryService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public PaymentController(PaymentRepository paymentRepository,
@@ -49,13 +50,15 @@ public class PaymentController {
             com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository,
             com.pyq.platform.repository.PaymentVerificationRepository paymentVerificationRepository,
             com.pyq.platform.service.EmailService emailService,
-            com.pyq.platform.service.CouponService couponService) {
+            com.pyq.platform.service.CouponService couponService,
+            com.pyq.platform.service.CloudinaryService cloudinaryService) {
         this.paymentRepository = paymentRepository;
         this.userRepository = userRepository;
         this.systemSettingsRepository = systemSettingsRepository;
         this.paymentVerificationRepository = paymentVerificationRepository;
         this.emailService = emailService;
         this.couponService = couponService;
+        this.cloudinaryService = cloudinaryService;
     }
 
     private boolean isRazorpayConfigured() {
@@ -732,6 +735,57 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("Error processing Razorpay webhook payload: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing error");
+        }
+    }
+
+    @PostMapping(value = "/upload-proof", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> uploadPaymentProofImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please select an image file to upload."));
+        }
+
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        if (!originalFilename.endsWith(".png") && !originalFilename.endsWith(".jpg") &&
+            !originalFilename.endsWith(".jpeg") && !originalFilename.endsWith(".webp") &&
+            !originalFilename.endsWith(".heic")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid file format. Please upload a PNG, JPG, or WEBP screenshot image."));
+        }
+
+        try {
+            String imageUrl = null;
+            // 1. Upload to Cloudinary if configured
+            if (cloudinaryService != null && cloudinaryService.isConfigured()) {
+                imageUrl = cloudinaryService.uploadMultipartFile(file, "payment_proofs");
+                log.info("☁️ Uploaded payment proof screenshot to Cloudinary: {}", imageUrl);
+            }
+
+            // 2. Fallback to local storage if Cloudinary is not configured or fails
+            if (imageUrl == null || imageUrl.isBlank()) {
+                String uploadDir = "uploads/payments/";
+                java.io.File dir = new java.io.File(uploadDir);
+                if (!dir.exists()) {
+                    dir.mkdirs();
+                }
+                String ext = originalFilename.contains(".") ? originalFilename.substring(originalFilename.lastIndexOf(".")) : ".png";
+                String filename = "proof_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8) + ext;
+                java.io.File targetFile = new java.io.File(dir, filename);
+                file.transferTo(targetFile);
+                imageUrl = "/uploads/payments/" + filename;
+                log.info("📁 Uploaded payment proof screenshot to local disk: {}", imageUrl);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "url", imageUrl,
+                    "message", "Payment screenshot uploaded successfully!"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to upload payment proof screenshot: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to upload screenshot: " + e.getMessage()));
         }
     }
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
-import { FiCheck, FiX, FiCpu, FiClock, FiActivity, FiFileText, FiAward, FiZap, FiLoader } from 'react-icons/fi';
+import { FiCheck, FiX, FiCpu, FiClock, FiActivity, FiFileText, FiAward, FiZap, FiLoader, FiUploadCloud, FiImage, FiTrash2 } from 'react-icons/fi';
 
 export default function PremiumPage() {
   const navigate = useNavigate();
@@ -30,6 +30,8 @@ export default function PremiumPage() {
   const [showUpiModal, setShowUpiModal] = useState(false);
   const [utrInput, setUtrInput] = useState('');
   const [screenshotUrlInput, setScreenshotUrlInput] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadedImagePreview, setUploadedImagePreview] = useState('');
   const [submittingUpi, setSubmittingUpi] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [modalError, setModalError] = useState('');
@@ -219,6 +221,57 @@ export default function PremiumPage() {
     navigator.clipboard.writeText(betaDetails.upiId);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setModalError("Selected image file exceeds 10MB limit. Please select a smaller screenshot.");
+      return;
+    }
+
+    const currentUser = AuthService.getCurrentUser();
+    if (!currentUser) {
+      setModalError("Please Sign In first to upload payment screenshot.");
+      return;
+    }
+
+    try {
+      setUploadingFile(true);
+      setModalError('');
+
+      const localPreview = URL.createObjectURL(file);
+      setUploadedImagePreview(localPreview);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/upload-proof`, formData, {
+        headers: {
+          ...AuthService.getAuthHeader(),
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (res.data && res.data.url) {
+        setScreenshotUrlInput(res.data.url);
+        if (res.data.url.startsWith('http')) {
+          setUploadedImagePreview(res.data.url);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to upload payment proof screenshot:", err);
+      setModalError(err.response?.data?.error || "Failed to upload screenshot image. Please try again.");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setScreenshotUrlInput('');
+    setUploadedImagePreview('');
   };
 
   const handleUpiSubmit = async (e) => {
@@ -1050,21 +1103,89 @@ export default function PremiumPage() {
                   />
                 </div>
 
+                {/* Direct Image File Upload Box */}
                 <div style={{ marginBottom: '18px' }}>
-                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '4px' }}>
-                    Payment Screenshot URL (Optional)
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '6px' }}>
+                    Upload Payment Screenshot (Cloudinary)
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Paste image link if available"
-                    value={screenshotUrlInput}
-                    onChange={e => setScreenshotUrlInput(e.target.value)}
-                    style={{
-                      width: '100%', padding: '10px 14px', borderRadius: '10px',
-                      border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)',
-                      color: '#fff', fontSize: '0.85rem'
-                    }}
-                  />
+
+                  {uploadedImagePreview || screenshotUrlInput ? (
+                    <div style={{
+                      position: 'relative',
+                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      borderRadius: '12px',
+                      padding: '10px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}>
+                      <img
+                        src={uploadedImagePreview || screenshotUrlInput}
+                        alt="Payment Screenshot Preview"
+                        style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <FiCheck size={14} /> Screenshot Uploaded to Cloudinary
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '200px', whiteSpace: 'nowrap' }}>
+                          {screenshotUrlInput}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        title="Remove Image"
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#ef4444',
+                          padding: '6px',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justify: 'center',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: '2px dashed var(--border-color)',
+                      backgroundColor: 'rgba(255,255,255,0.02)',
+                      cursor: uploadingFile ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={handleFileChange}
+                        disabled={uploadingFile}
+                        style={{ display: 'none' }}
+                      />
+                      {uploadingFile ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.85rem' }}>
+                          <FiLoader className="spin" size={18} /> Uploading screenshot to Cloudinary...
+                        </div>
+                      ) : (
+                        <>
+                          <FiUploadCloud size={24} style={{ color: 'var(--color-primary)', marginBottom: '4px' }} />
+                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>
+                            Click to Select Payment Screenshot File
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            PNG, JPG, WEBP • Max 10MB (Cloudinary Powered)
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  )}
                 </div>
 
                 <button
