@@ -103,6 +103,24 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
 
     long countByStatus(String status);
     long countByPdfSourceName(String pdfSourceName);
+    long countBySubjectId(Long subjectId);
+    long countByTopicId(Long topicId);
+    long countByTopicIdIn(List<Long> topicIds);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Question q SET q.subject = :newSubject WHERE q.topic.id IN :topicIds")
+    void updateSubjectForTopicIds(@Param("topicIds") List<Long> topicIds, @Param("newSubject") Subject newSubject);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Question q SET q.subject = :newSubject WHERE q.subject.id = :oldSubjectId")
+    void reassignQuestionsToSubject(@Param("oldSubjectId") Long oldSubjectId, @Param("newSubject") Subject newSubject);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Question q SET q.topic = :newTopic, q.subject = :newSubject WHERE q.topic.id IN :topicIds")
+    void reassignQuestionsToTopicAndSubject(@Param("topicIds") List<Long> topicIds, @Param("newTopic") Topic newTopic, @Param("newSubject") Subject newSubject);
 
     @EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findByStatusAndPublishAtBefore(String status, java.time.LocalDateTime time);

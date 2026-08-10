@@ -1,5 +1,6 @@
 package com.pyq.platform.repository;
 
+import com.pyq.platform.entity.Subject;
 import com.pyq.platform.entity.Topic;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,19 +16,27 @@ import java.util.Optional;
 @Repository
 public interface TopicRepository extends JpaRepository<Topic, Long> {
 
-    @EntityGraph(attributePaths = {"subject", "parentTopic"})
+    @EntityGraph(attributePaths = { "subject", "parentTopic" })
     List<Topic> findBySubjectId(Long subjectId);
 
-    @EntityGraph(attributePaths = {"subject", "parentTopic"})
+    @EntityGraph(attributePaths = { "subject", "parentTopic" })
     List<Topic> findBySubjectIdAndParentTopicIsNull(Long subjectId);
 
     List<Topic> findByParentTopicId(Long parentTopicId);
+
     List<Topic> findByName(String name);
+
     Optional<Topic> findByNameAndSubjectIdAndParentTopicId(String name, Long subjectId, Long parentTopicId);
+
     Optional<Topic> findByNameAndSubjectIdAndParentTopicIsNull(String name, Long subjectId);
 
     @Modifying(clearAutomatically = true)
     @Transactional
     @Query("UPDATE Topic t SET t.parentTopic = :newParent WHERE t.parentTopic.id = :oldParentId")
     int relinkChildTopics(@Param("oldParentId") Long oldParentId, @Param("newParent") Topic newParent);
+
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("UPDATE Topic t SET t.subject = :newSubject WHERE t.id IN :topicIds")
+    void updateSubjectForTopics(@Param("topicIds") List<Long> topicIds, @Param("newSubject") Subject newSubject);
 }

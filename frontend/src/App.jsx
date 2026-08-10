@@ -535,6 +535,8 @@ function AppRoutes() {
       <Route path="/practice" element={<DashboardLayout><PracticeArena /></DashboardLayout>} />
       <Route path="/practice/:subjectSlug" element={<DashboardLayout><PracticeArena /></DashboardLayout>} />
       <Route path="/practice/:subjectSlug/:qNum" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
+      <Route path="/practice/q/:id" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
+      <Route path="/practice/:subjectSlug/q/:id" element={<DashboardLayout><QuestionDetail /></DashboardLayout>} />
 
       <Route path="/admin/questions/new" element={<ProtectedAdminRoute><DashboardLayout><AdminQuestionEditor /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/questions/:id/edit" element={<ProtectedAdminRoute><DashboardLayout><AdminQuestionEditor /></DashboardLayout></ProtectedAdminRoute>} />

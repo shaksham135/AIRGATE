@@ -75,4 +75,86 @@ public class SubjectController {
             return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
         }
     }
+
+    @PutMapping("/admin/subjects/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics", "topicTrees"}, allEntries = true)
+    public ResponseEntity<?> updateSubject(
+            @PathVariable("id") Long id,
+            @RequestBody java.util.Map<String, String> payload) {
+        String newName = payload.get("name");
+        if (newName == null || newName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse("Error: Subject name is required!"));
+        }
+        try {
+            Subject updated = topicService.updateSubject(id, newName.trim());
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/subjects/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics", "topicTrees"}, allEntries = true)
+    public ResponseEntity<?> deleteSubject(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "targetSubjectId", required = false) Long targetSubjectId) {
+        try {
+            topicService.deleteSubject(id, targetSubjectId);
+            return ResponseEntity.ok(new com.pyq.platform.dto.MessageResponse("Subject deleted successfully."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/topics/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics", "topicTrees"}, allEntries = true)
+    public ResponseEntity<?> updateTopic(
+            @PathVariable("id") Long topicId,
+            @RequestBody java.util.Map<String, String> payload) {
+        String newName = payload.get("name");
+        if (newName == null || newName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse("Error: Topic name is required!"));
+        }
+        try {
+            com.pyq.platform.entity.Topic updated = topicService.updateTopic(topicId, newName.trim());
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/admin/topics/{id}/transfer")
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics", "topicTrees"}, allEntries = true)
+    public ResponseEntity<?> transferTopic(
+            @PathVariable("id") Long topicId,
+            @RequestBody java.util.Map<String, Object> payload) {
+        if (payload.get("targetSubjectId") == null) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse("Error: Target subject ID is required!"));
+        }
+        Long targetSubjectId = Long.valueOf(payload.get("targetSubjectId").toString());
+        try {
+            com.pyq.platform.entity.Topic transferred = topicService.transferTopic(topicId, targetSubjectId);
+            return ResponseEntity.ok(transferred);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/topics/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.cache.annotation.CacheEvict(value = {"subjects", "topics", "topicTrees"}, allEntries = true)
+    public ResponseEntity<?> deleteTopic(
+            @PathVariable("id") Long topicId,
+            @RequestParam(name = "targetTopicId", required = false) Long targetTopicId) {
+        try {
+            topicService.deleteTopic(topicId, targetTopicId);
+            return ResponseEntity.ok(new com.pyq.platform.dto.MessageResponse("Topic deleted successfully."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        }
+    }
 }

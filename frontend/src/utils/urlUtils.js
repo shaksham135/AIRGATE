@@ -91,10 +91,13 @@ export function getQuestionUrl(q) {
   const qId = q.id || q.questionId;
   if (!qId) return '/gate/cse';
 
-  const pdfSource = q.pdfSourceName || '';
-  const isAiPractice = pdfSource.toLowerCase().includes('ai_nightly') ||
-                       pdfSource.toLowerCase().includes('ai_generated') ||
-                       pdfSource.toLowerCase().includes('practice');
+  const pdfSource = (q.pdfSourceName || '').toLowerCase();
+  const isAiPractice = pdfSource.includes('ai_nightly') ||
+                       pdfSource.includes('ai_generated') ||
+                       pdfSource.includes('practice') ||
+                       pdfSource.includes('ai generator') ||
+                       (!q.year || q.year >= 2026) ||
+                       q.isOfficialPyq === false;
 
   if (isAiPractice) {
     const subSlug = getSubjectSlug(q.subjectName || q.subject);

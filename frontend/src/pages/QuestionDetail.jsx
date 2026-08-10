@@ -16,6 +16,17 @@ import {
 
 import { getQuestionUrl, getSubjectSlug, getSubjectNameFromSlug } from '../utils/urlUtils';
 
+const isPracticeQuestion = (q) => {
+  if (!q) return false;
+  const pdfSource = (q.pdfSourceName || '').toLowerCase();
+  return pdfSource.includes('ai_nightly') ||
+         pdfSource.includes('ai_generated') ||
+         pdfSource.includes('practice') ||
+         pdfSource.includes('ai generator') ||
+         (!q.year || q.year >= 2026) ||
+         q.isOfficialPyq === false;
+};
+
 export default function QuestionDetail() {
   const { id, branch, year, set, qNum, subjectSlug } = useParams();
   const navigate = useNavigate();
@@ -701,7 +712,7 @@ export default function QuestionDetail() {
       <nav aria-label="breadcrumb" style={{ marginBottom: '16px', fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
         <Link to="/" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Home</Link>
         <span>/</span>
-        {question.year ? (
+        {!isPracticeQuestion(question) ? (
           <>
             <Link to="/gate" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>GATE</Link>
             <span>/</span>
@@ -718,8 +729,14 @@ export default function QuestionDetail() {
             <Link to="/practice" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Practice</Link>
             <span>/</span>
             <Link to={`/practice/${getSubjectSlug(question.subjectName)}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>{question.subjectName || 'Subject'}</Link>
+            {question.topicName && (
+              <>
+                <span>/</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{question.topicName}</span>
+              </>
+            )}
             <span>/</span>
-            <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Q{question.questionNumber || question.id}</span>
+            <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Practice Q#{question.questionNumber || question.id}</span>
           </>
         )}
       </nav>
@@ -729,7 +746,13 @@ export default function QuestionDetail() {
         
         {/* Meta Header */}
         <div className="question-meta">
-          <span className="badge badge-info">GATE CSE {question.year}</span>
+          {!isPracticeQuestion(question) ? (
+            <span className="badge badge-info">GATE CSE {question.year}</span>
+          ) : (
+            <span className="badge badge-success" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 800 }}>
+              AI PRACTICE QUESTION
+            </span>
+          )}
           <span className="badge badge-dark">{question.questionType}</span>
           <span className="badge badge-dark">{question.marks} Mark{question.marks > 1 ? 's' : ''}</span>
           {question.negativeMarks !== 0 && (
