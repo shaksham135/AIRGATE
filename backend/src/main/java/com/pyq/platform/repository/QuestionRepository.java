@@ -107,20 +107,20 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     long countByTopicId(Long topicId);
     long countByTopicIdIn(List<Long> topicIds);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
     @Query("UPDATE Question q SET q.subject = :newSubject WHERE q.topic.id IN :topicIds")
-    void updateSubjectForTopicIds(@Param("topicIds") List<Long> topicIds, @Param("newSubject") Subject newSubject);
+    int updateSubjectForTopicIds(@Param("topicIds") List<Long> topicIds, @Param("newSubject") Subject newSubject);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Question q SET q.subject = :newSubject WHERE q.subject.id = :oldSubjectId")
-    void reassignQuestionsToSubject(@Param("oldSubjectId") Long oldSubjectId, @Param("newSubject") Subject newSubject);
+    @Query("UPDATE Question q SET q.subject = :targetSubject WHERE q.subject.id = :subjectId")
+    int reassignQuestionsToSubject(@Param("subjectId") Long subjectId, @Param("targetSubject") Subject targetSubject);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Question q SET q.topic = :newTopic, q.subject = :newSubject WHERE q.topic.id IN :topicIds")
-    void reassignQuestionsToTopicAndSubject(@Param("topicIds") List<Long> topicIds, @Param("newTopic") Topic newTopic, @Param("newSubject") Subject newSubject);
+    @Query("UPDATE Question q SET q.topic = :targetTopic, q.subject = :targetSubject WHERE q.topic.id IN :topicIds")
+    int reassignQuestionsToTopicAndSubject(@Param("topicIds") List<Long> topicIds, @Param("targetTopic") Topic targetTopic, @Param("targetSubject") Subject targetSubject);
 
     @EntityGraph(attributePaths = {"options", "subject", "topic"})
     List<Question> findByStatusAndPublishAtBefore(String status, java.time.LocalDateTime time);
@@ -199,21 +199,6 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
         @Param("oldTopicId") Long oldTopicId,
         @Param("newTopic") Topic newTopic,
         @Param("newSubject") Subject newSubject);
-
-    @Modifying(clearAutomatically = true)
-    @Transactional
-    @Query("UPDATE Question q SET q.subject = :newSubject WHERE q.topic.id IN :topicIds")
-    int updateSubjectForTopicIds(@Param("topicIds") List<Long> topicIds, @Param("newSubject") Subject newSubject);
-
-    @Modifying(clearAutomatically = true)
-    @Transactional
-    @Query("UPDATE Question q SET q.subject = :targetSubject WHERE q.subject.id = :subjectId")
-    int reassignQuestionsToSubject(@Param("subjectId") Long subjectId, @Param("targetSubject") Subject targetSubject);
-
-    @Modifying(clearAutomatically = true)
-    @Transactional
-    @Query("UPDATE Question q SET q.topic = :targetTopic, q.subject = :targetSubject WHERE q.topic.id IN :topicIds")
-    int reassignQuestionsToTopicAndSubject(@Param("topicIds") List<Long> topicIds, @Param("targetTopic") Topic targetTopic, @Param("targetSubject") Subject targetSubject);
 
     @Modifying(clearAutomatically = true)
     @Transactional
