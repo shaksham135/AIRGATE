@@ -776,6 +776,38 @@ function MockTestArena() {
           </div>
         </div>
 
+        {/* Official GATE TCS Exam Palette Color Legend Guidance */}
+        <div style={{
+          background: 'rgba(30, 41, 59, 0.6)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '14px',
+          padding: '14px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Official GATE Color Rules:
+          </span>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.8rem', fontWeight: 600 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981' }}>
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#10b981' }}></span> Answered
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444' }}>
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#ef4444' }}></span> Unanswered
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a78bfa' }}>
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#8b5cf6' }}></span> Marked for Review
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
+              <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#64748b' }}></span> Not Visited
+            </span>
+          </div>
+        </div>
+
         <div className="mock-arena-card">
           <div className="mock-header-icon">
             <FiClock size={32} />

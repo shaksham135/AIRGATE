@@ -44,6 +44,18 @@ export default function QuestionDetail() {
   const [reportDesc, setReportDesc] = useState('');
   const [copiedShare, setCopiedShare] = useState(false);
   const [shareSuccessMsg, setShareSuccessMsg] = useState('');
+  const [showGuestLimitModal, setShowGuestLimitModal] = useState(false);
+
+  const checkGuestSolvePermission = () => {
+    if (currentUser) return true;
+    const count = parseInt(localStorage.getItem('airgate_guest_solve_count') || '0', 10);
+    if (count >= 3) {
+      setShowGuestLimitModal(true);
+      return false;
+    }
+    localStorage.setItem('airgate_guest_solve_count', String(count + 1));
+    return true;
+  };
 
   // Dynamic OpenGraph SEO Meta Tag Inserter & Title Updater
   useEffect(() => {
@@ -450,6 +462,7 @@ export default function QuestionDetail() {
 
   const handleOptionClick = async (optionLabel) => {
     if (selectedOption) return; // Locked!
+    if (!currentUser && !checkGuestSolvePermission()) return;
 
     if (question && question.questionType === 'MSQ') {
       setTempSelectedMsq(prev => {
@@ -481,6 +494,7 @@ export default function QuestionDetail() {
 
   const handleSubmitMsq = async () => {
     if (selectedOption || tempSelectedMsq.length === 0) return;
+    if (!currentUser && !checkGuestSolvePermission()) return;
 
     const selectedStr = tempSelectedMsq.join(', ');
     setSelectedOption(selectedStr);
@@ -968,30 +982,51 @@ export default function QuestionDetail() {
                 );
               })}
             </div>
-            {question.questionType === 'MSQ' && !selectedOption && (
-              <div style={{ margin: '16px 0', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={handleSubmitMsq}
-                  disabled={tempSelectedMsq.length === 0}
-                  style={{ padding: '10px 24px', height: '42px', borderRadius: '8px' }}
-                >
-                  Submit MSQ Answer
-                </button>
-                {tempSelectedMsq.length > 0 && (
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Selected: {tempSelectedMsq.join(', ')}
-                  </span>
-                )}
-              </div>
-            )}
+        {/* MSQ Guidance Banner */}
+        {question.questionType === 'MSQ' && !selectedOption && (
+          <div style={{
+            background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)',
+            color: '#a78bfa', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem',
+            fontWeight: 600, margin: '16px 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+            <span>💡</span>
+            <span><strong>MSQ Guidance:</strong> Select one or more choices below, then click <strong>"Submit MSQ Answer"</strong>.</span>
           </div>
         )}
 
+        {question.questionType === 'MSQ' && !selectedOption && (
+          <div style={{ margin: '16px 0', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleSubmitMsq}
+              disabled={tempSelectedMsq.length === 0}
+              style={{ padding: '10px 24px', height: '42px', borderRadius: '8px' }}
+            >
+              Submit MSQ Answer
+            </button>
+            {tempSelectedMsq.length > 0 && (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Selected: {tempSelectedMsq.join(', ')}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    )}
 
-        {(question.questionType === 'NAT' || !question.options || question.options.length === 0) && (
-          <div style={{ margin: '24px 0', display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '350px' }}>
-            <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Numerical Answer (NAT):</label>
+    {(question.questionType === 'NAT' || !question.options || question.options.length === 0) && (
+      <div style={{ margin: '24px 0', display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '420px' }}>
+        {!selectedOption && (
+          <div style={{
+            background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)',
+            color: '#38bdf8', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem',
+            fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+            <span>💡</span>
+            <span><strong>NAT Guidance:</strong> Enter numeric value (e.g. <code>2.5</code>). Evaluated automatically against official GATE tolerance range.</span>
+          </div>
+        )}
+        <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Numerical Answer (NAT):</label>
             <div style={{ display: 'flex', gap: '12px' }}>
               <input 
                 type="text" 
@@ -1649,6 +1684,75 @@ export default function QuestionDetail() {
         isOpen={showPremiumModal} 
         onClose={() => setShowPremiumModal(false)} 
       />
+
+      {/* Guest Trial Limit Reached Modal */}
+      {showGuestLimitModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            border: '1px solid rgba(139, 92, 246, 0.4)',
+            borderRadius: '24px', padding: '32px', maxWidth: '480px', width: '100%',
+            textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowGuestLimitModal(false)}
+              style={{
+                position: 'absolute', top: '16px', right: '16px',
+                background: 'none', border: 'none', color: 'var(--text-muted)',
+                cursor: 'pointer', fontSize: '1.2rem'
+              }}
+            >
+              <FiX />
+            </button>
+
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #8b5cf6, #38bdf8)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 20px auto', fontSize: '1.8rem', color: '#fff'
+            }}>
+              🎉
+            </div>
+
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', marginBottom: '10px' }}>
+              You've Experienced 3 Free Solves!
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px' }}>
+              Create a free account in 5 seconds to unlock unlimited GATE PYQ solves, save your progress, track streaks, and view detailed step-by-step mathematical proofs!
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button
+                onClick={() => navigate('/register')}
+                className="btn btn-primary"
+                style={{
+                  padding: '14px', fontSize: '0.95rem', fontWeight: 800,
+                  borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #38bdf8)',
+                  border: 'none', cursor: 'pointer'
+                }}
+              >
+                🚀 Create Free Account Now
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="btn btn-outline"
+                style={{
+                  padding: '12px', fontSize: '0.88rem', fontWeight: 600,
+                  borderRadius: '12px', cursor: 'pointer'
+                }}
+              >
+                Already have an account? Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
