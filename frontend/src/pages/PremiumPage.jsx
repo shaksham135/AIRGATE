@@ -223,27 +223,28 @@ export default function PremiumPage() {
 
   const handleUpiSubmit = async (e) => {
     e.preventDefault();
-    if (!utrInput || utrInput.trim().length < 6) {
-      setError("Please enter a valid 12-digit UTR or Transaction Reference number.");
+    if (!utrInput || utrInput.trim().length < 4) {
+      setModalError("Please enter a valid 12-digit UTR or Transaction Reference number.");
       return;
     }
     const currentUser = AuthService.getCurrentUser();
     if (!currentUser) {
-      setError("Please Sign In first to submit payment proof.");
-      navigate('/login');
+      setModalError("Please Sign In first to submit payment proof.");
+      setTimeout(() => navigate('/login'), 1500);
       return;
     }
 
     setSubmittingUpi(true);
+    setModalError('');
     setError('');
     setSuccess('');
 
     try {
-      const activeAmount = selectedDuration === 6 ? betaDetails.tier2Price : betaDetails.tier1Price;
+      const activeAmount = selectedDuration === 6 ? betaDetails.tier3Price : selectedDuration === 3 ? betaDetails.tier2Price : betaDetails.tier1Price;
       const res = await axios.post(`${API_CONFIG.BASE_URL}/api/payments/submit-upi`, {
-        planType: selectedDuration === 6 ? 'SEASONAL_249' : 'MONTHLY_49',
+        planType: selectedDuration === 6 ? 'SEASONAL_249' : selectedDuration === 3 ? 'SPRINT_149' : 'MONTHLY_49',
         durationMonths: selectedDuration,
-        amount: activeAmount,
+        amount: activeAmount || 49.00,
         utrNumber: utrInput.trim(),
         screenshotUrl: screenshotUrlInput.trim()
       }, {
@@ -255,13 +256,14 @@ export default function PremiumPage() {
       setMyVerification({
         hasSubmitted: true,
         utrNumber: utrInput.trim(),
-        status: 'PENDING',
+        status: res.data.status || 'PENDING',
         amount: activeAmount,
         createdAt: new Date().toISOString()
       });
     } catch (err) {
       console.error("Failed to submit UPI payment proof:", err);
-      setError(err.response?.data?.error || "Failed to submit verification request. Please check UTR number.");
+      const serverMsg = err.response?.data?.error || err.response?.data?.message || "Failed to submit verification request. Please check UTR number.";
+      setModalError(serverMsg);
     } finally {
       setSubmittingUpi(false);
     }

@@ -378,13 +378,28 @@ public class PaymentController {
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
         User user = userRepository.findById(userDetails.getId()).orElseThrow();
-        String planType = (String) body.getOrDefault("planType", "MONTHLY_49");
-        int durationMonths = body.containsKey("durationMonths")
-                ? Integer.parseInt(body.get("durationMonths").toString())
-                : 1;
-        BigDecimal amount = new BigDecimal(body.getOrDefault("amount", "49.00").toString());
-        String utrNumber = (String) body.get("utrNumber");
-        String screenshotUrl = (String) body.get("screenshotUrl");
+        String planType = body.containsKey("planType") && body.get("planType") != null 
+                ? body.get("planType").toString() : "MONTHLY_49";
+        
+        int durationMonths = 1;
+        if (body.containsKey("durationMonths") && body.get("durationMonths") != null) {
+            try {
+                durationMonths = Integer.parseInt(body.get("durationMonths").toString().replaceAll("[^0-9]", ""));
+            } catch (Exception ignored) {}
+        }
+
+        BigDecimal amount = new BigDecimal("49.00");
+        if (body.containsKey("amount") && body.get("amount") != null) {
+            try {
+                String amtStr = body.get("amount").toString().replaceAll("[^0-9.]", "");
+                if (!amtStr.isBlank()) {
+                    amount = new BigDecimal(amtStr);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        String utrNumber = body.get("utrNumber") != null ? body.get("utrNumber").toString() : null;
+        String screenshotUrl = body.get("screenshotUrl") != null ? body.get("screenshotUrl").toString() : "";
 
         if (utrNumber == null || utrNumber.trim().isBlank()) {
             return ResponseEntity.badRequest()
@@ -392,14 +407,23 @@ public class PaymentController {
         }
 
         String cleanUtr = utrNumber.trim().replaceAll("\\s+", "");
-        if (cleanUtr.length() < 6) {
+        if (cleanUtr.length() < 4) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Invalid UTR number length. Please enter a valid 12-digit transaction ID."));
+                    .body(Map.of("error", "Invalid UTR reference length. Please enter a valid transaction reference."));
         }
 
-        if (paymentVerificationRepository.existsByUtrNumber(cleanUtr)) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "This UTR number has already been submitted for verification."));
+        Optional<com.pyq.platform.entity.PaymentVerification> existingOpt = paymentVerificationRepository.findByUtrNumber(cleanUtr);
+        if (existingOpt.isPresent()) {
+            com.pyq.platform.entity.PaymentVerification existing = existingOpt.get();
+            if (existing.getUser() != null && existing.getUser().getId().equals(user.getId())) {
+                return ResponseEntity.ok(Map.of(
+                        "message", "Your payment verification request for UTR " + cleanUtr + " is already recorded and under review!",
+                        "id", existing.getId(),
+                        "status", existing.getStatus().name()));
+            } else {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "This UTR number has already been submitted by another user."));
+            }
         }
 
         com.pyq.platform.entity.PaymentVerification pv = com.pyq.platform.entity.PaymentVerification.builder()
@@ -408,7 +432,7 @@ public class PaymentController {
                 .durationMonths(durationMonths)
                 .amount(amount)
                 .utrNumber(cleanUtr)
-                .screenshotUrl(screenshotUrl != null ? screenshotUrl.trim() : "")
+                .screenshotUrl(screenshotUrl.trim())
                 .status(com.pyq.platform.entity.PaymentVerification.Status.PENDING)
                 .build();
 

@@ -31,5 +31,7 @@ public interface PaymentVerificationRepository extends JpaRepository<PaymentVeri
     Page<PaymentVerification> findAllOrderedByPendingFirst(Pageable pageable);
 
     boolean existsByUtrNumber(String utrNumber);
+
+    Optional<PaymentVerification> findByUtrNumber(String utrNumber);
 }
 
