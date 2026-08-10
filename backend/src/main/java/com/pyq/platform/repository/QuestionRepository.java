@@ -202,6 +202,21 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
 
     @Modifying(clearAutomatically = true)
     @Transactional
+    @Query("UPDATE Question q SET q.subject = :newSubject WHERE q.topic.id IN :topicIds")
+    int updateSubjectForTopicIds(@Param("topicIds") List<Long> topicIds, @Param("newSubject") Subject newSubject);
+
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("UPDATE Question q SET q.subject = :targetSubject WHERE q.subject.id = :subjectId")
+    int reassignQuestionsToSubject(@Param("subjectId") Long subjectId, @Param("targetSubject") Subject targetSubject);
+
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("UPDATE Question q SET q.topic = :targetTopic, q.subject = :targetSubject WHERE q.topic.id IN :topicIds")
+    int reassignQuestionsToTopicAndSubject(@Param("topicIds") List<Long> topicIds, @Param("targetTopic") Topic targetTopic, @Param("targetSubject") Subject targetSubject);
+
+    @Modifying(clearAutomatically = true)
+    @Transactional
     @Query(
         value = "UPDATE questions q JOIN topics t ON q.topic_id = t.id SET q.subject_id = t.subject_id WHERE q.subject_id <> t.subject_id",
         nativeQuery = true)

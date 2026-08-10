@@ -135,12 +135,14 @@ public class SubjectController {
         if (payload.get("targetSubjectId") == null) {
             return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse("Error: Target subject ID is required!"));
         }
-        Long targetSubjectId = Long.valueOf(payload.get("targetSubjectId").toString());
         try {
+            Long targetSubjectId = Long.valueOf(payload.get("targetSubjectId").toString());
             com.pyq.platform.entity.Topic transferred = topicService.transferTopic(topicId, targetSubjectId);
             return ResponseEntity.ok(transferred);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new com.pyq.platform.dto.MessageResponse("Error transferring topic: " + e.getMessage()));
         }
     }
 
@@ -155,6 +157,8 @@ public class SubjectController {
             return ResponseEntity.ok(new com.pyq.platform.dto.MessageResponse("Topic deleted successfully."));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new com.pyq.platform.dto.MessageResponse(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new com.pyq.platform.dto.MessageResponse("Error deleting topic: " + e.getMessage()));
         }
     }
 }

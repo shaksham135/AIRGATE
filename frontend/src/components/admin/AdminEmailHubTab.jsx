@@ -17,7 +17,7 @@ export default function AdminEmailHubTab() {
   const fetchEmailLogs = async () => {
     try {
       setLogsLoading(true);
-      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/email-logs`, {
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/email/logs`, {
         headers: AuthService.getAuthHeader()
       });
       if (Array.isArray(res.data)) {
@@ -44,12 +44,14 @@ export default function AdminEmailHubTab() {
     try {
       setSending(true);
       setBroadcastResultMsg('');
-      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/email-broadcast`, {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/email/broadcast`, {
         targetSegment: emailSegment,
-        singleRecipientEmail: emailSegment === 'SINGLE' ? customSingleEmail.trim() : null,
+        customSingleEmail: emailSegment === 'SINGLE' ? customSingleEmail.trim() : null,
         subject: emailSubject.trim(),
-        htmlContent: emailBodyHtml.trim()
-      }, { headers: AuthService.getAuthHeader() });
+        bodyHtml: emailBodyHtml.trim()
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
 
       if (res.data) {
         setBroadcastResultMsg("📢 Broadcast email process triggered in background thread!");

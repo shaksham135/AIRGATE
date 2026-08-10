@@ -60,8 +60,13 @@ public class AdminEmailController {
 
     @GetMapping("/logs")
     public ResponseEntity<?> getEmailLogs() {
-        List<EmailLog> logs = emailLogRepository.findTop50ByOrderBySentAtDesc();
-        return ResponseEntity.ok(logs);
+        try {
+            List<EmailLog> logs = emailLogRepository.findTop50ByOrderBySentAtDesc();
+            return ResponseEntity.ok(logs != null ? logs : java.util.Collections.emptyList());
+        } catch (Exception e) {
+            log.error("Error fetching email logs: {}", e.getMessage());
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
 
     @Data
