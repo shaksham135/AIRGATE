@@ -43,27 +43,70 @@ export default function QuestionDetail() {
   const [reportReason, setReportReason] = useState('');
   const [reportDesc, setReportDesc] = useState('');
   const [copiedShare, setCopiedShare] = useState(false);
+  const [shareSuccessMsg, setShareSuccessMsg] = useState('');
+
+  // Dynamic OpenGraph SEO Meta Tag Inserter & Title Updater
+  useEffect(() => {
+    if (!question) return;
+
+    const subjectStr = question.subjectName || 'GATE CSE';
+    const yearStr = question.year ? `GATE ${question.year}` : 'Practice Question';
+    const qNumStr = question.questionNumber ? `Q.${question.questionNumber}` : `#${question.id}`;
+    const titleStr = `[${yearStr} | ${subjectStr}] ${qNumStr} - Solved Proofs on AIRGATE`;
+    document.title = titleStr;
+
+    const updateMetaTag = (attrName, attrValue, contentValue) => {
+      let element = document.querySelector(`meta[${attrName}="${attrValue}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attrName, attrValue);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', contentValue);
+    };
+
+    const rawText = (question.text || '').replace(/<[^>]*>?/gm, '').substring(0, 150);
+    const descStr = `${subjectStr} (${yearStr}): "${rawText}..." Access step-by-step mathematical derivations and instant AI Tutor hints on AIRGATE.`;
+    const shareUrl = `${window.location.origin}${getQuestionUrl(question)}`;
+    const ogImageUrl = (question.imagePath && question.imagePath.startsWith('http'))
+      ? question.imagePath
+      : `${window.location.origin}/logo.png`;
+
+    updateMetaTag('property', 'og:title', titleStr);
+    updateMetaTag('property', 'og:description', descStr);
+    updateMetaTag('property', 'og:url', shareUrl);
+    updateMetaTag('property', 'og:image', ogImageUrl);
+    updateMetaTag('name', 'twitter:title', titleStr);
+    updateMetaTag('name', 'twitter:description', descStr);
+    updateMetaTag('name', 'twitter:image', ogImageUrl);
+  }, [question]);
+
+  const getFormattedShareText = () => {
+    if (!question) return 'Solve this GATE CSE question on AIRGATE!';
+    const rawText = (question.text || '').replace(/<[^>]*>?/gm, '').substring(0, 120);
+    const subjectStr = question.subjectName || 'Computer Science';
+    const yearStr = question.year ? `GATE ${question.year}` : 'Practice Mock';
+    return `⚡ *GATE CSE Question Discussion*\n📘 *Subject:* ${subjectStr} (${yearStr})\n❓ *Q:* "${rawText}..."\n\n👇 Solve & View Detailed Mathematical Derivations:\n`;
+  };
+
+  const handleWhatsAppShare = () => {
+    const shareUrl = `${window.location.origin}${getQuestionUrl(question || { id })}?ref=whatsapp`;
+    const fullText = `${getFormattedShareText()}${shareUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(fullText)}`, '_blank');
+  };
+
+  const handleTelegramShare = () => {
+    const shareUrl = `${window.location.origin}${getQuestionUrl(question || { id })}?ref=telegram`;
+    const text = getFormattedShareText();
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`, '_blank');
+  };
 
   const handleShareQuestion = async () => {
-    const shareUrl = `${window.location.origin}${getQuestionUrl(question || { id })}`;
-    const shareTitle = question ? `GATE CSE ${question.year || ''} - ${question.topicName || 'Question'} | AIRGATE` : 'AIRGATE Question';
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: `Check out this GATE question on AIRGATE:`,
-          url: shareUrl,
-        });
-        return;
-      } catch (err) {
-        // Fallback to clipboard if share dismissed
-      }
-    }
-
+    const shareUrl = `${window.location.origin}${getQuestionUrl(question || { id })}?ref=share`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopiedShare(true);
+      setShareSuccessMsg('Link copied to clipboard!');
       setTimeout(() => setCopiedShare(false), 2500);
     } catch (err) {
       const textArea = document.createElement('textarea');
@@ -772,29 +815,69 @@ export default function QuestionDetail() {
             <FiBookmark size={20} fill={isBookmarked ? 'var(--color-warning)' : 'none'} />
           </button>
 
-          {/* Share Button */}
-          <button 
-            style={{ 
-              background: copiedShare ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)', 
-              border: `1px solid ${copiedShare ? '#22c55e' : 'var(--border-color)'}`, 
-              color: copiedShare ? '#22c55e' : 'var(--text-secondary)', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              padding: '4px 10px',
-              borderRadius: '8px',
-              fontSize: '0.82rem',
-              fontWeight: 600,
-              marginLeft: '12px',
-              transition: 'all 0.2s ease'
-            }}
-            onClick={handleShareQuestion}
-            title="Share Direct Question Link"
-          >
-            {copiedShare ? <FiCheck size={16} /> : <FiShare2 size={16} />}
-            <span>{copiedShare ? 'Link Copied!' : 'Share'}</span>
-          </button>
+          {/* Viral Social Share Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+            <button
+              onClick={handleWhatsAppShare}
+              title="Share with WhatsApp GATE Group"
+              style={{
+                backgroundColor: 'rgba(37, 211, 102, 0.15)',
+                border: '1px solid rgba(37, 211, 102, 0.4)',
+                color: '#25D366',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              📲 WhatsApp
+            </button>
+
+            <button
+              onClick={handleTelegramShare}
+              title="Share with Telegram GATE Group"
+              style={{
+                backgroundColor: 'rgba(0, 136, 204, 0.15)',
+                border: '1px solid rgba(0, 136, 204, 0.4)',
+                color: '#38bdf8',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              ✈️ Telegram
+            </button>
+
+            <button 
+              style={{ 
+                background: copiedShare ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)', 
+                border: `1px solid ${copiedShare ? '#22c55e' : 'var(--border-color)'}`, 
+                color: copiedShare ? '#22c55e' : 'var(--text-secondary)', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 600
+              }}
+              onClick={handleShareQuestion}
+              title="Copy Question Direct Link"
+            >
+              {copiedShare ? <FiCheck size={14} /> : <FiShare2 size={14} />}
+              <span>{copiedShare ? 'Copied!' : 'Copy Link'}</span>
+            </button>
+          </div>
 
           {/* Report Button */}
           <button 

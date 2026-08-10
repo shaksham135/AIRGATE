@@ -65,11 +65,81 @@ function MockTestArena() {
   const examStartedRef = useRef(false);
   const examSubmittedRef = useRef(false);
 
+  // Auto-Resume Engine State
+  const [savedSession, setSavedSession] = useState(null);
+
   // Keep refs in sync with state
   useEffect(() => { questionsRef.current = questions; }, [questions]);
   useEffect(() => { answersRef.current = answers; }, [answers]);
   useEffect(() => { examStartedRef.current = examStarted; }, [examStarted]);
   useEffect(() => { examSubmittedRef.current = examSubmitted; }, [examSubmitted]);
+
+  // 1. Detect and check active incomplete mock session on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('airgate_active_mock_session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.questions && parsed.questions.length > 0) {
+          const hoursOld = (Date.now() - (parsed.lastUpdated || 0)) / (1000 * 3600);
+          if (hoursOld < 24) {
+            const elapsedOfflineSecs = Math.floor((Date.now() - (parsed.lastUpdated || Date.now())) / 1000);
+            const remaining = Math.max(0, (parsed.timeLeft || 0) - elapsedOfflineSecs);
+            parsed.adjustedTimeLeft = remaining;
+            setSavedSession(parsed);
+          } else {
+            localStorage.removeItem('airgate_active_mock_session');
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load saved mock session", e);
+    }
+  }, []);
+
+  // 2. Real-time Auto-Save active mock test state to LocalStorage
+  useEffect(() => {
+    if (examStarted && !examSubmitted && questions.length > 0) {
+      try {
+        const sessionPayload = {
+          mode: activeTab,
+          selectedSubject,
+          customQuestionCount,
+          customTime,
+          questions,
+          answers,
+          visited: Array.from(visited),
+          flagged: Array.from(flagged),
+          currentIndex,
+          timeLeft,
+          lastUpdated: Date.now()
+        };
+        localStorage.setItem('airgate_active_mock_session', JSON.stringify(sessionPayload));
+      } catch (e) {
+        console.error("Failed to auto-save mock session state", e);
+      }
+    }
+  }, [examStarted, examSubmitted, questions, answers, visited, flagged, currentIndex, timeLeft]);
+
+  const handleResumeSession = () => {
+    if (!savedSession) return;
+    setQuestions(savedSession.questions || []);
+    setAnswers(savedSession.answers || {});
+    setVisited(new Set(savedSession.visited || [0]));
+    setFlagged(new Set(savedSession.flagged || []));
+    setCurrentIndex(savedSession.currentIndex || 0);
+    setTimeLeft(savedSession.adjustedTimeLeft || 0);
+    if (savedSession.mode) setActiveTab(savedSession.mode);
+    setExamStarted(true);
+    setExamSubmitted(false);
+    setSavedSession(null);
+    enterFullscreen();
+  };
+
+  const handleDiscardSession = () => {
+    localStorage.removeItem('airgate_active_mock_session');
+    setSavedSession(null);
+  };
 
   // Load questions when exam starts
   const startExam = async () => {
@@ -317,33 +387,18 @@ function MockTestArena() {
       examSubmittedRef.current = true;
     };
 
-    // 1. Tab close/refresh → ONLY warn, do NOT auto-submit here
-    //    (user might click Cancel — we must not submit if they stay)
+    // 1. Tab close/refresh → Warn user and save state
     const onBeforeUnload = (e) => {
       if (!examStartedRef.current || examSubmittedRef.current) return;
       e.preventDefault();
-      e.returnValue = 'Your mock exam is still in progress. Leaving will auto-submit your answers.';
+      e.returnValue = 'Your mock exam is still in progress. Your answers will be saved for auto-resume.';
       return e.returnValue;
     };
 
-    // 2. Actual page unload (confirmed refresh or tab close)
-    const onUnload = () => {
-      isUnloadingRef.current = true;
-      autoSubmitViaRef();
-    };
-
     window.addEventListener('beforeunload', onBeforeUnload);
-    window.addEventListener('unload', onUnload);
 
-    // 3. Cleanup = component unmount = in-app navigation → auto-submit
     return () => {
       window.removeEventListener('beforeunload', onBeforeUnload);
-      window.removeEventListener('unload', onUnload);
-      
-      // Only auto-submit on component unmount if the page itself is NOT unloading
-      if (!isUnloadingRef.current) {
-        autoSubmitViaRef(); // only fires if exam was running and not yet submitted
-      }
     };
   }, []); // runs once — uses refs for latest state
 
@@ -636,6 +691,55 @@ function MockTestArena() {
     return (
       <div className="mock-arena-container">
         
+        {/* Active Session Auto-Resume Card */}
+        {savedSession && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '16px',
+            padding: '20px 24px',
+            marginBottom: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+          }}>
+            <div>
+              <span style={{
+                backgroundColor: '#10b981', color: '#fff', fontSize: '0.7rem', fontWeight: 800,
+                padding: '3px 10px', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '0.05em'
+              }}>
+                ⚡ Auto-Resume Incomplete Test
+              </span>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff', margin: '6px 0 4px 0' }}>
+                You have an active in-progress Mock Session!
+              </h3>
+              <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', margin: 0 }}>
+                Mode: <strong style={{ color: '#38bdf8' }}>{savedSession.mode === 'hybrid' ? 'Smart Hybrid Mock' : savedSession.mode === 'custom' ? 'Subject Practice' : 'Standard PYQ Mock'}</strong> • Solved: <strong style={{ color: '#10b981' }}>{Object.keys(savedSession.answers || {}).length} / {savedSession.questions.length} Questions</strong> • Time Remaining: <strong style={{ color: '#f59e0b' }}>{Math.floor(savedSession.adjustedTimeLeft / 60)}m {savedSession.adjustedTimeLeft % 60}s</strong>
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button
+                onClick={handleResumeSession}
+                className="btn btn-primary"
+                style={{ padding: '10px 20px', fontSize: '0.88rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', cursor: 'pointer' }}
+              >
+                ▶️ Resume Mock Test
+              </button>
+              <button
+                onClick={handleDiscardSession}
+                className="btn btn-outline"
+                style={{ padding: '10px 16px', fontSize: '0.84rem', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', cursor: 'pointer' }}
+              >
+                🗑️ Discard & Start Fresh
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Desktop Recommendation Notice Banner */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%)',
