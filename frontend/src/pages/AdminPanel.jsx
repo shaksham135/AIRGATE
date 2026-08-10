@@ -51,9 +51,7 @@ export default function AdminPanel() {
   const fetchOverviewStats = async () => {
     try {
       setStatsLoading(true);
-      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/questions/stats`, {
-        headers: AuthService.getAuthHeader()
-      });
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/stats`);
       if (res.data) setStats(res.data);
     } catch (err) {
       console.error("Failed to load overview stats", err);
@@ -64,13 +62,12 @@ export default function AdminPanel() {
 
   const fetchPendingBetaCount = async () => {
     try {
-      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/payments/verifications`, {
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/payments/admin/verifications`, {
         headers: AuthService.getAuthHeader()
       });
-      if (Array.isArray(res.data)) {
-        const pending = res.data.filter(v => v.status === 'PENDING').length;
-        setBetaPendingCount(pending);
-      }
+      const contentList = Array.isArray(res.data) ? res.data : (res.data?.content || []);
+      const pending = contentList.filter(v => v.status === 'PENDING').length;
+      setBetaPendingCount(pending);
     } catch (err) {
       console.error("Failed to load pending beta payment count", err);
     }
