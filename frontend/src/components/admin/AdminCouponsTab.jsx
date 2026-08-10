@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../../config/api';
-import AuthService from '../../services/authService';
+import AuthService from '../../services/AuthService';
 import { FiGift, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 export default function AdminCouponsTab() {

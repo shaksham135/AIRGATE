@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
-import AuthService from '../services/authService';
+import AuthService from '../services/AuthService';
 import '../styles/adminPanel.css';
 
 import { 

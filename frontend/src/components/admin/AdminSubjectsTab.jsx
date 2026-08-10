@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../../config/api';
-import AuthService from '../../services/authService';
+import AuthService from '../../services/AuthService';
 import { 
   FiLayers, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, 
   FiSearch, FiAlertTriangle 
