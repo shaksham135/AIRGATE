@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../../config/api';
 import AuthService from '../../services/AuthService';
-import { FiMail, FiSend, FiRefreshCw } from 'react-icons/fi';
+import { FiMail, FiSend, FiRefreshCw, FiGlobe, FiCheckCircle, FiCheck, FiPlay, FiSettings } from 'react-icons/fi';
 
 export default function AdminEmailHubTab() {
   const [emailSegment, setEmailSegment] = useState('ALL');
@@ -13,6 +13,14 @@ export default function AdminEmailHubTab() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [broadcastResultMsg, setBroadcastResultMsg] = useState('');
+
+  // Website Link & Domain Configuration State
+  const [frontendBaseUrl, setFrontendBaseUrl] = useState('https://airgate-in.vercel.app');
+  const [supportEmail, setSupportEmail] = useState('support@airgate.in');
+  const [testEmailTarget, setTestEmailTarget] = useState('');
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [domainSuccessMsg, setDomainSuccessMsg] = useState('');
+  const [testEmailMsg, setTestEmailMsg] = useState('');
 
   const fetchEmailLogs = async () => {
     try {
@@ -30,9 +38,64 @@ export default function AdminEmailHubTab() {
     }
   };
 
+  const fetchSettingsDomain = async () => {
+    try {
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/settings`, {
+        headers: AuthService.getAuthHeader()
+      });
+      if (res.data) {
+        if (res.data.frontendBaseUrl) setFrontendBaseUrl(res.data.frontendBaseUrl);
+        if (res.data.supportEmail) setSupportEmail(res.data.supportEmail);
+      }
+    } catch (err) {
+      console.error("Failed to load email domain settings", err);
+    }
+  };
+
   useEffect(() => {
     fetchEmailLogs();
+    fetchSettingsDomain();
   }, []);
+
+  const handleSaveDomainConfig = async (e) => {
+    e.preventDefault();
+    try {
+      setDomainSaving(true);
+      setDomainSuccessMsg('');
+      await axios.put(`${API_CONFIG.BASE_URL}/api/admin/settings`, {
+        frontendBaseUrl: frontendBaseUrl.trim(),
+        supportEmail: supportEmail.trim()
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+      setDomainSuccessMsg("✅ Email website URL updated successfully! All outgoing emails will now use this link.");
+      fetchSettingsDomain();
+    } catch (err) {
+      alert("Failed to save email domain settings.");
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    const target = testEmailTarget.trim() || supportEmail.trim() || AuthService.getCurrentUser()?.email;
+    if (!target) {
+      alert("Please enter a target email address for the diagnostic test.");
+      return;
+    }
+    try {
+      setTestEmailMsg("Sending test email...");
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/admin/email/test`, {
+        email: target
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+      setTestEmailMsg(res.data.message || `✅ Test email successfully sent to ${target}`);
+      fetchEmailLogs();
+    } catch (err) {
+      setTestEmailMsg("❌ " + (err.response?.data?.error || "Failed to send test email. Check server logs."));
+    }
+  };
 
   const handleSendBroadcast = async (e) => {
     e.preventDefault();
@@ -73,11 +136,94 @@ export default function AdminEmailHubTab() {
       {/* Header Card */}
       <div className="admin-header-card">
         <h2 className="admin-header-title">
-          <FiMail style={{ color: '#0ea5e9' }} /> Targeted Email Broadcast Engine
+          <FiMail style={{ color: '#0ea5e9' }} /> Targeted Email & Website Links Hub
         </h2>
         <p className="admin-header-desc">
-          Dispatch announcements, study tips, or promo updates to specific aspirant segments asynchronously in the background.
+          Configure outgoing email website domain URLs, test email templates, and dispatch announcements to aspirants.
         </p>
+      </div>
+
+      {/* SECTION 1: Website Link & Domain Configuration Panel */}
+      <div className="admin-card" style={{ marginBottom: '28px', borderLeft: '4px solid #0ea5e9' }}>
+        <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FiGlobe style={{ color: '#38bdf8' }} /> Outgoing Email Website URL & Domain Settings
+        </h3>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+          Configure the active frontend domain link embedded in all outgoing emails (Welcome, Payment Confirmation, UTR Approvals, Password Reset, etc.).
+        </p>
+
+        {domainSuccessMsg && (
+          <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.84rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 600 }}>
+            {domainSuccessMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleSaveDomainConfig} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '14px', alignItems: 'end' }}>
+          <div>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+              Active Website Base URL (Link in Emails)
+            </label>
+            <input 
+              type="url" 
+              value={frontendBaseUrl}
+              onChange={e => setFrontendBaseUrl(e.target.value)}
+              placeholder="e.g. https://airgate-in.vercel.app"
+              className="admin-input"
+              style={{ fontWeight: 700, color: '#38bdf8' }}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+              Sender / Support Email
+            </label>
+            <input 
+              type="email" 
+              value={supportEmail}
+              onChange={e => setSupportEmail(e.target.value)}
+              placeholder="support@airgate.in"
+              className="admin-input"
+              required
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={domainSaving}
+            className="btn btn-primary"
+            style={{ padding: '10px 18px', background: '#0ea5e9', borderColor: '#0ea5e9', fontWeight: 800, fontSize: '0.85rem' }}
+          >
+            {domainSaving ? 'Saving...' : 'Save Email Link'}
+          </button>
+        </form>
+
+        {/* Diagnostic Test Email Bar */}
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '500px' }}>
+            <input 
+              type="email" 
+              placeholder="Enter email to send diagnostic test" 
+              value={testEmailTarget}
+              onChange={e => setTestEmailTarget(e.target.value)}
+              className="admin-input"
+              style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+            />
+            <button 
+              type="button" 
+              onClick={handleSendTestEmail}
+              className="btn btn-outline"
+              style={{ padding: '8px 14px', fontSize: '0.8rem', color: '#38bdf8', borderColor: 'rgba(56,189,248,0.3)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <FiPlay size={12} /> Send Test Email
+            </button>
+          </div>
+          {testEmailMsg && (
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: testEmailMsg.startsWith('❌') ? '#ef4444' : '#10b981' }}>
+              {testEmailMsg}
+            </div>
+          )}
+        </div>
       </div>
 
       {broadcastResultMsg && (
@@ -86,7 +232,7 @@ export default function AdminEmailHubTab() {
         </div>
       )}
 
-      {/* Form + Preset Templates Split Grid */}
+      {/* Form + Broadcast History Grid */}
       <div className="admin-grid-split-rev">
         
         {/* Left: Broadcast Composer Form */}
@@ -96,174 +242,106 @@ export default function AdminEmailHubTab() {
           </h3>
 
           <form onSubmit={handleSendBroadcast}>
-            
-            {/* Target Audience Segment */}
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Target Audience Segment
-              </label>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Target Segment</label>
               <select 
-                value={emailSegment}
+                value={emailSegment} 
                 onChange={e => setEmailSegment(e.target.value)}
-                className="admin-select"
+                className="admin-input"
               >
-                <option value="ALL">👥 All Registered Aspirants</option>
-                <option value="FREE">🆓 Free Tier Users Only (Upgrade Nudge)</option>
-                <option value="PREMIUM">⭐ Aspirant Pro Members Only (Exclusive Updates)</option>
-                <option value="SINGLE">🎯 Specific Single User Email</option>
+                <option value="ALL">All Registered Aspirants</option>
+                <option value="FREE">Free Tier Aspirants</option>
+                <option value="PREMIUM">Aspirant Pro Members Only</option>
+                <option value="SINGLE">Custom Single Email Recipient</option>
               </select>
             </div>
 
             {emailSegment === 'SINGLE' && (
-              <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Recipient Email Address
-                </label>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Custom Single Target Email</label>
                 <input 
-                  type="email"
-                  placeholder="student@example.com"
-                  value={customSingleEmail}
+                  type="email" 
+                  value={customSingleEmail} 
                   onChange={e => setCustomSingleEmail(e.target.value)}
-                  className="admin-input"
+                  placeholder="student@example.com"
+                  className="admin-input" 
                   required
                 />
               </div>
             )}
 
-            {/* Email Subject Line */}
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Email Subject Line
-              </label>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Email Subject Line</label>
               <input 
-                type="text"
-                placeholder="e.g. 🚨 New GATE CSE Mock Test Released for Operating Systems!"
-                value={emailSubject}
+                type="text" 
+                value={emailSubject} 
                 onChange={e => setEmailSubject(e.target.value)}
-                className="admin-input"
+                placeholder="e.g. ⚡ Limited Offer: Upgrade to Aspirant Pro & Unlock Full PYQs"
+                className="admin-input" 
                 required
               />
             </div>
 
-            {/* HTML Body */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                HTML Body Content
-              </label>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Email Body (HTML Supported)</label>
               <textarea 
-                rows={6}
-                placeholder="<p>Write your HTML content or plain text here...</p>"
-                value={emailBodyHtml}
+                rows={7} 
+                value={emailBodyHtml} 
                 onChange={e => setEmailBodyHtml(e.target.value)}
-                className="admin-textarea"
+                placeholder="<p>Dear Aspirant,</p><p>We have added 50+ new GATE 2026 practice questions...</p>"
+                className="admin-textarea" 
                 required
               />
             </div>
 
             <button 
-              type="submit"
+              type="submit" 
               disabled={sending}
               className="btn btn-primary"
-              style={{ width: '100%', padding: '12px', background: '#0ea5e9', borderColor: '#0ea5e9', fontWeight: 800, fontSize: '0.92rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              style={{ width: '100%', padding: '12px', background: '#0ea5e9', borderColor: '#0ea5e9', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
-              <FiSend /> {sending ? 'Dispatching Email Threads...' : 'Dispatch Broadcast Email'}
+              <FiSend /> {sending ? 'Triggering Broadcast...' : 'Dispatch Email Broadcast'}
             </button>
           </form>
         </div>
 
-        {/* Right: Quick Template Presets */}
+        {/* Right: Recent Email Logs */}
         <div className="admin-card">
-          <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '16px', fontWeight: 700 }}>
-            ⚡ Preset Announcement Templates
-          </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
-            Click any template below to prefill subject and email content:
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', color: '#fff', margin: 0, fontWeight: 700 }}>
+              📜 Recent Dispatched Logs
+            </h3>
             <button 
-              type="button"
-              onClick={() => {
-                setEmailSubject('🚀 Brand New GATE CSE Smart Mock Test Series Released!');
-                setEmailBodyHtml('<p>We have released a brand new Smart Hybrid Mock Test containing 70% fresh double-verified questions + 30% high-yield GATE PYQs.</p><p>Practice under exact GATE interface conditions now!</p>');
-              }}
-              style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)', color: '#e2e8f0', cursor: 'pointer', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}
+              onClick={fetchEmailLogs} 
+              className="btn btn-outline"
+              style={{ padding: '4px 8px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              🚀 Preset: New Mock Release
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => {
-                setEmailSubject('✨ Unlock Unlimited AI Tutor & Full Proofs with Aspirant Pro');
-                setEmailBodyHtml('<p>Stuck on complex GATE CS proofs? Upgrade to <strong>Aspirant Pro</strong> to get 50 daily AI Tutor queries and step-by-step math breakdowns.</p>');
-              }}
-              style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)', color: '#e2e8f0', cursor: 'pointer', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}
-            >
-              ⭐ Preset: Pro Membership Offer
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => {
-                setEmailSubject('📢 Important System Maintenance Notice');
-                setEmailBodyHtml('<p>AIRGATE platform will undergo a quick 15-minute maintenance update tonight at 2:00 AM IST. All mock history will remain secure.</p>');
-              }}
-              style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)', color: '#e2e8f0', cursor: 'pointer', textAlign: 'left', fontSize: '0.85rem', fontWeight: 600 }}
-            >
-              📢 Preset: System Announcement
+              <FiRefreshCw size={12} /> Refresh
             </button>
           </div>
 
-          <div style={{ padding: '14px', borderRadius: '10px', backgroundColor: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.2)', fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.5 }}>
-            💡 <strong>Deliverability Tip:</strong> Bulk broadcast emails run in background threads with 100ms throttle between dispatches to maintain 100% inbox delivery rate.
-          </div>
+          {logsLoading ? (
+            <p style={{ color: 'var(--text-muted)' }}>Loading email logs...</p>
+          ) : emailLogs.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)' }}>No email logs recorded yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto' }}>
+              {emailLogs.map((log, idx) => (
+                <div key={idx} style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 700, color: '#38bdf8' }}>{log.recipientEmail}</span>
+                    <span className="admin-badge admin-badge-emerald" style={{ fontSize: '0.68rem' }}>{log.status || 'SENT'}</span>
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 600, marginBottom: '4px' }}>{log.subject}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Type: {log.emailType} • {log.sentAt ? new Date(log.sentAt).toLocaleString() : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Email Audit Log History Table */}
-      <div className="admin-card">
-        <h3 style={{ fontSize: '1.1rem', color: '#fff', marginTop: 0, marginBottom: '20px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>📜 Sent Email Logs (Top 50 Recent)</span>
-          <button onClick={fetchEmailLogs} className="btn btn-outline" style={{ padding: '4px 12px', fontSize: '0.78rem' }}><FiRefreshCw /> Refresh Logs</button>
-        </h3>
-
-        {logsLoading ? (
-          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>Loading email logs...</div>
-        ) : emailLogs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No email dispatch logs recorded yet.</div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Recipient</th>
-                  <th>Subject</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {emailLogs.map(log => (
-                  <tr key={log.id}>
-                    <td style={{ fontWeight: 600 }}>{log.recipientEmail}</td>
-                    <td>{log.subject}</td>
-                    <td><span className="admin-badge admin-badge-purple">{log.emailType}</span></td>
-                    <td>
-                      <span className={`admin-badge ${log.status === 'SENT' ? 'admin-badge-emerald' : 'admin-badge-rose'}`}>
-                        {log.status}
-                      </span>
-                    </td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      {new Date(log.sentAt).toLocaleString('en-IN')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
     </div>

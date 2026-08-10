@@ -83,6 +83,10 @@ public class DataInitializer implements CommandLineRunner {
             if (settings.getBetaSpotsRemaining() == null) { settings.setBetaSpotsRemaining(100); updated = true; }
             if (settings.getBetaTier1Price() == null) { settings.setBetaTier1Price(new java.math.BigDecimal("49.00")); updated = true; }
             if (settings.getBetaTier2Price() == null) { settings.setBetaTier2Price(new java.math.BigDecimal("249.00")); updated = true; }
+            if (settings.getFrontendBaseUrl() == null || settings.getFrontendBaseUrl().isBlank()) {
+                settings.setFrontendBaseUrl("https://airgate-in.vercel.app");
+                updated = true;
+            }
             if (updated) {
                 systemSettingsRepository.save(settings);
                 log.info("⚙️ DataInitializer: Updated SystemSettings with VIP Beta defaults.");

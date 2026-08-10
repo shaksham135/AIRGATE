@@ -236,7 +236,15 @@ export default function AdminSettingsTab() {
             <FiCpu style={{ color: '#8b5cf6' }} /> AI Quota & Support Contacts
           </h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '14px' }}>
+            <div>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Website Domain URL (Email Link)</label>
+              <input 
+                type="url" value={settings.frontendBaseUrl || 'https://airgate-in.vercel.app'}
+                onChange={e => setSettings({ ...settings, frontendBaseUrl: e.target.value })}
+                className="admin-input" style={{ fontWeight: 700, color: '#38bdf8' }} required
+              />
+            </div>
             <div>
               <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Pro AI Daily Query Limit</label>
               <input 

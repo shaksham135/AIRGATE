@@ -27,6 +27,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByIsPremiumTrueAndPremiumExpiresAtBefore(LocalDateTime now);
 
+    List<User> findByRole(User.UserRole role);
+
     @Modifying
     @Transactional
     @Query("UPDATE User u SET u.lastActiveAt = :lastActiveAt WHERE u.id = :id")

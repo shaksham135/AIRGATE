@@ -492,14 +492,35 @@ public class EmailService {
     @Async
     public void sendAdminUpiPaymentNotification(com.pyq.platform.entity.PaymentVerification pv, User user) {
         try {
-            String adminEmail = "support@airgate.in";
+            java.util.Set<String> recipientEmails = new java.util.HashSet<>();
+
+            // 1. Configured support / admin email from SystemSettings
             try {
                 com.pyq.platform.entity.SystemSettings settings = systemSettingsRepository.findById(1).orElse(null);
                 if (settings != null && settings.getSupportEmail() != null && !settings.getSupportEmail().isBlank()) {
-                    adminEmail = settings.getSupportEmail().trim();
+                    recipientEmails.add(settings.getSupportEmail().trim().toLowerCase());
                 }
             } catch (Exception e) {
                 log.warn("Could not fetch supportEmail from settings: {}", e.getMessage());
+            }
+
+            // Default fallback if set empty
+            if (recipientEmails.isEmpty()) {
+                recipientEmails.add("support@airgate.in");
+            }
+
+            // 2. Also send to all registered ADMIN users' actual email addresses in DB
+            try {
+                List<User> adminUsers = userRepository.findByRole(User.UserRole.ADMIN);
+                if (adminUsers != null) {
+                    for (User admin : adminUsers) {
+                        if (admin.getEmail() != null && !admin.getEmail().isBlank()) {
+                            recipientEmails.add(admin.getEmail().trim().toLowerCase());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not fetch admin users from DB for payment notification: {}", e.getMessage());
             }
 
             String currentBaseUrl = getEffectiveFrontendUrl();
@@ -536,8 +557,10 @@ public class EmailService {
             .replace("{FRONTEND_URL}", currentBaseUrl);
 
             String html = buildBrandedLayout("Admin", body);
-            sendHtmlEmail(adminEmail, subject, html, "ADMIN_PAYMENT_VERIFICATION_ALERT");
-            log.info("宿 Notification email sent to admin [{}] for payment verification UTR {}", adminEmail, pv.getUtrNumber());
+            for (String adminEmail : recipientEmails) {
+                sendHtmlEmail(adminEmail, subject, html, "ADMIN_PAYMENT_VERIFICATION_ALERT");
+                log.info("📩 Instant notification email dispatched to admin [{}] for UTR {}", adminEmail, pv.getUtrNumber());
+            }
         } catch (Exception e) {
             log.error("Failed to send admin payment verification email alert: {}", e.getMessage(), e);
         }

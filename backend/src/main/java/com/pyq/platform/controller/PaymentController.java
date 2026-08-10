@@ -649,10 +649,13 @@ public class PaymentController {
     }
 
     private String calculateHmacSha256(String data, String secret) throws Exception {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalArgumentException("Razorpay Secret Key is not configured.");
+        }
         Mac mac = Mac.getInstance("HmacSHA256");
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256");
         mac.init(secretKeySpec);
-        byte[] rawHmac = mac.doFinal(data.getBytes());
+        byte[] rawHmac = mac.doFinal(data.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         StringBuilder hexString = new StringBuilder();
         for (byte b : rawHmac) {
             String hex = Integer.toHexString(0xff & b);
@@ -661,5 +664,74 @@ public class PaymentController {
             hexString.append(hex);
         }
         return hexString.toString();
+    }
+
+    @PostMapping("/webhook")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<?> handleRazorpayWebhook(
+            @RequestBody String rawPayload,
+            @RequestHeader(value = "X-Razorpay-Signature", required = false) String razorpaySignature) {
+        
+        log.info("🔔 Received Razorpay Webhook Notification");
+
+        // 1. Verify Webhook Signature if keySecret is available
+        if (keySecret != null && !keySecret.isBlank() && !keySecret.equals("placeholder")) {
+            if (razorpaySignature == null || razorpaySignature.isBlank()) {
+                log.warn("⚠️ Webhook missing X-Razorpay-Signature header");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature header");
+            }
+            try {
+                String expectedSig = calculateHmacSha256(rawPayload, keySecret);
+                if (!expectedSig.equalsIgnoreCase(razorpaySignature)) {
+                    log.warn("❌ Webhook signature verification failed!");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid webhook signature");
+                }
+            } catch (Exception e) {
+                log.error("Error verifying webhook signature: {}", e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Signature verification error");
+            }
+        }
+
+        // 2. Parse Webhook Event JSON safely
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(rawPayload);
+            
+            String event = rootNode.has("event") ? rootNode.get("event").asText() : "";
+            log.info("Processing Razorpay Webhook event type: [{}]", event);
+
+            if ("order.paid".equals(event) || "payment.captured".equals(event)) {
+                com.fasterxml.jackson.databind.JsonNode entityNode = rootNode.path("payload").path("payment").path("entity");
+                if (entityNode.isMissingNode()) {
+                    entityNode = rootNode.path("payload").path("order").path("entity");
+                }
+
+                String orderId = entityNode.has("order_id") ? entityNode.get("order_id").asText() : 
+                               (entityNode.has("id") && entityNode.get("id").asText().startsWith("order_") ? entityNode.get("id").asText() : null);
+                String paymentId = entityNode.has("id") ? entityNode.get("id").asText() : null;
+
+                if (orderId != null) {
+                    Optional<Payment> paymentOpt = paymentRepository.findByOrderId(orderId);
+                    if (paymentOpt.isPresent()) {
+                        Payment payment = paymentOpt.get();
+                        if (!"SUCCESS".equals(payment.getStatus())) {
+                            payment.setPaymentId(paymentId != null ? paymentId : "wh_" + System.currentTimeMillis());
+                            payment.setStatus("SUCCESS");
+                            paymentRepository.save(payment);
+
+                            User user = payment.getUser();
+                            if (user != null) {
+                                upgradeUserPremium(user, payment);
+                                log.info("🎉 Webhook automatically activated Aspirant Pro for user {} on order {}", user.getUsername(), orderId);
+                            }
+                        }
+                    }
+                }
+            }
+            return ResponseEntity.ok(Map.of("status", "processed"));
+        } catch (Exception e) {
+            log.error("Error processing Razorpay webhook payload: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing error");
+        }
     }
 }
