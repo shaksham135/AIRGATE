@@ -36,14 +36,20 @@ public class QuestionMapper {
     public QuestionDTO convertToDTO(Question question, boolean fetchSubQueries) {
         if (question == null) return null;
 
-        List<OptionDTO> options = question.getOptions() != null ? question.getOptions().stream()
-                .sorted(Comparator.comparing(QuestionOption::getOptionLabel, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
-                .collect(Collectors.toList()) : List.of();
+        List<OptionDTO> options = List.of();
+        if (question.getOptions() != null && org.hibernate.Hibernate.isInitialized(question.getOptions())) {
+            options = question.getOptions().stream()
+                    .sorted(Comparator.comparing(QuestionOption::getOptionLabel, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
+                    .collect(Collectors.toList());
+        }
 
-        Set<String> tags = question.getTags() != null ? question.getTags().stream()
-                .map(Tag::getName)
-                .collect(Collectors.toSet()) : Set.of();
+        Set<String> tags = Set.of();
+        if (question.getTags() != null && org.hibernate.Hibernate.isInitialized(question.getTags())) {
+            tags = question.getTags().stream()
+                    .map(Tag::getName)
+                    .collect(Collectors.toSet());
+        }
 
         String aiSuggestedAnswer = null;
         String aiSuggestedExplanation = null;

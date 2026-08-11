@@ -4,7 +4,7 @@ import axios from 'axios';
 import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
 import API_CONFIG from '../config/api';
-import { getAssetUrl, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis } from '../utils/mathRenderer';
+import { getAssetUrl, renderQuestionText, checkAnswerCorrect, isOptionLabelCorrect, renderMentorAnalysis } from '../utils/mathRenderer';
 import { getQuestionUrl } from '../utils/urlUtils';
 import { 
   FiSearch, FiBookOpen, FiLayers, FiAlertTriangle, FiCheckCircle, 
@@ -693,7 +693,7 @@ export default function PracticeArena() {
 
                       const isCorrectOption = isMsq
                         ? (q.aiSuggestedAnswer && q.aiSuggestedAnswer.toUpperCase().replace(/[^A-D]/g, '').includes(opt.optionLabel.toUpperCase()))
-                        : (q.aiSuggestedAnswer && q.aiSuggestedAnswer.trim().toUpperCase() === opt.optionLabel.toUpperCase());
+                        : isOptionLabelCorrect(opt.optionLabel, q.aiSuggestedAnswer);
 
                       let bg = 'var(--bg-main)';
                       let borderColor = 'var(--border-color)';

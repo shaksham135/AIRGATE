@@ -413,6 +413,20 @@ export const renderOptionContent = (text) => {
   return renderTextWithImages(text, 'opt');
 };
 
+export const isOptionLabelCorrect = (optionLabel, correctAnsStr) => {
+  if (!optionLabel || !correctAnsStr) return false;
+  
+  const label = optionLabel.trim().toUpperCase().replace(/[^A-D]/g, '');
+  const cleanAns = correctAnsStr.trim().toUpperCase()
+    .replace(/^OPTION\s+/i, '')
+    .replace(/[^A-D,\s]/g, '');
+
+  if (!label || !cleanAns) return false;
+
+  const parts = cleanAns.split(/[\s,]+/);
+  return parts.includes(label) || cleanAns === label;
+};
+
 export const checkAnswerCorrect = (correct, selected) => {
   if (!correct || !selected) return false;
 
@@ -427,12 +441,12 @@ export const checkAnswerCorrect = (correct, selected) => {
 
   const normC = normalizeMsqString(correct);
   const normS = normalizeMsqString(selected);
-  if (normC && normC === normS) {
+  if (normC && normS && normC === normS) {
     return true;
   }
 
-  const c = correct.trim().toLowerCase().replace(/^option\s+/i, '');
-  const s = selected.trim().toLowerCase().replace(/^option\s+/i, '');
+  const c = correct.trim().toLowerCase().replace(/^option\s+/i, '').replace(/[\(\)\.]/g, '');
+  const s = selected.trim().toLowerCase().replace(/^option\s+/i, '').replace(/[\(\)\.]/g, '');
   if (c === s) return true;
 
   const sNum = parseFloat(s);

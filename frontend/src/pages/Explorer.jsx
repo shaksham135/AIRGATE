@@ -11,12 +11,13 @@ import {
   FiX, FiFilter, FiLoader, FiMaximize2, FiMinimize2, FiShare2, FiCheck
 } from 'react-icons/fi';
 
-import { getAssetUrl, formatMathText, renderQuestionText, checkAnswerCorrect, renderMentorAnalysis, renderAiChatText } from '../utils/mathRenderer';
+import { getAssetUrl, formatMathText, renderQuestionText, checkAnswerCorrect, isOptionLabelCorrect, renderMentorAnalysis, renderAiChatText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
 import { getQuestionUrl } from '../utils/urlUtils';
 import PremiumGateModal from '../components/PremiumGateModal';
 import ConfirmModal from '../components/ConfirmModal';
 import AIRGATELoader from '../components/AIRGATELoader';
+import './Explorer.css';
 
 export default function Explorer() {
   const [subjects, setSubjects] = useState([]);
@@ -87,6 +88,20 @@ export default function Explorer() {
   const [tempMsqSelections, setTempMsqSelections] = useState({});
   const [tempMcqSelections, setTempMcqSelections] = useState({});
   const [natInputs, setNatInputs] = useState({});
+
+  // Top-Right Answer Feedback Toast State
+  const [answerToast, setAnswerToast] = useState(null);
+
+  const triggerAnswerToast = (isCorrect, marks) => {
+    const markStr = marks ? ` (${isCorrect ? '+' : '-'}${isCorrect ? marks : (marks === 1 ? '0.33' : '0.67')} Marks)` : '';
+    setAnswerToast({
+      type: isCorrect ? 'correct' : 'incorrect',
+      message: isCorrect ? `✅ Correct Answer!${markStr}` : `❌ Incorrect Answer`
+    });
+    setTimeout(() => {
+      setAnswerToast(null);
+    }, 3500);
+  };
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportQuestionId, setReportQuestionId] = useState(null);
   const [reportReason, setReportReason] = useState('');
@@ -455,10 +470,16 @@ export default function Explorer() {
     const optionLabel = tempMcqSelections[questionId];
     if (!optionLabel) return;
 
-    setSelectedOptions({
-      ...selectedOptions,
+    setSelectedOptions(prev => ({
+      ...prev,
       [questionId]: optionLabel
-    });
+    }));
+
+    const qObj = questions.find(q => q.id === questionId);
+    if (qObj) {
+      const isCorrect = isOptionLabelCorrect(optionLabel, qObj.aiSuggestedAnswer);
+      triggerAnswerToast(isCorrect, qObj.marks || 1);
+    }
 
     CacheService.clear();
 
@@ -483,10 +504,16 @@ export default function Explorer() {
     if (current.length === 0) return;
 
     const selectedStr = current.join(', ');
-    setSelectedOptions({
-      ...selectedOptions,
+    setSelectedOptions(prev => ({
+      ...prev,
       [questionId]: selectedStr
-    });
+    }));
+
+    const qObj = questions.find(q => q.id === questionId);
+    if (qObj) {
+      const isCorrect = checkAnswerCorrect(qObj.aiSuggestedAnswer, selectedStr);
+      triggerAnswerToast(isCorrect, qObj.marks || 1);
+    }
 
     CacheService.clear();
 
@@ -820,6 +847,14 @@ export default function Explorer() {
 
   return (
     <div className="explorer-container" style={{ flexDirection: 'column', height: '100vh' }}>
+      
+      {/* Top-Right Mini Toast Notification */}
+      {answerToast && (
+        <div className={`answer-feedback-toast ${answerToast.type}`}>
+          <span>{answerToast.message}</span>
+        </div>
+      )}
+
       {/* Top filter dashboard bar */}
       {isFiltersCollapsed ? <div style={{
           backgroundColor: 'var(--bg-sidebar)',
@@ -1250,7 +1285,7 @@ export default function Explorer() {
                           
                         const isCorrectAnswer = q.questionType === 'MSQ'
                           ? isLetterInCorrectAnswer(opt.optionLabel, q.aiSuggestedAnswer)
-                          : (q.aiSuggestedAnswer && q.aiSuggestedAnswer.trim().toUpperCase() === opt.optionLabel.toUpperCase());
+                          : isOptionLabelCorrect(opt.optionLabel, q.aiSuggestedAnswer);
 
                         let btnClass = 'option-btn';
                         if (selectedOpt) {
