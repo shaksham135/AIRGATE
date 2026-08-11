@@ -37,18 +37,24 @@ public class QuestionMapper {
         if (question == null) return null;
 
         List<OptionDTO> options = List.of();
-        if (question.getOptions() != null && org.hibernate.Hibernate.isInitialized(question.getOptions())) {
-            options = question.getOptions().stream()
-                    .sorted(Comparator.comparing(QuestionOption::getOptionLabel, Comparator.nullsLast(Comparator.naturalOrder())))
-                    .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
-                    .collect(Collectors.toList());
+        if (question.getOptions() != null) {
+            try {
+                options = question.getOptions().stream()
+                        .sorted(Comparator.comparing(QuestionOption::getOptionLabel, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .map(o -> new OptionDTO(o.getId(), o.getOptionLabel(), o.getOptionText()))
+                        .collect(Collectors.toList());
+            } catch (Exception ignored) {
+            }
         }
 
         Set<String> tags = Set.of();
-        if (question.getTags() != null && org.hibernate.Hibernate.isInitialized(question.getTags())) {
-            tags = question.getTags().stream()
-                    .map(Tag::getName)
-                    .collect(Collectors.toSet());
+        if (question.getTags() != null) {
+            try {
+                tags = question.getTags().stream()
+                        .map(Tag::getName)
+                        .collect(Collectors.toSet());
+            } catch (Exception ignored) {
+            }
         }
 
         String aiSuggestedAnswer = null;

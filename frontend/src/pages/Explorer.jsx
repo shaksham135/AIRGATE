@@ -1375,7 +1375,7 @@ export default function Explorer() {
                 )}
 
 
-                {(q.questionType === 'NAT' || !q.options || q.options.length === 0) && (
+                {q.questionType === 'NAT' && (
                   <div style={{ margin: '16px 0', display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '320px' }}>
                     <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Numerical Answer (NAT):</label>
                     <div style={{ display: 'flex', gap: '8px' }}>
