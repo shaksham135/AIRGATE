@@ -270,7 +270,7 @@ public class DataInitializer implements CommandLineRunner {
                                 log.info("🔧 Self-Healing DB: Merging duplicate Topic '{}' (ID {}) into Canonical Topic (ID {}) under Subject '{}'",
                                         t.getName(), t.getId(), canonicalTopic.getId(), targetSub.getName());
                                 questionRepository.relinkQuestionsToTopic(t.getId(), canonicalTopic, targetSub);
-                                topicRepository.relinkChildTopics(t.getId(), canonicalTopic);
+                                mergeChildTopics(t, canonicalTopic, targetSub);
                                 try {
                                     topicRepository.deleteById(t.getId());
                                 } catch (Exception e) {
@@ -420,6 +420,31 @@ public class DataInitializer implements CommandLineRunner {
             log.info("✅ Self-Healing DB: Successfully added missing column '{}.{}' to production database.", tableName, columnName);
         } catch (Exception e) {
             // Column already exists or matches schema
+        }
+    }
+
+    private void mergeChildTopics(Topic sourceTopic, Topic targetTopic, Subject targetSubject) {
+        try {
+            List<Topic> children = topicRepository.findByParentTopicId(sourceTopic.getId());
+            for (Topic child : children) {
+                Optional<Topic> existingChildOpt = topicRepository.findByNameAndSubjectIdAndParentTopicId(
+                        child.getName(), targetSubject.getId(), targetTopic.getId());
+
+                if (existingChildOpt.isPresent()) {
+                    Topic targetChild = existingChildOpt.get();
+                    questionRepository.relinkQuestionsToTopic(child.getId(), targetChild, targetSubject);
+                    mergeChildTopics(child, targetChild, targetSubject);
+                    try {
+                        topicRepository.deleteById(child.getId());
+                    } catch (Exception ignored) {}
+                } else {
+                    child.setParentTopic(targetTopic);
+                    child.setSubject(targetSubject);
+                    topicRepository.save(child);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("🔧 Self-Healing DB: Error during child topic merge: {}", e.getMessage());
         }
     }
 }
