@@ -153,7 +153,81 @@ public class SolveController {
         Map<String, Object> response = new HashMap<>();
         response.put("isCorrect", isCorrect);
         response.put("correctAnswer", correctAnswer);
+        response.put("explanation", aiAnalysis.map(QuestionAIAnalysis::getSuggestedExplanation).orElse(""));
+        response.put("mentorInsights", aiAnalysis.map(QuestionAIAnalysis::getMentorInsights).orElse(""));
         response.put("message", "Answer logged successfully!");
+        return ResponseEntity.ok(response);
+    }
+
+    // Industry Standard Secure Verification (Supports both Guests & Logged-In Users)
+    @PostMapping("/questions/{id}/verify")
+    public ResponseEntity<?> verifyQuestionAnswer(
+            @PathVariable("id") Long id,
+            @RequestBody Map<String, String> payload,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        Optional<Question> questionOpt = questionRepository.findById(id);
+        if (questionOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found!"));
+        }
+
+        String selectedOption = payload.get("selectedOption");
+        if (selectedOption == null || selectedOption.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(new MessageResponse("Error: selectedOption is required!"));
+        }
+
+        Question question = questionOpt.get();
+
+        // Get AI Suggested correct answer & solution
+        Optional<QuestionAIAnalysis> aiAnalysis = aiAnalysisRepository.findFirstByQuestionIdOrderByCreatedAtDesc(id);
+        String correctAnswer = aiAnalysis.map(QuestionAIAnalysis::getSuggestedAnswer).orElse("");
+        String explanation = aiAnalysis.map(QuestionAIAnalysis::getSuggestedExplanation).orElse("");
+        String mentorInsights = aiAnalysis.map(QuestionAIAnalysis::getMentorInsights).orElse("");
+
+        boolean isCorrect = checkAnswer(correctAnswer, selectedOption);
+
+        // If user is authenticated, save solve & update streak automatically
+        if (userDetails != null && userDetails.getId() != null) {
+            try {
+                Optional<User> userOpt = userRepository.findById(userDetails.getId());
+                if (userOpt.isPresent()) {
+                    User user = userOpt.get();
+                    Optional<UserQuestionSolve> existingOpt = userQuestionSolveRepository.findByUserIdAndQuestionId(user.getId(), id);
+                    if (existingOpt.isEmpty()) {
+                        String timeTakenStr = payload.get("timeTaken");
+                        Integer timeTaken = null;
+                        if (timeTakenStr != null && !timeTakenStr.trim().isEmpty()) {
+                            try {
+                                timeTaken = Integer.parseInt(timeTakenStr.trim());
+                            } catch (Exception ignored) {}
+                        }
+                        UserQuestionSolve solve = UserQuestionSolve.builder()
+                                .user(user)
+                                .question(question)
+                                .selectedOption(selectedOption)
+                                .isCorrect(isCorrect)
+                                .solvingTimeSeconds(timeTaken)
+                                .build();
+                        userQuestionSolveRepository.save(solve);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to record solve history for user: {}", e.getMessage());
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("questionId", id);
+        response.put("selectedOption", selectedOption);
+        response.put("isCorrect", isCorrect);
+        response.put("correctAnswer", correctAnswer);
+        response.put("explanation", explanation);
+        response.put("mentorInsights", mentorInsights);
+        response.put("marks", question.getMarks() != null ? question.getMarks() : 1);
+        response.put("message", isCorrect ? "Correct Answer!" : "Incorrect Answer");
+
         return ResponseEntity.ok(response);
     }
 

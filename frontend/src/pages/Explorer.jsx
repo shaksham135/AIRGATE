@@ -88,6 +88,7 @@ export default function Explorer() {
   const [tempMsqSelections, setTempMsqSelections] = useState({});
   const [tempMcqSelections, setTempMcqSelections] = useState({});
   const [natInputs, setNatInputs] = useState({});
+  const [verifiedAnswers, setVerifiedAnswers] = useState({});
 
   // Top-Right Answer Feedback Toast State
   const [answerToast, setAnswerToast] = useState(null);
@@ -475,27 +476,33 @@ export default function Explorer() {
       [questionId]: optionLabel
     }));
 
-    const qObj = questions.find(q => q.id === questionId);
-    if (qObj) {
-      const isCorrect = isOptionLabelCorrect(optionLabel, qObj.aiSuggestedAnswer);
-      triggerAnswerToast(isCorrect, qObj.marks || 1);
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+
+    try {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${questionId}/verify`, {
+        selectedOption: optionLabel,
+        timeTaken: String(timeTaken)
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+
+      const data = res.data;
+      triggerAnswerToast(data.isCorrect, data.marks || 1);
+
+      setVerifiedAnswers(prev => ({
+        ...prev,
+        [questionId]: data
+      }));
+    } catch (e) {
+      console.error('Failed to verify answer', e);
+      const qObj = questions.find(q => q.id === questionId);
+      if (qObj) {
+        const isCorrect = isOptionLabelCorrect(optionLabel, qObj.aiSuggestedAnswer);
+        triggerAnswerToast(isCorrect, qObj.marks || 1);
+      }
     }
 
     CacheService.clear();
-
-    if (currentUser) {
-      try {
-        const timeTaken = Math.round((Date.now() - startTime) / 1000);
-        await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${questionId}/solve`, {
-          selectedOption: optionLabel,
-          timeTaken: String(timeTaken)
-        }, {
-          headers: AuthService.getAuthHeader()
-        });
-      } catch (e) {
-        console.error('Failed to log solve history', e);
-      }
-    }
   };
 
   const handleSubmitMsq = async (questionId) => {
@@ -509,27 +516,33 @@ export default function Explorer() {
       [questionId]: selectedStr
     }));
 
-    const qObj = questions.find(q => q.id === questionId);
-    if (qObj) {
-      const isCorrect = checkAnswerCorrect(qObj.aiSuggestedAnswer, selectedStr);
-      triggerAnswerToast(isCorrect, qObj.marks || 1);
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+
+    try {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${questionId}/verify`, {
+        selectedOption: selectedStr,
+        timeTaken: String(timeTaken)
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+
+      const data = res.data;
+      triggerAnswerToast(data.isCorrect, data.marks || 1);
+
+      setVerifiedAnswers(prev => ({
+        ...prev,
+        [questionId]: data
+      }));
+    } catch (e) {
+      console.error('Failed to verify answer', e);
+      const qObj = questions.find(q => q.id === questionId);
+      if (qObj) {
+        const isCorrect = checkAnswerCorrect(qObj.aiSuggestedAnswer, selectedStr);
+        triggerAnswerToast(isCorrect, qObj.marks || 1);
+      }
     }
 
     CacheService.clear();
-
-    if (currentUser) {
-      try {
-        const timeTaken = Math.round((Date.now() - startTime) / 1000);
-        await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${questionId}/solve`, {
-          selectedOption: selectedStr,
-          timeTaken: String(timeTaken)
-        }, {
-          headers: AuthService.getAuthHeader()
-        });
-      } catch (e) {
-        console.error('Failed to log solve history', e);
-      }
-    }
   };
 
   const handleSendReport = async () => {
@@ -1283,14 +1296,21 @@ export default function Explorer() {
                               ? (selectedOpt === opt.optionLabel)
                               : (tempMcqSelections[q.id] === opt.optionLabel));
                           
+                        const verified = verifiedAnswers[q.id];
+                        const correctAns = verified ? verified.correctAnswer : q.aiSuggestedAnswer;
+                          
                         const isCorrectAnswer = q.questionType === 'MSQ'
-                          ? isLetterInCorrectAnswer(opt.optionLabel, q.aiSuggestedAnswer)
-                          : isOptionLabelCorrect(opt.optionLabel, q.aiSuggestedAnswer);
+                          ? isLetterInCorrectAnswer(opt.optionLabel, correctAns)
+                          : isOptionLabelCorrect(opt.optionLabel, correctAns);
 
                         let btnClass = 'option-btn';
                         if (selectedOpt) {
                           if (isSelected) {
-                            btnClass += isCorrectAnswer ? ' correct' : ' incorrect';
+                            if (verified) {
+                              btnClass += verified.isCorrect ? ' correct' : ' incorrect';
+                            } else {
+                              btnClass += isCorrectAnswer ? ' correct' : ' incorrect';
+                            }
                           } else if (isCorrectAnswer) {
                             btnClass += ' correct';
                           }
@@ -1599,7 +1619,7 @@ export default function Explorer() {
                       <div style={{ padding: '12px 20px', backgroundColor: 'rgba(16, 185, 129, 0.06)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Correct Answer</span>
                         <span className="badge badge-success" style={{ fontSize: '1rem', padding: '4px 14px', letterSpacing: '0.05em' }}>
-                          {q.questionType === 'NAT' ? '' : 'Option '}{q.aiSuggestedAnswer || '—'}
+                          {q.questionType === 'NAT' ? '' : 'Option '}{(verifiedAnswers[q.id] ? verifiedAnswers[q.id].correctAnswer : q.aiSuggestedAnswer) || '—'}
                         </span>
                       </div>
 
@@ -1610,8 +1630,8 @@ export default function Explorer() {
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚡ Solution Explanation</span>
                           </div>
                           <div style={{ color: 'var(--text-primary)', lineHeight: '1.7', whiteSpace: 'pre-line' }}>
-                            {(q.aiSuggestedExplanation || q.aiMentorInsights)
-                              ? renderQuestionText(q.aiSuggestedExplanation || q.aiMentorInsights)
+                            {((verifiedAnswers[q.id] && verifiedAnswers[q.id].explanation) || q.aiSuggestedExplanation || q.aiMentorInsights)
+                              ? renderQuestionText((verifiedAnswers[q.id] && verifiedAnswers[q.id].explanation) || q.aiSuggestedExplanation || q.aiMentorInsights)
                               : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Solution is being generated in background…</span>
                             }
                           </div>

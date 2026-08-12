@@ -132,6 +132,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/subjects", "/api/subjects/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/topics", "/api/topics/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/questions", "/api/questions/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/questions/*/verify", "/api/questions/*/solve").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/practice/questions", "/api/practice/questions/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payments/pricing").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
