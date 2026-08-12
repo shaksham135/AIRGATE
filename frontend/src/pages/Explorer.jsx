@@ -846,7 +846,7 @@ export default function Explorer() {
   };
 
   return (
-    <div className="explorer-container" style={{ flexDirection: 'column', height: '100vh' }}>
+    <div className="explorer-container" style={{ flexDirection: 'column', minHeight: '100vh' }}>
       
       {/* Top-Right Mini Toast Notification */}
       {answerToast && (
@@ -1582,18 +1582,6 @@ export default function Explorer() {
                     title={!selectedOpt ? "Submit an answer first to unlock" : ""}
                   >
                     {!selectedOpt ? '🔒 Ask AI Tutor' : '🤖 Ask AI Tutor' + (!AuthService.isPremium() ? ' (3 Free/day)' : '')}
-                  </button>
-
-                  <button className={`btn ${activeSection === 'explanations' ? 'btn-primary' : 'btn-outline'}`} onClick={() => handleSectionToggle(q.id, 'explanations')} style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
-                    Explanations
-                  </button>
-
-                  <button className={`btn ${activeSection === 'discussions' ? 'btn-primary' : 'btn-outline'}`} onClick={() => handleSectionToggle(q.id, 'discussions')} style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
-                    <FiMessageSquare /> Discussion
-                  </button>
-
-                  <button className={`btn ${activeSection === 'similar' ? 'btn-primary' : 'btn-outline'}`} onClick={() => handleSectionToggle(q.id, 'similar')} style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
-                    Similar
                   </button>
 
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>

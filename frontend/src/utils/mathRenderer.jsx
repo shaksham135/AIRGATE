@@ -163,15 +163,34 @@ export const sanitizeLatexString = (str) => {
     parts.push({ type: 'text', value: s.slice(lastIndex) });
   }
 
-  // 6. Process plain text parts only (auto-wrap unwrapped matrices, commands, subscripts)
+  // 6. Process parts (auto-heal squished prose inside math mode and unwrapped fractions)
   s = parts.map(part => {
-    if (part.type === 'math') return part.value;
+    if (part.type === 'math') {
+      let mVal = part.value;
+      // Auto-fix OCR mistake: If a math block contains long English sentences (e.g. $... A packet is lost at node i ...$),
+      // wrap the English text in \text{...} so it doesn't get squished without spaces in italic math font.
+      const inner = mVal.slice(1, -1);
+      if (/[a-zA-Z]{3,}\s+[a-zA-Z]{2,}\s+[a-zA-Z]{2,}/.test(inner) && !inner.includes('\\begin') && !inner.includes('\\text') && !inner.includes('\\operatorname')) {
+        mVal = inner.replace(/([a-zA-Z]{2,}(?:\s+[a-zA-Z,]{2,})+)/g, ' \\text{$1} ');
+        return ` $${mVal}$ `;
+      }
+      return mVal;
+    }
     let t = part.value;
 
     // Auto-wrap unwrapped matrices found in plain text (e.g. \begin{bmatrix}...\end{bmatrix})
     t = t.replace(/\\begin\{(bmatrix|matrix|pmatrix|vmatrix|aligned)\}([\s\S]*?)\\end\{\1\}/gi, ' $$ \\begin{$1}$2\\end{$1} $$ ');
 
-    // Auto-wrap unwrapped LaTeX commands like \frac, \sqrt, \cdot, \times, \lambda, \sum, etc.
+    // Auto-wrap unwrapped \frac equations (e.g. \frac{t}{2} + \frac{MSS \times n}{BW \times cwnd})
+    t = t.replace(/(?<!\$)(\\frac\{[^{}]*\}\{[^{}]*\}[\s\+\-\*\/A-Za-z0-9_\\\{\}\(\)\times]*)(?!\$)/gi, (m) => {
+      let trimmed = m.trim();
+      if (trimmed && !trimmed.startsWith('$')) {
+        return ` $${trimmed}$ `;
+      }
+      return m;
+    });
+
+    // Auto-wrap remaining unwrapped LaTeX commands like \sqrt, \cdot, \times, \lambda, \sum, etc.
     t = t.replace(/(?<!\$)(\\(?:frac|sqrt|cdot|times|div|pm|mp|le|ge|neq|equiv|approx|infty|forall|exists|in|notin|subset|cap|cup|vee|wedge|neg|rightarrow|left|right|lambda|alpha|beta|gamma|delta|epsilon|theta|pi|sigma|omega|sum|prod|int|iint|iiint|det|tr|gcd|lcm|rank)\b[^\$\n]*?)(?!\$)/gi, (m, token) => {
       let trimmed = token.trim();
       if (trimmed && !/^\$(.*)\$$/.test(trimmed)) {

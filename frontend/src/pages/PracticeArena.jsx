@@ -412,7 +412,7 @@ export default function PracticeArena() {
         boxShadow: '0 4px 15px rgba(0, 0, 0, 0.15)',
         backdropFilter: 'blur(10px)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'nowrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)',
@@ -423,23 +423,24 @@ export default function PracticeArena() {
             }}>
               <FiZap size={14} style={{ color: '#fff' }} />
             </div>
-            <h1 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#fff', letterSpacing: '-0.01em' }}>
+            <h1 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
               Practice Arena
             </h1>
           </div>
 
-          {/* Daily Quota Counter Badge - Ultra Sleek Mini Progress */}
+          {/* Daily Goal Counter Badge - Ultra Sleek Mini Progress */}
           <div style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
             borderRadius: '10px',
-            padding: '4px 10px',
+            padding: '4px 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px'
+            gap: '10px',
+            flexShrink: 0
           }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              QUOTA: <span style={{ color: quota.isPremium ? '#10b981' : quota.usedToday >= quota.limitToday ? '#ef4444' : '#818cf8', fontWeight: 800 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              DAILY GOAL: <span style={{ color: quota.isPremium ? '#10b981' : quota.usedToday >= quota.limitToday ? '#ef4444' : '#818cf8', fontWeight: 800 }}>
                 {quota.isPremium ? 'UNLIMITED 👑' : `${quota.usedToday}/${quota.limitToday}`}
               </span>
             </div>

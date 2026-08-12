@@ -829,47 +829,8 @@ export default function QuestionDetail() {
             <FiBookmark size={20} fill={isBookmarked ? 'var(--color-warning)' : 'none'} />
           </button>
 
-          {/* Viral Social Share Buttons */}
+          {/* Share Button */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
-            <button
-              onClick={handleWhatsAppShare}
-              title="Share with WhatsApp GATE Group"
-              style={{
-                backgroundColor: 'rgba(37, 211, 102, 0.15)',
-                border: '1px solid rgba(37, 211, 102, 0.4)',
-                color: '#25D366',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              📲 WhatsApp
-            </button>
-
-            <button
-              onClick={handleTelegramShare}
-              title="Share with Telegram GATE Group"
-              style={{
-                backgroundColor: 'rgba(0, 136, 204, 0.15)',
-                border: '1px solid rgba(0, 136, 204, 0.4)',
-                color: '#38bdf8',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              ✈️ Telegram
-            </button>
 
             <button 
               style={{ 
