@@ -83,7 +83,7 @@ public class QuestionController {
     // Public search with filters (anonymous access mapped in SecurityConfig)
     @GetMapping
     @Transactional(readOnly = true)
-    @org.springframework.cache.annotation.Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #solvedStatus, #bookmarked, #status, #page, #size, #userDetails != null ? #userDetails.getId() : 0)")
+    @org.springframework.cache.annotation.Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #solvedStatus, #bookmarked, #status, #sourceType, #page, #size, #userDetails != null ? #userDetails.getId() : 0)")
     public ResponseEntity<PageDTO<QuestionDTO>> searchQuestions(
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "subjectId", required = false) Long subjectId,
@@ -94,6 +94,7 @@ public class QuestionController {
             @RequestParam(name = "solvedStatus", required = false) String solvedStatus,
             @RequestParam(name = "bookmarked", required = false) Boolean bookmarked,
             @RequestParam(name = "status", required = false, defaultValue = "APPROVED") String status,
+            @RequestParam(name = "sourceType", required = false) String sourceType,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -102,7 +103,7 @@ public class QuestionController {
         Long userId = (userDetails != null) ? userDetails.getId() : null;
 
         Page<Question> questionsPage = questionService.searchQuestions(query, subjectId, topicId, year, questionType,
-                tagName, status, userId, solvedStatus, bookmarked, pageable);
+                tagName, status, sourceType, userId, solvedStatus, bookmarked, pageable);
 
         List<QuestionDTO> dtos = questionsPage.getContent().stream()
                 .map(this::convertToDTOFast)
@@ -886,5 +887,47 @@ public class QuestionController {
         }
 
         return ResponseEntity.ok(convertToDTO(question));
+    }
+
+    @PostMapping("/{id}/re-analyze")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> reAnalyzeQuestion(@PathVariable("id") Long id) {
+        Optional<Question> qOpt = questionRepository.findById(id);
+        if (qOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Error: Question not found with ID: " + id));
+        }
+        Question question = qOpt.get();
+        String rawText = question.getRawOcrText();
+        
+        // If rawOcrText is absent (e.g. for AI Practice Questions), construct text block from current question & options
+        if (rawText == null || rawText.isBlank()) {
+            StringBuilder sb = new StringBuilder();
+            if (question.getText() != null) sb.append(question.getText()).append("\n\n");
+            if (question.getOptions() != null && !question.getOptions().isEmpty()) {
+                sb.append("Options:\n");
+                for (QuestionOption opt : question.getOptions()) {
+                    sb.append(opt.getOptionLabel()).append(") ").append(opt.getOptionText()).append("\n");
+                }
+            }
+            rawText = sb.toString().trim();
+        }
+
+        if (rawText.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(new MessageResponse("Error: Question has no text or OCR data to re-analyze."));
+        }
+
+        try {
+            AIClassificationService.AIAnalysisResult aiRes = aiClassificationService.classifyQuestion(
+                    rawText, 
+                    question.getPdfSourceName() != null ? question.getPdfSourceName() : "Manual Rephrase"
+            );
+            return ResponseEntity.ok(aiRes);
+        } catch (Exception e) {
+            log.error("Re-analysis failed for question {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("AI Re-Analysis failed: " + e.getMessage()));
+        }
     }
 }

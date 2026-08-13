@@ -335,8 +335,8 @@ public class AiQuestionGeneratorService {
                         ? vResult.getExplanation()
                         : "Verified step-by-step mathematical proof for option (" + genAnswer + ").";
                 saveQuestionToDatabase(targetSubject, targetTopic, difficulty, qType,
-                        generatedNode, genAnswer, explanationToSave, "APPROVED", normalizedHash);
-                log.info("✅ [AI Generator] Dual-verified question saved as APPROVED! Subject: {}, Topic: {}, Type: {}, Diff: {}",
+                        generatedNode, genAnswer, explanationToSave, "PENDING_REVIEW", normalizedHash);
+                log.info("✅ [AI Generator] Dual-verified practice question saved as PENDING_REVIEW! Subject: {}, Topic: {}, Type: {}, Diff: {}",
                         targetSubject.getName(), targetTopic.getName(), qType, difficulty);
                 return true;
             } else {
@@ -855,7 +855,8 @@ public class AiQuestionGeneratorService {
                     .build();
 
             List<QuestionOption> options = new ArrayList<>();
-            if (node.has("options") && node.get("options").isArray()) {
+            // STRICT VALIDATION: Strip options if question type is NAT
+            if (!"NAT".equalsIgnoreCase(qType) && node.has("options") && node.get("options").isArray()) {
                 node.get("options").forEach(opt -> {
                     String label = opt.has("label") ? opt.get("label").asText() : "";
                     String text = opt.has("text") ? opt.get("text").asText() : "";

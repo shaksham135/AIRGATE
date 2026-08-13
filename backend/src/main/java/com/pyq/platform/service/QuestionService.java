@@ -38,9 +38,9 @@ public class QuestionService {
     private final MockAttemptAnswerRepository mockAttemptAnswerRepository;
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    @Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #status, #userId, #solvedStatus, #bookmarked, #pageable.pageNumber, #pageable.pageSize)")
+    @Cacheable(value = "questions", key = "T(java.util.Objects).hash(#query, #subjectId, #topicId, #year, #questionType, #tagName, #status, #sourceType, #userId, #solvedStatus, #bookmarked, #pageable.pageNumber, #pageable.pageSize)")
     public Page<Question> searchQuestions(String query, Long subjectId, Long topicId, Integer year, String questionType,
-            String tagName, String status, Long userId, String solvedStatus, Boolean bookmarked, Pageable pageable) {
+            String tagName, String status, String sourceType, Long userId, String solvedStatus, Boolean bookmarked, Pageable pageable) {
         return questionRepository.findAll(new Specification<Question>() {
             @Override
             public Predicate toPredicate(Root<Question> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder cb) {
@@ -51,16 +51,30 @@ public class QuestionService {
                     predicates.add(cb.equal(root.get("status"), status));
                 }
 
-                // Exclude AI practice questions from Explorer page (show only real PYQs)
-                Predicate notAiNightly = cb.notLike(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
-                Predicate notAiGenerated = cb.notLike(cb.lower(root.get("pdfSourceName")), "ai_generated%");
-                Predicate notAiGenerator = cb.notLike(cb.lower(root.get("pdfSourceName")), "%ai generator%");
-                Predicate notPractice = cb.notLike(cb.lower(root.get("pdfSourceName")), "%practice%");
+                // Source Type Filter (OFFICIAL vs AI_PRACTICE vs ALL)
+                String effectiveSourceType = sourceType;
+                if (effectiveSourceType == null || effectiveSourceType.trim().isEmpty()) {
+                    effectiveSourceType = "APPROVED".equalsIgnoreCase(status) ? "OFFICIAL" : "ALL";
+                }
 
-                Predicate isNullPdf = cb.isNull(root.get("pdfSourceName"));
-                Predicate isRealPyq = cb.and(notAiNightly, notAiGenerated, notAiGenerator, notPractice);
+                if ("OFFICIAL".equalsIgnoreCase(effectiveSourceType)) {
+                    Predicate notAiNightly = cb.notLike(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
+                    Predicate notAiGenerated = cb.notLike(cb.lower(root.get("pdfSourceName")), "ai_generated%");
+                    Predicate notAiGenerator = cb.notLike(cb.lower(root.get("pdfSourceName")), "%ai generator%");
+                    Predicate notPractice = cb.notLike(cb.lower(root.get("pdfSourceName")), "%practice%");
 
-                predicates.add(cb.or(isNullPdf, isRealPyq));
+                    Predicate isNullPdf = cb.isNull(root.get("pdfSourceName"));
+                    Predicate isRealPyq = cb.and(notAiNightly, notAiGenerated, notAiGenerator, notPractice);
+                    predicates.add(cb.or(isNullPdf, isRealPyq));
+                } else if ("AI_PRACTICE".equalsIgnoreCase(effectiveSourceType)) {
+                    Predicate isAiNightly = cb.like(cb.lower(root.get("pdfSourceName")), "ai_nightly%");
+                    Predicate isAiGenerated = cb.like(cb.lower(root.get("pdfSourceName")), "ai_generated%");
+                    Predicate isAiGenerator = cb.like(cb.lower(root.get("pdfSourceName")), "%ai generator%");
+                    Predicate isPractice = cb.like(cb.lower(root.get("pdfSourceName")), "%practice%");
+                    Predicate isAiPath = cb.equal(cb.lower(root.get("pdfSourcePath")), "system/ai-generator");
+
+                    predicates.add(cb.or(isAiNightly, isAiGenerated, isAiGenerator, isPractice, isAiPath));
+                }
 
                 // Text search query
                 if (query != null && !query.trim().isEmpty()) {

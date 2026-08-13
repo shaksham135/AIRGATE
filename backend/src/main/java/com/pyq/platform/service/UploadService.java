@@ -198,6 +198,19 @@ public class UploadService {
                         continue;
                     }
 
+                    if (aiRes.isFallback) {
+                        transactionTemplate.executeWithoutResult(status -> {
+                            UploadJob job = uploadJobRepository.findById(jobId).orElseThrow();
+                            job.setFallbackQuestions(job.getFallbackQuestions() + 1);
+                            uploadJobRepository.save(job);
+                        });
+                        
+                        UploadJob checkJob = uploadJobRepository.findById(jobId).orElseThrow();
+                        if (checkJob.getFallbackQuestions() >= 20) {
+                            throw new IllegalStateException("ABORT_JOB");
+                        }
+                    }
+
                     // Save the question block, options, and tags in a dedicated short transaction
                     transactionTemplate.executeWithoutResult(status -> {
                         aiRes.questionText = AIClassificationService.stripQuestionNumbering(aiRes.questionText);
@@ -302,6 +315,9 @@ public class UploadService {
                     });
 
                 } catch (Exception e) {
+                    if ("ABORT_JOB".equals(e.getMessage())) {
+                        throw e;
+                    }
                     log.error("Failed to process question block for job {}: {}", jobId, e.getMessage(), e);
                     failed++;
                     final int currentFailed = failed;
@@ -328,13 +344,31 @@ public class UploadService {
             transactionTemplate.executeWithoutResult(status -> {
                 UploadJob job = uploadJobRepository.findById(jobId).orElseThrow();
                 job.setStatus("FAILED");
-                job.setErrorMessage(e.getMessage());
+                if ("ABORT_JOB".equals(e.getMessage())) {
+                    job.setErrorMessage("Aborted: Too many AI fallbacks (>= 20). Please check AI API quotas.");
+                } else {
+                    job.setErrorMessage(e.getMessage());
+                }
                 job.setCompletedAt(LocalDateTime.now());
                 if (job.getStartedAt() != null) {
                     job.setProcessingTimeMs(Duration.between(job.getStartedAt(), job.getCompletedAt()).toMillis());
                 }
                 uploadJobRepository.save(job);
             });
+            // Cleanup parsed questions for this job
+            if (jobOpt.isPresent()) {
+                String filename = jobOpt.get().getFilename();
+                transactionTemplate.executeWithoutResult(status -> {
+                    List<Question> qs = questionRepository.findByPdfSourceName(filename);
+                    List<Long> qIds = qs.stream().map(Question::getId).toList();
+                    if (!qIds.isEmpty()) {
+                        log.info("Cleaning up {} questions from aborted job {}", qIds.size(), jobId);
+                        questionRepository.deleteQuestionTagsIn(qIds);
+                        aiAnalysisRepository.deleteByQuestionIdIn(qIds);
+                        questionRepository.deleteQuestionsBulk(qIds);
+                    }
+                });
+            }
         } finally {
             clearCaches();
             if (downloadedFile != null && downloadedFile.exists()) {

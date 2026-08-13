@@ -263,6 +263,29 @@ public class AIClassificationService {
             res.negativeMarks = 0.0;
         }
 
+        JsonNode optionsNode = parsedResult.path("options");
+        List<String> optionsList = new ArrayList<>();
+        if (optionsNode.isArray()) { for (JsonNode o : optionsNode) optionsList.add(o.asText()); }
+
+        // 🚀 Smart Type Correction: If classified as MCQ, but answer is purely numeric without A/B/C/D
+        if ("MCQ".equals(res.questionType) && res.suggestedAnswer != null && res.suggestedAnswer.matches("^[0-9.-]+$")) {
+            if (optionsList.size() < 2) {
+                res.questionType = "NAT";
+                res.negativeMarks = 0.0;
+            } else {
+                // MCQ has options, but AI gave numeric answer. Fallback to Option A so UI form renders valid MCQ letter
+                res.suggestedAnswer = "A";
+            }
+        }
+
+        // STRICT VALIDATION: If question is NAT, strip options array completely
+        if ("NAT".equals(res.questionType)) {
+            optionsList.clear();
+            res.negativeMarks = 0.0;
+        }
+
+        res.options = optionsList;
+
         res.suggestedExplanation = "### Detailed Solution\n"
                 + "The correct answer is **" + res.suggestedAnswer + "**.\n\n"
                 + "### Core Concept Tested\n"
@@ -287,10 +310,6 @@ public class AIClassificationService {
         if (tagsNode.isArray()) { for (JsonNode t : tagsNode) tagsList.add(t.asText()); }
         res.tags = tagsList.toArray(new String[0]);
 
-        JsonNode optionsNode = parsedResult.path("options");
-        List<String> optionsList = new ArrayList<>();
-        if (optionsNode.isArray()) { for (JsonNode o : optionsNode) optionsList.add(o.asText()); }
-        res.options = optionsList;
         return res;
     }
 

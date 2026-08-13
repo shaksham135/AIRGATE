@@ -15,6 +15,8 @@ export default function ReviewQueue() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
@@ -42,6 +44,8 @@ export default function ReviewQueue() {
 
   // Tab State: 'form' | 'ocr' | 'json'
   const [activeTab, setActiveTab] = useState('form');
+  // Category Feed State: 'OFFICIAL' | 'AI_PRACTICE' | 'ALL'
+  const [activeCategory, setActiveCategory] = useState('OFFICIAL');
 
   // Slider image adjustment states
   const [zoom, setZoom] = useState(1.0);
@@ -278,15 +282,15 @@ export default function ReviewQueue() {
     }
   };
 
-  const fetchPendingQuestions = async () => {
+  const fetchPendingQuestions = async (category = activeCategory) => {
     setLoading(true);
     try {
-      let response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING_REVIEW&size=100`, {
+      let response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING_REVIEW&sourceType=${category}&size=100`, {
         headers: AuthService.getAuthHeader()
       });
       let fetched = response.data && Array.isArray(response.data.content) ? response.data.content : [];
-      if (fetched.length === 0) {
-        response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING&size=100`, {
+      if (fetched.length === 0 && category === 'OFFICIAL') {
+        response = await axios.get(`${API_CONFIG.BASE_URL}/api/questions?status=PENDING&sourceType=${category}&size=100`, {
           headers: AuthService.getAuthHeader()
         });
         fetched = response.data && Array.isArray(response.data.content) ? response.data.content : [];
@@ -299,6 +303,11 @@ export default function ReviewQueue() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCategoryChange = (cat) => {
+    setActiveCategory(cat);
+    fetchPendingQuestions(cat);
   };
 
   const fetchAnalyticsDashboard = async () => {
@@ -446,6 +455,80 @@ export default function ReviewQueue() {
       setTimeout(() => setSuccess(''), 1500);
     } catch (err) {
       setError('Failed to save draft!');
+    }
+  };
+
+  const handleGenerateSolutionOnly = async () => {
+    if (isGeneratingSolution) return;
+    setError('');
+    setSuccess('');
+    setIsGeneratingSolution(true);
+    const q = questions[currentIndex];
+
+    try {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${q.id}/regenerate-explanation`, {}, {
+        headers: AuthService.getAuthHeader()
+      });
+      const data = response.data;
+      if (data) {
+        let explanationText = '';
+        if (data.suggestedExplanation) {
+          explanationText = data.suggestedExplanation;
+        } else if (data.aiAnalysis && data.aiAnalysis.suggestedExplanation) {
+          explanationText = data.aiAnalysis.suggestedExplanation;
+        }
+        
+        if (explanationText) {
+          setAiSuggestedExplanation(explanationText);
+          setSuccess('AI Solution generated successfully!');
+        } else {
+          setSuccess('Solution updated!');
+        }
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate AI solution!');
+    } finally {
+      setIsGeneratingSolution(false);
+    }
+  };
+
+  const handleReAnalyze = async () => {
+    if (isReanalyzing) return;
+    setError('');
+    setSuccess('');
+    setIsReanalyzing(true);
+    const q = questions[currentIndex];
+
+    try {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${q.id}/re-analyze`, {}, {
+        headers: AuthService.getAuthHeader()
+      });
+      const aiRes = response.data;
+      
+      if (aiRes) {
+        if (aiRes.questionText) setText(aiRes.questionText);
+        if (aiRes.questionType) setQuestionType(aiRes.questionType);
+        if (aiRes.marks) setMarks(aiRes.marks);
+        if (aiRes.negativeMarks) setNegativeMarks(Math.abs(aiRes.negativeMarks));
+        if (aiRes.suggestedAnswer) setAiSuggestedAnswer(aiRes.suggestedAnswer);
+        if (aiRes.suggestedExplanation) setAiSuggestedExplanation(aiRes.suggestedExplanation);
+        
+        if (aiRes.options && aiRes.options.length > 0) {
+          const newOpts = [...aiRes.options];
+          while (newOpts.length < 4) newOpts.push('');
+          setOptions(newOpts);
+        }
+        
+        if (aiRes.tags && aiRes.tags.length > 0) {
+          setTagString(aiRes.tags.join(', '));
+        }
+        
+        setSuccess('AI Re-Analysis successful! Please review changes.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to re-analyze question!');
+    } finally {
+      setIsReanalyzing(false);
     }
   };
 
@@ -627,11 +710,51 @@ export default function ReviewQueue() {
   const isQueueEmpty = questions.length === 0 || currentIndex >= questions.length;
   if (isQueueEmpty) {
     return (
-      <div style={{ padding: '60px 40px', maxWidth: '500px', margin: '0 auto', textAlign: 'center', color: 'var(--text-primary)' }}>
-        <FiCheck style={{ fontSize: '64px', color: 'var(--color-success)', marginBottom: '20px' }} />
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>Inbox Reached!</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', lineHeight: '1.6' }}>All AI-parsed questions have been approved and published to students.</p>
-        <button className="btn btn-primary" onClick={() => navigate('/explore')} style={{ padding: '12px 32px' }}>Return to Explorer</button>
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100vh', backgroundColor: '#0b0f19' }}>
+        {/* Productivity Stats Dashboard Bar */}
+        <div className="review-top-stats-bar">
+          <div className="stats-badges-group">
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>Queue Feed:</span>
+            <button 
+              type="button" 
+              onClick={() => handleCategoryChange('OFFICIAL')}
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: '1px solid #3b82f6', backgroundColor: activeCategory === 'OFFICIAL' ? '#2563eb' : '#1e293b', color: '#fff', transition: 'all 0.2s' }}
+            >
+              📄 Official PYQs (PDFs)
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleCategoryChange('AI_PRACTICE')}
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: '1px solid #8b5cf6', backgroundColor: activeCategory === 'AI_PRACTICE' ? '#7c3aed' : '#1e293b', color: '#fff', transition: 'all 0.2s' }}
+            >
+              🤖 AI Practice Questions
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleCategoryChange('ALL')}
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: '1px solid #475569', backgroundColor: activeCategory === 'ALL' ? '#475569' : '#1e293b', color: '#fff', transition: 'all 0.2s' }}
+            >
+              🌐 All Pending
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: '80px 40px', maxWidth: '550px', margin: '0 auto', textAlign: 'center', color: 'var(--text-primary)' }}>
+          <FiCheck style={{ fontSize: '64px', color: 'var(--color-success)', marginBottom: '20px' }} />
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '12px' }}>Queue Empty for Selected Feed!</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
+            No pending questions found in <strong>{activeCategory === 'OFFICIAL' ? 'Official PYQs' : activeCategory === 'AI_PRACTICE' ? 'AI Practice Questions' : 'All Pending'}</strong> feed.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            {activeCategory !== 'OFFICIAL' && (
+              <button className="btn btn-outline" onClick={() => handleCategoryChange('OFFICIAL')} style={{ padding: '10px 20px', border: '1px solid #3b82f6', color: '#38bdf8' }}>View Official PYQs</button>
+            )}
+            {activeCategory !== 'AI_PRACTICE' && (
+              <button className="btn btn-outline" onClick={() => handleCategoryChange('AI_PRACTICE')} style={{ padding: '10px 20px', border: '1px solid #8b5cf6', color: '#c084fc' }}>View AI Practice Queue</button>
+            )}
+            <button className="btn btn-primary" onClick={() => navigate('/explore')} style={{ padding: '10px 24px' }}>Explorer</button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -649,10 +772,35 @@ export default function ReviewQueue() {
       
       {/* Productivity Stats Dashboard Bar */}
       <div className="review-top-stats-bar">
-        <div className="stats-badges-group">
-          <span>Pending in Queue: <strong style={{ color: '#f3f4f6' }}>{pendingTotal - sessionReviewedCount > 0 ? pendingTotal - sessionReviewedCount : questions.length - currentIndex}</strong></span>
+        <div className="stats-badges-group" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingRight: '12px', borderRight: '1px solid #1e293b' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>Queue Feed:</span>
+            <button 
+              type="button" 
+              onClick={() => handleCategoryChange('OFFICIAL')}
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: '1px solid #3b82f6', backgroundColor: activeCategory === 'OFFICIAL' ? '#2563eb' : '#1e293b', color: '#fff', transition: 'all 0.2s' }}
+            >
+              📄 Official PYQs (PDFs)
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleCategoryChange('AI_PRACTICE')}
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: '1px solid #8b5cf6', backgroundColor: activeCategory === 'AI_PRACTICE' ? '#7c3aed' : '#1e293b', color: '#fff', transition: 'all 0.2s' }}
+            >
+              🤖 AI Practice Questions
+            </button>
+            <button 
+              type="button" 
+              onClick={() => handleCategoryChange('ALL')}
+              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: '1px solid #475569', backgroundColor: activeCategory === 'ALL' ? '#475569' : '#1e293b', color: '#fff', transition: 'all 0.2s' }}
+            >
+              🌐 All Pending
+            </button>
+          </div>
+
+          <span>Pending: <strong style={{ color: '#f3f4f6' }}>{questions.length - currentIndex}</strong></span>
           <span>Reviewed Today: <strong style={{ color: '#10b981' }}>{sessionReviewedCount}</strong></span>
-          <span>Average Speed: <strong style={{ color: '#38bdf8' }}>{avgTimePerQuestion ? `${avgTimePerQuestion} sec/q` : '--'}</strong></span>
+          <span>Avg Speed: <strong style={{ color: '#38bdf8' }}>{avgTimePerQuestion ? `${avgTimePerQuestion} s/q` : '--'}</strong></span>
         </div>
 
         <div className="desktop-shortcuts-hint">
@@ -1155,7 +1303,29 @@ export default function ReviewQueue() {
               </div>
 
               <div className="form-group">
-                <label className="form-label" style={{ color: '#9ca3af' }}>Suggested Solution / Explanation (Markdown supported)</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label className="form-label" style={{ color: '#9ca3af', margin: 0 }}>Suggested Solution / Explanation (Markdown supported)</label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateSolutionOnly}
+                    disabled={isSubmitting || isGeneratingSolution}
+                    style={{
+                      padding: '2px 10px',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: '1px solid #38bdf8',
+                      backgroundColor: 'rgba(56,189,248,0.1)',
+                      color: '#38bdf8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <FiRotateCw className={isGeneratingSolution ? "spin" : ""} /> {isGeneratingSolution ? 'Generating...' : '💡 AI Generate Solution Only'}
+                  </button>
+                </div>
                 <textarea 
                   className="form-input" 
                   rows="6" 
@@ -1186,6 +1356,26 @@ export default function ReviewQueue() {
                 style={{ flex: 1, border: '1px solid #334155', color: '#e2e8f0', fontWeight: 600, opacity: isSubmitting ? 0.5 : 1 }}
               >
                 Save Draft
+              </button>
+
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={handleGenerateSolutionOnly} 
+                disabled={isSubmitting || isGeneratingSolution}
+                style={{ flex: 1, border: '1px solid #38bdf8', color: '#38bdf8', fontWeight: 600, opacity: (isSubmitting || isGeneratingSolution) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+              >
+                <FiRotateCw className={isGeneratingSolution ? "spin" : ""} /> Solution Only
+              </button>
+
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={handleReAnalyze} 
+                disabled={isSubmitting || isReanalyzing}
+                style={{ flex: 1, border: '1px solid #8b5cf6', color: '#8b5cf6', fontWeight: 600, opacity: (isSubmitting || isReanalyzing) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+              >
+                <FiRotateCw className={isReanalyzing ? "spin" : ""} /> AI Rephrase & Polish
               </button>
 
               <button 

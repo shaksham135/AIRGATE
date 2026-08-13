@@ -42,6 +42,10 @@ public class UploadJob {
     @Column(name = "failed_questions")
     private Integer failedQuestions = 0;
 
+    @Builder.Default
+    @Column(name = "fallback_questions")
+    private Integer fallbackQuestions = 0;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 
@@ -69,5 +73,6 @@ public class UploadJob {
         if (this.processedQuestions == null) this.processedQuestions = 0;
         if (this.duplicateQuestions == null) this.duplicateQuestions = 0;
         if (this.failedQuestions == null) this.failedQuestions = 0;
+        if (this.fallbackQuestions == null) this.fallbackQuestions = 0;
     }
 }
