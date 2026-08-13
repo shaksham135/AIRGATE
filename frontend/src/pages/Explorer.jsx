@@ -89,6 +89,7 @@ export default function Explorer() {
   const [tempMcqSelections, setTempMcqSelections] = useState({});
   const [natInputs, setNatInputs] = useState({});
   const [verifiedAnswers, setVerifiedAnswers] = useState({});
+  const [submittingMap, setSubmittingMap] = useState({});
 
   // Top-Right Answer Feedback Toast State
   const [answerToast, setAnswerToast] = useState(null);
@@ -467,15 +468,11 @@ export default function Explorer() {
   };
 
   const handleSubmitMcq = async (questionId) => {
-    if (selectedOptions[questionId]) return;
+    if (selectedOptions[questionId] || submittingMap[questionId]) return;
     const optionLabel = tempMcqSelections[questionId];
     if (!optionLabel) return;
 
-    setSelectedOptions(prev => ({
-      ...prev,
-      [questionId]: optionLabel
-    }));
-
+    setSubmittingMap(prev => ({ ...prev, [questionId]: true }));
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
 
     try {
@@ -487,35 +484,40 @@ export default function Explorer() {
       });
 
       const data = res.data;
-      triggerAnswerToast(data.isCorrect, data.marks || 1);
-
       setVerifiedAnswers(prev => ({
         ...prev,
         [questionId]: data
       }));
+      setSelectedOptions(prev => ({
+        ...prev,
+        [questionId]: optionLabel
+      }));
+      triggerAnswerToast(data.isCorrect, data.marks || 1);
     } catch (e) {
       console.error('Failed to verify answer', e);
       const qObj = questions.find(q => q.id === questionId);
       if (qObj) {
         const isCorrect = isOptionLabelCorrect(optionLabel, qObj.aiSuggestedAnswer);
+        setSelectedOptions(prev => ({
+          ...prev,
+          [questionId]: optionLabel
+        }));
         triggerAnswerToast(isCorrect, qObj.marks || 1);
       }
+    } finally {
+      setSubmittingMap(prev => ({ ...prev, [questionId]: false }));
     }
 
     CacheService.clear();
   };
 
   const handleSubmitMsq = async (questionId) => {
-    if (selectedOptions[questionId]) return;
+    if (selectedOptions[questionId] || submittingMap[questionId]) return;
     const current = tempMsqSelections[questionId] || [];
     if (current.length === 0) return;
 
     const selectedStr = current.join(', ');
-    setSelectedOptions(prev => ({
-      ...prev,
-      [questionId]: selectedStr
-    }));
-
+    setSubmittingMap(prev => ({ ...prev, [questionId]: true }));
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
 
     try {
@@ -527,19 +529,68 @@ export default function Explorer() {
       });
 
       const data = res.data;
-      triggerAnswerToast(data.isCorrect, data.marks || 1);
-
       setVerifiedAnswers(prev => ({
         ...prev,
         [questionId]: data
       }));
+      setSelectedOptions(prev => ({
+        ...prev,
+        [questionId]: selectedStr
+      }));
+      triggerAnswerToast(data.isCorrect, data.marks || 1);
     } catch (e) {
       console.error('Failed to verify answer', e);
       const qObj = questions.find(q => q.id === questionId);
       if (qObj) {
         const isCorrect = checkAnswerCorrect(qObj.aiSuggestedAnswer, selectedStr);
+        setSelectedOptions(prev => ({
+          ...prev,
+          [questionId]: selectedStr
+        }));
         triggerAnswerToast(isCorrect, qObj.marks || 1);
       }
+    } finally {
+      setSubmittingMap(prev => ({ ...prev, [questionId]: false }));
+    }
+
+    CacheService.clear();
+  };
+
+  const handleSubmitNat = async (questionId) => {
+    if (selectedOptions[questionId] || submittingMap[questionId]) return;
+    const val = natInputs[questionId];
+    if (!val || !val.trim()) return;
+
+    const inputVal = val.trim();
+    setSubmittingMap(prev => ({ ...prev, [questionId]: true }));
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+
+    try {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${questionId}/verify`, {
+        selectedOption: inputVal,
+        timeTaken: String(timeTaken)
+      }, {
+        headers: AuthService.getAuthHeader()
+      });
+
+      const data = res.data;
+      setVerifiedAnswers(prev => ({
+        ...prev,
+        [questionId]: data
+      }));
+      setSelectedOptions(prev => ({
+        ...prev,
+        [questionId]: inputVal
+      }));
+      triggerAnswerToast(data.isCorrect, data.marks || 1);
+    } catch (e) {
+      console.error('Failed to verify NAT answer', e);
+      setSelectedOptions(prev => ({
+        ...prev,
+        [questionId]: inputVal
+      }));
+    } finally {
+      setSubmittingMap(prev => ({ ...prev, [questionId]: false }));
     }
 
     CacheService.clear();
@@ -1361,10 +1412,10 @@ export default function Explorer() {
                             <button 
                               className="btn btn-primary" 
                               onClick={() => handleSubmitMsq(q.id)}
-                              disabled={!(tempMsqSelections[q.id] && tempMsqSelections[q.id].length > 0)}
+                              disabled={submittingMap[q.id] || !(tempMsqSelections[q.id] && tempMsqSelections[q.id].length > 0)}
                               style={{ padding: '8px 22px', fontSize: '0.85rem', height: '38px', borderRadius: '8px', fontWeight: 700 }}
                             >
-                              Submit MSQ Answer
+                              {submittingMap[q.id] ? '⏳ Verifying...' : 'Submit MSQ Answer'}
                             </button>
                             {tempMsqSelections[q.id] && tempMsqSelections[q.id].length > 0 && (
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -1377,10 +1428,10 @@ export default function Explorer() {
                             <button 
                               className="btn btn-primary" 
                               onClick={() => handleSubmitMcq(q.id)}
-                              disabled={!tempMcqSelections[q.id]}
+                              disabled={submittingMap[q.id] || !tempMcqSelections[q.id]}
                               style={{ padding: '8px 22px', fontSize: '0.85rem', height: '38px', borderRadius: '8px', fontWeight: 700 }}
                             >
-                              Lock & Submit Answer
+                              {submittingMap[q.id] ? '⏳ Verifying...' : 'Lock & Submit Answer'}
                             </button>
                             {tempMcqSelections[q.id] && (
                               <span style={{ fontSize: '0.82rem', color: '#c4b5fd', fontWeight: 600 }}>
@@ -1404,22 +1455,18 @@ export default function Explorer() {
                         placeholder={selectedOpt ? `Submitted: ${selectedOpt}` : "Type your numeric answer..."}
                         value={natInputs[q.id] || ''}
                         onChange={(e) => setNatInputs({ ...natInputs, [q.id]: e.target.value })}
-                        disabled={!!selectedOpt}
+                        disabled={!!selectedOpt || submittingMap[q.id]}
                         className="form-input"
                         style={{ flexGrow: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                       />
                       {!selectedOpt && (
                         <button 
                           className="btn btn-primary"
-                          onClick={() => {
-                            const val = natInputs[q.id];
-                            if (val && val.trim() !== '') {
-                              handleOptionClick(q.id, val.trim());
-                            }
-                          }}
+                          disabled={submittingMap[q.id] || !(natInputs[q.id] && natInputs[q.id].trim())}
+                          onClick={() => handleSubmitNat(q.id)}
                           style={{ padding: '0 16px', height: '38px', borderRadius: '8px', fontSize: '0.85rem' }}
                         >
-                          Submit
+                          {submittingMap[q.id] ? '⏳ ...' : 'Submit'}
                         </button>
                       )}
                     </div>
