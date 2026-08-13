@@ -120,7 +120,7 @@ export default function ReviewQueue() {
 
       setYear(q.year || 2024);
       setImagePath(q.imagePath || '');
-      setAiSuggestedAnswer(q.aiSuggestedAnswer || 'A');
+      setAiSuggestedAnswer(q.aiSuggestedAnswer != null && q.aiSuggestedAnswer !== '' ? q.aiSuggestedAnswer : (detectedType === 'NAT' ? '' : 'A'));
       setAiSuggestedExplanation(q.aiSuggestedExplanation || '');
       
       // Reset CSS controls
