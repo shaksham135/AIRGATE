@@ -53,6 +53,74 @@ public class SystemSettingController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/ai/live-models")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> fetchLiveModels(@RequestParam(name = "apiUrl", required = false) String paramUrl) {
+        String apiKey = groqKeyManager.getNextKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new MessageResponse("Error: No active Groq API Key available to fetch live models list."));
+        }
+
+        String targetUrl = (paramUrl != null && !paramUrl.isBlank()) ? paramUrl.trim() : systemSettingService.getGroqApiUrl();
+        // Convert chat completions endpoint to models list endpoint if needed
+        String modelsUrl = targetUrl.contains("/chat/completions") 
+                ? targetUrl.replace("/chat/completions", "/models") 
+                : "https://api.groq.com/openai/v1/models";
+
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(6000);
+            factory.setReadTimeout(10000);
+            restTemplate.setRequestFactory(factory);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(apiKey);
+
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(modelsUrl, HttpMethod.GET, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                JsonNode dataNode = root.path("data");
+
+                List<Map<String, Object>> modelsList = new ArrayList<>();
+                if (dataNode.isArray()) {
+                    for (JsonNode m : dataNode) {
+                        String id = m.path("id").asText("");
+                        // Exclude whisper/audio models
+                        if (!id.isEmpty() && !id.contains("whisper")) {
+                            Map<String, Object> item = new HashMap<>();
+                            item.put("id", id);
+                            item.put("ownedBy", m.path("owned_by").asText("provider"));
+                            item.put("active", m.path("active").asBoolean(true));
+                            item.put("contextWindow", m.path("context_window").asInt(0));
+                            modelsList.add(item);
+                        }
+                    }
+                }
+
+                modelsList.sort((a, b) -> ((String) a.get("id")).compareTo((String) b.get("id")));
+
+                Map<String, Object> resMap = new HashMap<>();
+                resMap.put("sourceUrl", modelsUrl);
+                resMap.put("totalModels", modelsList.size());
+                resMap.put("models", modelsList);
+
+                return ResponseEntity.ok(resMap);
+            } else {
+                return ResponseEntity.status(response.getStatusCode())
+                        .body(new MessageResponse("Error fetching live models: HTTP " + response.getStatusCode().value()));
+            }
+
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to fetch live models from provider ({}): {}", modelsUrl, e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new MessageResponse("Could not fetch live models list: " + e.getMessage()));
+        }
+    }
+
     @PutMapping("/ai")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateAiSettings(@RequestBody Map<String, String> payload) {

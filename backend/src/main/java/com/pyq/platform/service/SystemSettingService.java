@@ -1,7 +1,7 @@
 package com.pyq.platform.service;
 
-import com.pyq.platform.entity.SystemSetting;
-import com.pyq.platform.repository.SystemSettingRepository;
+import com.pyq.platform.entity.AiSystemConfig;
+import com.pyq.platform.repository.AiSystemConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,20 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class SystemSettingService {
 
-    private final SystemSettingRepository systemSettingRepository;
-
-    @Value("${groq.model.fast:llama-3.3-70b-versatile}")
-    private String fallbackFastModel;
-
-    @Value("${groq.model.heavy:llama-3.3-70b-versatile}")
-    private String fallbackHeavyModel;
+    private final AiSystemConfigRepository aiSystemConfigRepository;
 
     @Value("${groq.api.key:}")
     private String fallbackGroqKey;
@@ -38,22 +31,22 @@ public class SystemSettingService {
     @Cacheable(value = "systemSettings", key = "#key", unless = "#result == null")
     public String getSetting(String key, String defaultValue) {
         try {
-            Optional<SystemSetting> setting = systemSettingRepository.findById(key);
-            if (setting.isPresent() && setting.get().getSettingValue() != null && !setting.get().getSettingValue().isBlank()) {
-                return setting.get().getSettingValue().trim();
+            Optional<AiSystemConfig> config = aiSystemConfigRepository.findById(key);
+            if (config.isPresent() && config.get().getConfigValue() != null && !config.get().getConfigValue().isBlank()) {
+                return config.get().getConfigValue().trim();
             }
         } catch (Exception e) {
-            log.warn("⚠️ Error reading system_setting key '{}': {}", key, e.getMessage());
+            log.warn("⚠️ Error reading ai_system_configs key '{}': {}", key, e.getMessage());
         }
         return defaultValue;
     }
 
     public String getGroqFastModel() {
-        return getSetting("groq_fast_model", fallbackFastModel);
+        return getSetting("groq_fast_model", "llama-3.3-70b-versatile");
     }
 
     public String getGroqHeavyModel() {
-        return getSetting("groq_heavy_model", fallbackHeavyModel);
+        return getSetting("groq_heavy_model", "llama-3.3-70b-versatile");
     }
 
     public String getGroqApiUrl() {
@@ -115,10 +108,10 @@ public class SystemSettingService {
     }
 
     public Map<String, String> getAllAiSettings() {
-        List<SystemSetting> list = systemSettingRepository.findByCategory("AI");
+        List<AiSystemConfig> list = aiSystemConfigRepository.findByCategory("AI");
         Map<String, String> map = new HashMap<>();
-        for (SystemSetting s : list) {
-            map.put(s.getSettingKey(), s.getSettingValue() != null ? s.getSettingValue() : "");
+        for (AiSystemConfig s : list) {
+            map.put(s.getConfigKey(), s.getConfigValue() != null ? s.getConfigValue() : "");
         }
         // Ensure defaults are populated in response
         map.putIfAbsent("groq_fast_model", getGroqFastModel());
@@ -141,18 +134,18 @@ public class SystemSettingService {
             String k = entry.getKey();
             String v = entry.getValue() != null ? entry.getValue().trim() : "";
 
-            SystemSetting setting = systemSettingRepository.findById(k)
-                    .orElseGet(() -> SystemSetting.builder()
-                            .settingKey(k)
+            AiSystemConfig config = aiSystemConfigRepository.findById(k)
+                    .orElseGet(() -> AiSystemConfig.builder()
+                            .configKey(k)
                             .category("AI")
                             .description("Dynamic AI Platform Configuration")
                             .build());
 
-            setting.setSettingValue(v);
-            systemSettingRepository.save(setting);
+            config.setConfigValue(v);
+            aiSystemConfigRepository.save(config);
         }
 
-        log.info("✅ [SystemSettingService] Saved {} AI settings to Database and evicted cache.", settings.size());
+        log.info("✅ [SystemSettingService] Saved {} AI configs to Database and evicted cache.", settings.size());
 
         if (onSettingsUpdatedListener != null) {
             try {

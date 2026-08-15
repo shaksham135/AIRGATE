@@ -7,20 +7,20 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "system_settings")
+@Table(name = "ai_system_configs")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SystemSetting {
+public class AiSystemConfig {
 
     @Id
-    @Column(name = "setting_key", nullable = false, length = 100)
-    private String settingKey;
+    @Column(name = "config_key", nullable = false, length = 100)
+    private String configKey;
 
-    @Column(name = "setting_value", columnDefinition = "TEXT")
-    private String settingValue;
+    @Column(name = "config_value", columnDefinition = "TEXT")
+    private String configValue;
 
     @Column(name = "category", nullable = false, length = 50)
     @Builder.Default

@@ -4,7 +4,7 @@ import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import { 
   FiCpu, FiKey, FiServer, FiCheckCircle, FiAlertTriangle, 
-  FiActivity, FiSave, FiRefreshCw, FiZap, FiShield, FiXCircle, FiSlash
+  FiActivity, FiSave, FiRefreshCw, FiZap, FiShield, FiXCircle, FiSlash, FiRadio, FiList
 } from 'react-icons/fi';
 
 export default function AiSettingsManager() {
@@ -26,6 +26,15 @@ export default function AiSettingsManager() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Live provider models
+  const [liveModels, setLiveModels] = useState([]);
+  const [fetchingLiveModels, setFetchingLiveModels] = useState(false);
+  const [customModelInputs, setCustomModelInputs] = useState({
+    fast: false,
+    heavy: false,
+    tutor: false
+  });
+
   // Per-section check status states
   const [fastCheckState, setFastCheckState] = useState({ loading: false, result: null });
   const [heavyCheckState, setHeavyCheckState] = useState({ loading: false, result: null });
@@ -36,6 +45,7 @@ export default function AiSettingsManager() {
 
   useEffect(() => {
     fetchSettings();
+    fetchLiveModels();
   }, []);
 
   const fetchSettings = async () => {
@@ -57,6 +67,22 @@ export default function AiSettingsManager() {
       setError(err.response?.data?.message || 'Failed to load AI settings from backend.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLiveModels = async () => {
+    setFetchingLiveModels(true);
+    try {
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/admin/settings/ai/live-models`, {
+        headers: AuthService.getAuthHeader()
+      });
+      if (response.data && response.data.models) {
+        setLiveModels(response.data.models);
+      }
+    } catch (err) {
+      console.warn('Could not fetch live models list from provider', err);
+    } finally {
+      setFetchingLiveModels(false);
     }
   };
 
@@ -138,62 +164,31 @@ export default function AiSettingsManager() {
     const isInvalidKey = status === 'INVALID_KEY';
     const isDecommissioned = status === 'MODEL_DECOMMISSIONED';
 
-    let bg = 'rgba(239, 68, 68, 0.12)';
-    let border = 'rgba(239, 68, 68, 0.4)';
-    let color = '#f87171';
-    let icon = <FiXCircle size={16} />;
-    let text = result.message || 'Status Check Failed';
+    let badgeBg = 'bg-red-500/10 border-red-500/30 text-red-400';
+    let icon = <FiXCircle className="w-4 h-4 text-red-400" />;
 
     if (isSuccess) {
-      bg = 'rgba(16, 185, 129, 0.12)';
-      border = 'rgba(16, 185, 129, 0.4)';
-      color = '#34d399';
-      icon = <FiCheckCircle size={16} />;
+      badgeBg = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+      icon = <FiCheckCircle className="w-4 h-4 text-emerald-400" />;
     } else if (isRateLimit) {
-      bg = 'rgba(245, 158, 11, 0.12)';
-      border = 'rgba(245, 158, 11, 0.4)';
-      color = '#fbbf24';
-      icon = <FiAlertTriangle size={16} />;
+      badgeBg = 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+      icon = <FiAlertTriangle className="w-4 h-4 text-amber-400" />;
     } else if (isInvalidKey) {
-      bg = 'rgba(239, 68, 68, 0.15)';
-      border = 'rgba(239, 68, 68, 0.5)';
-      color = '#f87171';
-      icon = <FiSlash size={16} />;
+      badgeBg = 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+      icon = <FiShield className="w-4 h-4 text-rose-400" />;
     } else if (isDecommissioned) {
-      bg = 'rgba(168, 85, 247, 0.15)';
-      border = 'rgba(168, 85, 247, 0.5)';
-      color = '#c084fc';
-      icon = <FiAlertTriangle size={16} />;
+      badgeBg = 'bg-purple-500/10 border-purple-500/30 text-purple-400';
+      icon = <FiSlash className="w-4 h-4 text-purple-400" />;
     }
 
     return (
-      <div style={{
-        marginTop: '14px',
-        padding: '12px 14px',
-        borderRadius: '10px',
-        background: bg,
-        border: `1px solid ${border}`,
-        color: color,
-        fontSize: '0.84rem',
-        fontWeight: 600,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '8px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className={`mt-3 p-3 rounded-lg border text-xs font-mono flex items-center justify-between gap-2 ${badgeBg}`}>
+        <div className="flex items-center gap-2 overflow-hidden">
           {icon}
-          <span>{text}</span>
+          <span className="truncate font-semibold">{result.message || status}</span>
         </div>
         {result.latencyMs !== undefined && (
-          <span style={{
-            fontSize: '0.75rem',
-            background: 'rgba(0, 0, 0, 0.25)',
-            padding: '2px 8px',
-            borderRadius: '6px',
-            fontFamily: 'monospace'
-          }}>
+          <span className="shrink-0 font-bold px-2 py-0.5 rounded bg-black/40 text-slate-300">
             ⚡ {result.latencyMs}ms
           </span>
         )}
@@ -201,390 +196,403 @@ export default function AiSettingsManager() {
     );
   };
 
+  // Helper component to render model selection dropdown or custom text field
+  const renderModelInput = (settingKey, customStateKey) => {
+    const isCustom = customModelInputs[customStateKey];
+    const currentValue = settings[settingKey] || '';
+
+    if (isCustom || liveModels.length === 0) {
+      return (
+        <div className="space-y-1.5">
+          <input
+            type="text"
+            value={currentValue}
+            onChange={(e) => handleInputChange(settingKey, e.target.value)}
+            placeholder="e.g. llama-3.3-70b-versatile"
+            className="w-full bg-slate-900/80 border border-slate-700/70 rounded-lg px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-mono transition-all"
+          />
+          {liveModels.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCustomModelInputs(prev => ({ ...prev, [customStateKey]: false }))}
+              className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
+            >
+              <FiList className="w-3 h-3" /> Select from live fetched Groq models list
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // Dropdown mode
+    return (
+      <div className="space-y-1.5">
+        <select
+          value={currentValue}
+          onChange={(e) => {
+            if (e.target.value === 'CUSTOM_INPUT') {
+              setCustomModelInputs(prev => ({ ...prev, [customStateKey]: true }));
+            } else {
+              handleInputChange(settingKey, e.target.value);
+            }
+          }}
+          className="w-full bg-slate-900/90 border border-slate-700/70 rounded-lg px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-mono transition-all cursor-pointer"
+        >
+          {!liveModels.some(m => m.id === currentValue) && currentValue && (
+            <option value={currentValue}>⚠️ Current ({currentValue})</option>
+          )}
+          {liveModels.map(m => (
+            <option key={m.id} value={m.id}>
+              {m.id} {m.ownedBy ? `(${m.ownedBy})` : ''}
+            </option>
+          ))}
+          <option value="CUSTOM_INPUT">✏️ Type Custom Model String...</option>
+        </select>
+        <div className="flex justify-between items-center text-[11px] text-slate-400 px-0.5">
+          <span>📡 {liveModels.length} active Groq models loaded</span>
+          <button
+            type="button"
+            onClick={() => setCustomModelInputs(prev => ({ ...prev, [customStateKey]: true }))}
+            className="text-cyan-400 hover:underline"
+          >
+            Type Custom String
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-        <FiRefreshCw className="spin" size={32} style={{ color: 'var(--color-primary)' }} />
-        <p style={{ marginTop: '16px', fontWeight: 600 }}>Loading AI Platform Configurations...</p>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3">
+          <FiRefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
+          <p className="text-slate-400 text-sm font-medium">Loading AI Engine Configurations...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '32px 20px' }}>
-      
-      {/* Header Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(139, 92, 246, 0.12) 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.3)',
-        borderRadius: '16px',
-        padding: '28px',
-        marginBottom: '28px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '20px'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <FiCpu size={26} style={{ color: '#38bdf8' }} />
-            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#fff' }}>
-              AI Models & API Keys Management
-            </h1>
-            <span className="badge badge-success" style={{ fontSize: '0.78rem', padding: '3px 10px' }}>
-              Dynamic Live-Reloading
-            </span>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+
+        {/* Top Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 rounded-xl text-cyan-400">
+                <FiCpu className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                  AI Models & Provider Settings
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-medium">
+                    Fully Dynamic
+                  </span>
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                  Configure models, API keys, endpoints, token limits, and run live diagnostic health checks.
+                </p>
+              </div>
+            </div>
           </div>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '720px' }}>
-            Configure and test each AI model, version, and API key pool individually. Click <strong>"Check Status"</strong> inside any section to instantly verify API key health and latency!
-          </p>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={fetchLiveModels}
+              disabled={fetchingLiveModels}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-medium text-xs flex items-center gap-2 transition-all disabled:opacity-50"
+            >
+              <FiRadio className={`w-3.5 h-3.5 text-cyan-400 ${fetchingLiveModels ? 'animate-spin' : ''}`} />
+              {fetchingLiveModels ? 'Fetching Models...' : '📡 Fetch Live Groq Models'}
+            </button>
+            <button
+              type="button"
+              onClick={fetchSettings}
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all"
+              title="Reload from Database"
+            >
+              <FiRefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={saving}
+              className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-semibold text-sm shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+            >
+              {saving ? <FiRefreshCw className="w-4 h-4 animate-spin" /> : <FiSave className="w-4 h-4" />}
+              {saving ? 'Saving...' : 'Save Configuration'}
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={handleSaveSettings}
-          disabled={saving}
-          className="btn btn-primary"
-          style={{ padding: '12px 26px', fontSize: '0.95rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          {saving ? <FiRefreshCw className="spin" /> : <FiSave />}
-          <span>{saving ? 'Saving...' : 'Save Configuration'}</span>
-        </button>
-      </div>
+        {/* Global Notifications */}
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm flex items-center gap-3">
+            <FiAlertTriangle className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-      {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '14px 18px', borderRadius: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <FiAlertTriangle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
+        {success && (
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-sm flex items-center gap-3">
+            <FiCheckCircle className="w-5 h-5 shrink-0" />
+            <span>{success}</span>
+          </div>
+        )}
 
-      {success && (
-        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', padding: '14px 18px', borderRadius: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <FiCheckCircle size={20} />
-          <span>{success}</span>
-        </div>
-      )}
+        {/* Grid Settings Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      <form onSubmit={handleSaveSettings}>
-        
-        {/* Model Configurations Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: '24px', marginBottom: '28px' }}>
-          
-          {/* Card 1: Fast AI Model Slot */}
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8' }}>
-                  <FiZap size={20} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#fff' }}>Fast AI Model Slot</h3>
+          {/* Card 1: Fast AI Model (Parsing & Classification) */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 backdrop-blur-md flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <FiZap className="w-5 h-5 text-amber-400" />
+                  <h2 className="font-semibold text-white text-base">Fast AI Model</h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => testSectionStatus(settings.groq_fast_model, settings.groq_api_url, null, setFastCheckState)}
                   disabled={fastCheckState.loading}
-                  className="btn btn-outline"
-                  style={{ padding: '4px 12px', fontSize: '0.78rem', borderColor: '#38bdf8', color: '#38bdf8', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
-                  title="Test if Fast Model is active and responsive"
+                  className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50"
                 >
-                  {fastCheckState.loading ? <FiRefreshCw className="spin" size={12} /> : <FiZap size={12} />}
-                  <span>{fastCheckState.loading ? 'Checking...' : 'Check Status'}</span>
+                  {fastCheckState.loading ? <FiRefreshCw className="w-3 h-3 animate-spin" /> : <FiActivity className="w-3 h-3" />}
+                  Check Status
                 </button>
               </div>
 
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                Used for PDF question parsing, fast classification, and initial option extraction.
+              <p className="text-xs text-slate-400">
+                Used for question classification, PDF metadata extraction, and rapid indexing tasks.
               </p>
 
-              <div className="form-group">
-                <label className="form-label">Model Name / Version ID</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={settings.groq_fast_model || ''}
-                  onChange={(e) => handleInputChange('groq_fast_model', e.target.value)}
-                  placeholder="e.g. llama-3.3-70b-versatile or gemma2-9b-it"
-                  required
-                />
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Model ID / Name</label>
+                {renderModelInput('groq_fast_model', 'fast')}
               </div>
 
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                Suggested: <code>llama-3.3-70b-versatile</code>, <code>gemma2-9b-it</code>
-              </div>
+              {renderStatusBadge(fastCheckState.result)}
             </div>
-
-            {renderStatusBadge(fastCheckState.result)}
           </div>
 
-          {/* Card 2: Heavy Reasoning Model Slot */}
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#a78bfa' }}>
-                  <FiActivity size={20} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#fff' }}>Heavy Reasoning Slot</h3>
+          {/* Card 2: Heavy Reasoning Model (Solution Generation) */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 backdrop-blur-md flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <FiCpu className="w-5 h-5 text-cyan-400" />
+                  <h2 className="font-semibold text-white text-base">Heavy Reasoning Model</h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => testSectionStatus(settings.groq_heavy_model, settings.groq_api_url, null, setHeavyCheckState)}
                   disabled={heavyCheckState.loading}
-                  className="btn btn-outline"
-                  style={{ padding: '4px 12px', fontSize: '0.78rem', borderColor: '#a78bfa', color: '#a78bfa', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
-                  title="Test if Heavy Reasoning Model is active and responsive"
+                  className="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50"
                 >
-                  {heavyCheckState.loading ? <FiRefreshCw className="spin" size={12} /> : <FiActivity size={12} />}
-                  <span>{heavyCheckState.loading ? 'Checking...' : 'Check Status'}</span>
+                  {heavyCheckState.loading ? <FiRefreshCw className="w-3 h-3 animate-spin" /> : <FiActivity className="w-3 h-3" />}
+                  Check Status
                 </button>
               </div>
 
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                Used for step-by-step mathematical derivations, practice question generator & dual verification.
+              <p className="text-xs text-slate-400">
+                Used for AI Practice Question Generation and step-by-step LaTeX solution derivations.
               </p>
 
-              <div className="form-group">
-                <label className="form-label">Model Name / Version ID</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={settings.groq_heavy_model || ''}
-                  onChange={(e) => handleInputChange('groq_heavy_model', e.target.value)}
-                  placeholder="e.g. llama-3.3-70b-versatile"
-                  required
-                />
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Model ID / Name</label>
+                {renderModelInput('groq_heavy_model', 'heavy')}
               </div>
 
-              <div className="form-group" style={{ marginTop: '12px' }}>
-                <label className="form-label">Detailed Solution Max Output Tokens</label>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Max Output Tokens per Solution</label>
                 <input
                   type="number"
-                  className="form-input"
                   value={settings.ai_solution_max_tokens || '3500'}
                   onChange={(e) => handleInputChange('ai_solution_max_tokens', e.target.value)}
                   placeholder="3500"
-                  min={500}
-                  max={16000}
-                  required
+                  className="w-full bg-slate-900/80 border border-slate-700/70 rounded-lg px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
                 />
               </div>
 
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                Suggested: <code>llama-3.3-70b-versatile</code>, <code>mixtral-8x7b-32768</code>
-              </div>
+              {renderStatusBadge(heavyCheckState.result)}
             </div>
-
-            {renderStatusBadge(heavyCheckState.result)}
           </div>
 
-          {/* Card 3: AI Tutor Model Slot */}
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f472b6' }}>
-                  <FiCpu size={20} />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#fff' }}>AI Tutor Assistant Slot</h3>
+          {/* Card 3: AI Tutor Assistant */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 backdrop-blur-md flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <FiServer className="w-5 h-5 text-indigo-400" />
+                  <h2 className="font-semibold text-white text-base">AI Tutor Assistant</h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => testSectionStatus(settings.ai_tutor_model, settings.ai_tutor_api_url, null, setTutorCheckState)}
                   disabled={tutorCheckState.loading}
-                  className="btn btn-outline"
-                  style={{ padding: '4px 12px', fontSize: '0.78rem', borderColor: '#f472b6', color: '#f472b6', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
-                  title="Test if AI Tutor endpoint and model are active"
+                  className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50"
                 >
-                  {tutorCheckState.loading ? <FiRefreshCw className="spin" size={12} /> : <FiCpu size={12} />}
-                  <span>{tutorCheckState.loading ? 'Checking...' : 'Check Status'}</span>
+                  {tutorCheckState.loading ? <FiRefreshCw className="w-3 h-3 animate-spin" /> : <FiActivity className="w-3 h-3" />}
+                  Check Status
                 </button>
               </div>
 
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                Powers student interactive AI Chat Tutor & instant hint derivations.
+              <p className="text-xs text-slate-400">
+                Powers real-time student Q&A assistant chats on Question Detail pages.
               </p>
 
-              <div className="form-group">
-                <label className="form-label">Tutor Model Name</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={settings.ai_tutor_model || ''}
-                  onChange={(e) => handleInputChange('ai_tutor_model', e.target.value)}
-                  placeholder="e.g. llama-3.3-70b-versatile or deepseek-chat"
-                  required
-                />
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Tutor Model ID</label>
+                {renderModelInput('ai_tutor_model', 'tutor')}
               </div>
 
-              <div className="form-group" style={{ marginTop: '12px' }}>
-                <label className="form-label">Tutor API Endpoint URL</label>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Endpoint API URL</label>
                 <input
                   type="text"
-                  className="form-input"
                   value={settings.ai_tutor_api_url || ''}
                   onChange={(e) => handleInputChange('ai_tutor_api_url', e.target.value)}
                   placeholder="https://api.groq.com/openai/v1/chat/completions"
-                  required
+                  className="w-full bg-slate-900/80 border border-slate-700/70 rounded-lg px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
 
-              <div className="form-group" style={{ marginTop: '12px' }}>
-                <label className="form-label">Tutor Max Tokens per Request</label>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Max Output Tokens per Request</label>
                 <input
                   type="number"
-                  className="form-input"
                   value={settings.ai_tutor_max_tokens || '2000'}
                   onChange={(e) => handleInputChange('ai_tutor_max_tokens', e.target.value)}
                   placeholder="2000"
-                  min={200}
-                  max={16000}
-                  required
+                  className="w-full bg-slate-900/80 border border-slate-700/70 rounded-lg px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
+
+              {renderStatusBadge(tutorCheckState.result)}
+            </div>
+          </div>
+
+          {/* Card 4: Global Groq Endpoint API URL */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 backdrop-blur-md flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2.5 border-b border-slate-800 pb-3">
+                <FiServer className="w-5 h-5 text-emerald-400" />
+                <h2 className="font-semibold text-white text-base">Global API Endpoint</h2>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                Primary completions endpoint URL for classification and practice question generators.
+              </p>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Groq API URL</label>
+                <input
+                  type="text"
+                  value={settings.groq_api_url || ''}
+                  onChange={(e) => handleInputChange('groq_api_url', e.target.value)}
+                  placeholder="https://api.groq.com/openai/v1/chat/completions"
+                  className="w-full bg-slate-900/80 border border-slate-700/70 rounded-lg px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
             </div>
-
-            {renderStatusBadge(tutorCheckState.result)}
           </div>
 
         </div>
 
-        {/* API Key Pool & Multi-Key Diagnostics Card */}
-        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '28px', marginBottom: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <FiKey size={22} style={{ color: 'var(--color-primary)' }} />
+        {/* Card 5: Groq API Key Pool & Multi-Key Load Balancer */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+                <FiKey className="w-5 h-5" />
+              </div>
               <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: '#fff' }}>
-                  Groq API Key Pool & Load Balancer
-                </h3>
-                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Round-Robin load balancing and 60-second rate-limit cooldown isolation.
-                </span>
+                <h2 className="font-semibold text-white text-base flex items-center gap-2">
+                  Groq Multi-Key Load Balancer Pool
+                  <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">
+                    {activeKeysCount} Active Keys
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Enter multiple keys (separated by commas or newlines). The platform balances traffic in round-robin fashion.
+                </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <div className="badge badge-outline" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <FiServer style={{ color: 'var(--color-success)' }} />
-                <span>Active Keys in Pool: <strong>{activeKeysCount}</strong></span>
-              </div>
-
-              <button
-                type="button"
-                onClick={runKeyPoolDiagnostics}
-                disabled={poolDiagnostics.loading}
-                className="btn btn-outline"
-                style={{ padding: '8px 18px', fontSize: '0.85rem', borderColor: '#f59e0b', color: '#f59e0b', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                {poolDiagnostics.loading ? <FiRefreshCw className="spin" size={14} /> : <FiShield size={14} />}
-                <span>{poolDiagnostics.loading ? 'Diagnosing Pool...' : 'Diagnose All Pool Keys'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={runKeyPoolDiagnostics}
+              disabled={poolDiagnostics.loading}
+              className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50 shrink-0"
+            >
+              {poolDiagnostics.loading ? <FiRefreshCw className="w-4 h-4 animate-spin" /> : <FiZap className="w-4 h-4 text-emerald-400" />}
+              Diagnose All Pool Keys
+            </button>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Primary Groq API Endpoint URL</label>
-            <input
-              type="text"
-              className="form-input"
-              value={settings.groq_api_url || ''}
-              onChange={(e) => handleInputChange('groq_api_url', e.target.value)}
-              placeholder="https://api.groq.com/openai/v1/chat/completions"
-              required
-            />
-          </div>
-
-          <div className="form-group" style={{ marginTop: '16px' }}>
-            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Groq API Key Pool (Comma or Newline Separated)</span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Paste multiple keys (gsk_...)</span>
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              Groq API Keys Pool (Comma or Line-separated)
             </label>
             <textarea
-              className="form-input"
               rows={4}
-              style={{ fontFamily: 'monospace', fontSize: '0.88rem' }}
               value={settings.groq_api_keys || ''}
               onChange={(e) => handleInputChange('groq_api_keys', e.target.value)}
-              placeholder="gsk_key1_here&#10;gsk_key2_here&#10;gsk_key3_here"
+              placeholder="gsk_1234567890...,&#10;gsk_0987654321..."
+              className="w-full bg-slate-900/90 border border-slate-700/70 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono leading-relaxed resize-y"
             />
           </div>
 
-          {/* Active Key Preview List */}
-          {maskedKeys && maskedKeys.length > 0 && !poolDiagnostics.results && (
-            <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Pool Key Preview:</span>
-              {maskedKeys.map((mk, idx) => (
-                <span key={idx} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontFamily: 'monospace', color: '#38bdf8' }}>
-                  🔑 {mk}
-                </span>
-              ))}
+          {/* Masked Active Keys Preview */}
+          {maskedKeys && maskedKeys.length > 0 && (
+            <div className="pt-2">
+              <label className="block text-xs font-medium text-slate-400 mb-2">Active Key Pool Previews:</label>
+              <div className="flex flex-wrap gap-2">
+                {maskedKeys.map((k, idx) => (
+                  <span key={idx} className="px-2.5 py-1 bg-slate-800 border border-slate-700/60 rounded-lg text-xs font-mono text-slate-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Key {idx + 1}: <span className="text-white font-semibold">{k}</span>
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Interactive Batch Key Diagnostic Results */}
+          {/* Batch Diagnostic Results */}
           {poolDiagnostics.results && poolDiagnostics.results.length > 0 && (
-            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-              <h4 style={{ fontSize: '0.92rem', fontWeight: 700, margin: '0 0 12px 0', color: '#fff' }}>
-                📊 Key Pool Diagnostic Health Report:
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
-                {poolDiagnostics.results.map((res, idx) => {
-                  const isOk = res.status === 'ACTIVE' || res.status === 'SUCCESS';
-                  const isRate = res.status === 'RATE_LIMITED';
-                  const isInvalid = res.status === 'INVALID_KEY';
-
-                  let badgeBg = 'rgba(239, 68, 68, 0.12)';
-                  let badgeBorder = 'rgba(239, 68, 68, 0.3)';
-                  let badgeColor = '#f87171';
-                  let statusLabel = res.message || 'FAILED';
-
-                  if (isOk) {
-                    badgeBg = 'rgba(16, 185, 129, 0.12)';
-                    badgeBorder = 'rgba(16, 185, 129, 0.3)';
-                    badgeColor = '#34d399';
-                  } else if (isRate) {
-                    badgeBg = 'rgba(245, 158, 11, 0.12)';
-                    badgeBorder = 'rgba(245, 158, 11, 0.3)';
-                    badgeColor = '#fbbf24';
-                  }
-
-                  return (
-                    <div key={idx} style={{
-                      padding: '12px 14px',
-                      borderRadius: '8px',
-                      background: badgeBg,
-                      border: `1px solid ${badgeBorder}`,
-                      color: badgeColor,
-                      fontSize: '0.82rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', fontFamily: 'monospace', fontWeight: 700 }}>
-                        <span>🔑 {res.maskedKey}</span>
-                        {res.latencyMs !== undefined && (
-                          <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>⚡ {res.latencyMs}ms</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', opacity: 0.9 }}>
-                        {statusLabel}
-                      </div>
+            <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
+              <h3 className="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                <FiActivity className="w-4 h-4 text-emerald-400" />
+                Key Pool Diagnostic Results ({poolDiagnostics.results.length} Keys Tested)
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {poolDiagnostics.results.map((res, i) => (
+                  <div key={i} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-300 font-semibold">{res.maskedKey || `Key ${i + 1}`}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        res.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' :
+                        res.status === 'RATE_LIMITED' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {res.status}
+                      </span>
                     </div>
-                  );
-                })}
+                    <p className="text-[11px] text-slate-400 truncate">{res.message}</p>
+                    {res.latencyMs && (
+                      <p className="text-[10px] font-mono text-slate-500">Latency: {res.latencyMs}ms</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
         </div>
 
-        {/* Bottom Save Bar */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn btn-primary"
-            style={{ padding: '14px 32px', fontSize: '1rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
-            {saving ? <FiRefreshCw className="spin" /> : <FiSave />}
-            <span>{saving ? 'Saving Changes...' : 'Save AI Configuration'}</span>
-          </button>
-        </div>
-
-      </form>
+      </div>
     </div>
   );
 }
