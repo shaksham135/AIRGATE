@@ -662,6 +662,48 @@ public class QuestionController {
         }
     }
 
+    @PostMapping("/upload-multiple-images")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDITOR')")
+    public ResponseEntity<?> uploadMultipleImages(
+            @RequestParam("files") org.springframework.web.multipart.MultipartFile[] files) {
+        if (files == null || files.length == 0) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: No files provided!"));
+        }
+
+        List<String> uploadedUrls = new ArrayList<>();
+        try {
+            for (org.springframework.web.multipart.MultipartFile file : files) {
+                if (file.isEmpty()) continue;
+                String imagePath;
+                if (cloudinaryService.isConfigured()) {
+                    imagePath = cloudinaryService.uploadMultipartFile(file, "images");
+                    if (imagePath == null) {
+                        throw new java.io.IOException("Failed to upload image to Cloudinary");
+                    }
+                } else {
+                    String originalName = file.getOriginalFilename();
+                    String uniqueName = java.util.UUID.randomUUID().toString().substring(0, 8) + "_" + originalName;
+                    java.io.File destFile = new java.io.File("uploads/images/" + uniqueName).getAbsoluteFile();
+                    destFile.getParentFile().mkdirs();
+                    file.transferTo(destFile);
+                    imagePath = "/uploads/images/" + uniqueName;
+                }
+                uploadedUrls.add(imagePath);
+            }
+
+            String joined = String.join(",", uploadedUrls);
+            Map<String, Object> res = new HashMap<>();
+            res.put("message", joined);
+            res.put("imagePath", joined);
+            res.put("urls", uploadedUrls);
+            return ResponseEntity.ok(res);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Error uploading images: " + e.getMessage()));
+        }
+    }
+
     private QuestionDTO convertToDTO(Question question) {
         return questionMapper.convertToDTO(question);
     }

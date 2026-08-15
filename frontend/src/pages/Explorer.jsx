@@ -13,7 +13,7 @@ import {
 
 import { getAssetUrl, formatMathText, renderQuestionText, checkAnswerCorrect, isOptionLabelCorrect, renderMentorAnalysis, renderAiChatText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
-import { getQuestionUrl } from '../utils/urlUtils';
+import { getQuestionUrl, parseImagePaths } from '../utils/urlUtils';
 import PremiumGateModal from '../components/PremiumGateModal';
 import ConfirmModal from '../components/ConfirmModal';
 import AIRGATELoader from '../components/AIRGATELoader';
@@ -1293,33 +1293,38 @@ export default function Explorer() {
                   {renderQuestionText(q.text)}
                 </div>
 
-                {q.imagePath && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <div 
-                      onClick={() => {
-                        setSelectedZoomImage(q.imagePath);
-                        setIsImageModalOpen(true);
-                      }}
-                      onMouseEnter={() => setHoveredImgId(q.id)}
-                      onMouseLeave={() => setHoveredImgId(null)}
-                      style={{ 
-                        border: '1px solid var(--border-color)', 
-                        borderRadius: '8px', 
-                        overflow: 'hidden', 
-                        padding: '12px', 
-                        textAlign: 'center', 
-                        backgroundColor: '#fff',
-                        cursor: 'zoom-in',
-                        transition: 'all 0.2s ease',
-                        transform: hoveredImgId === q.id ? 'scale(1.02)' : 'scale(1)',
-                        boxShadow: hoveredImgId === q.id ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none',
-                        display: 'inline-block',
-                        maxWidth: '300px'
-                      }}
-                    >
-                      <p style={{ fontSize: '0.7rem', color: '#666', marginBottom: '6px', fontWeight: '500' }}>Diagram (Click to enlarge)</p>
-                      <img src={getAssetUrl(q.imagePath)} alt="Question Diagram" style={{ maxWidth: '100%', maxHeight: '150px', display: 'block' }} />
-                    </div>
+                {parseImagePaths(q.imagePath).length > 0 && (
+                  <div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                    {parseImagePaths(q.imagePath).map((imgUrl, imgIdx) => (
+                      <div 
+                        key={imgIdx}
+                        onClick={() => {
+                          setSelectedZoomImage(imgUrl);
+                          setIsImageModalOpen(true);
+                        }}
+                        onMouseEnter={() => setHoveredImgId(`${q.id}_${imgIdx}`)}
+                        onMouseLeave={() => setHoveredImgId(null)}
+                        style={{ 
+                          border: '1px solid var(--border-color)', 
+                          borderRadius: '8px', 
+                          overflow: 'hidden', 
+                          padding: '10px', 
+                          textAlign: 'center', 
+                          backgroundColor: '#fff',
+                          cursor: 'zoom-in',
+                          transition: 'all 0.2s ease',
+                          transform: hoveredImgId === `${q.id}_${imgIdx}` ? 'scale(1.02)' : 'scale(1)',
+                          boxShadow: hoveredImgId === `${q.id}_${imgIdx}` ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none',
+                          display: 'inline-block',
+                          maxWidth: '280px'
+                        }}
+                      >
+                        <p style={{ fontSize: '0.7rem', color: '#666', marginBottom: '6px', fontWeight: '500' }}>
+                          {parseImagePaths(q.imagePath).length > 1 ? `Diagram ${imgIdx + 1}` : 'Diagram (Click to enlarge)'}
+                        </p>
+                        <img src={getAssetUrl(imgUrl)} alt={`Question Diagram ${imgIdx + 1}`} style={{ maxWidth: '100%', maxHeight: '150px', display: 'block', margin: '0 auto' }} />
+                      </div>
+                    ))}
                   </div>
                 )}
 

@@ -33,6 +33,7 @@ public class QuestionDTO {
     private String pdfSourcePath;
     private Integer pdfPageNumber;
     private String imagePath;
+    private List<String> imagePaths;
     private String status;
     private List<OptionDTO> options;
     private Set<String> tags;

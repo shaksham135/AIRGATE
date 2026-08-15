@@ -5,6 +5,7 @@ import AuthService from '../services/AuthService';
 import CacheService from '../services/CacheService';
 import { formatMathText, renderQuestionText, getAssetUrl, renderMentorAnalysis, checkAnswerCorrect, renderAiChatText } from '../utils/mathRenderer';
 import API_CONFIG from '../config/api';
+import { parseImagePaths } from '../utils/urlUtils';
 import PremiumGateModal from '../components/PremiumGateModal';
 import AIRGATELoader from '../components/AIRGATELoader';
 import { 
@@ -870,11 +871,17 @@ export default function QuestionDetail() {
           {renderQuestionText(question.text)}
         </div>
 
-        {/* Diagram Image */}
-        {question.imagePath && (
-          <div style={{ margin: '24px 0', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', backgroundColor: '#fff', textAlign: 'center', display: 'inline-block', maxWidth: '400px' }}>
-            <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Question Reference Diagram</p>
-            <img src={getAssetUrl(question.imagePath)} alt="Question Diagram" style={{ maxWidth: '100%', maxHeight: '250px', display: 'block' }} />
+        {/* Diagram Images Gallery */}
+        {parseImagePaths(question.imagePath).length > 0 && (
+          <div style={{ margin: '24px 0', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+            {parseImagePaths(question.imagePath).map((url, idx) => (
+              <div key={idx} style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '12px', backgroundColor: '#fff', textAlign: 'center', maxWidth: '380px' }}>
+                <p style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '6px', fontWeight: 'bold' }}>
+                  {parseImagePaths(question.imagePath).length > 1 ? `Diagram ${idx + 1}` : 'Question Reference Diagram'}
+                </p>
+                <img src={getAssetUrl(url)} alt={`Question Diagram ${idx + 1}`} style={{ maxWidth: '100%', maxHeight: '250px', display: 'block', margin: '0 auto' }} />
+              </div>
+            ))}
           </div>
         )}
 

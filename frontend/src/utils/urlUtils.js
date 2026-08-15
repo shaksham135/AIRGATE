@@ -148,3 +148,15 @@ export function parsePracticeParams(params = {}) {
 
   return { subjectSlug, subjectName, questionNumber };
 }
+
+/**
+ * Parses raw imagePath string into an array of clean image URLs.
+ */
+export function parseImagePaths(imagePath) {
+  if (!imagePath) return [];
+  if (Array.isArray(imagePath)) return imagePath.filter(Boolean);
+  return String(imagePath)
+    .split(/[,;]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}

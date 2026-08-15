@@ -8,6 +8,7 @@ import {
   FiRotateCw, FiZoomIn, FiSun, FiEye, FiSliders, FiCornerUpLeft, FiEdit, FiTrash 
 } from 'react-icons/fi';
 import { formatMathText, renderQuestionText, getAssetUrl } from '../utils/mathRenderer';
+import { parseImagePaths } from '../utils/urlUtils';
 import AIRGATELoader from '../components/AIRGATELoader';
 import './ReviewQueue.css';
 
@@ -621,24 +622,34 @@ export default function ReviewQueue() {
   };
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(f => formData.append('files', f));
 
     try {
       setError('');
-      const q = questions[currentIndex];
-      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${q.id}/image`, formData, {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/questions/upload-multiple-images`, formData, {
         headers: {
           ...AuthService.getAuthHeader(),
           'Content-Type': 'multipart/form-data'
         }
       });
-      setImagePath(response.data.message);
+      const newUrls = response.data.urls || (response.data.message ? response.data.message.split(',') : []);
+      const currentList = parseImagePaths(imagePath);
+      const combined = [...currentList, ...newUrls].filter((v, i, a) => a.indexOf(v) === i);
+      setImagePath(combined.join(','));
+      setSuccess(`✅ Successfully attached ${newUrls.length} photo(s)!`);
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Failed to upload diagram image.');
+      setError('Failed to upload photos: ' + (err.response?.data?.message || err.message));
     }
+  };
+
+  const handleRemovePhoto = (photoUrlToRemove) => {
+    const currentList = parseImagePaths(imagePath);
+    const updatedList = currentList.filter(url => url !== photoUrlToRemove);
+    setImagePath(updatedList.join(','));
   };
 
   const handleOptionImageUpload = async (idx, file) => {
@@ -905,20 +916,24 @@ export default function ReviewQueue() {
               </div>
 
               {/* Diagrams adjust sliders */}
-              {imagePath && (
-                <div className="review-diagram-container">
-                  <div style={{ flex: 1, minWidth: 0, border: '1px solid #374151', borderRadius: '8px', padding: '10px', backgroundColor: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '160px', overflow: 'hidden' }}>
-                    <img 
-                      src={getAssetUrl(imagePath)} 
-                      alt="Adjustable Diagram" 
-                      style={{ 
-                        maxHeight: '100%', 
-                        maxWidth: '100%', 
-                        transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                        filter: `brightness(${brightness}%) contrast(${contrast}%)`,
-                        transition: 'transform 0.1s ease'
-                      }} 
-                    />
+              {parseImagePaths(imagePath).length > 0 && (
+                <div className="review-diagram-container" style={{ flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '6px 0', maxWidth: '100%' }}>
+                    {parseImagePaths(imagePath).map((url, idx) => (
+                      <div key={idx} style={{ flexShrink: 0, border: '1px solid #374151', borderRadius: '8px', padding: '6px', backgroundColor: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '140px', width: '160px', overflow: 'hidden' }}>
+                        <img 
+                          src={getAssetUrl(url)} 
+                          alt={`Diagram ${idx + 1}`} 
+                          style={{ 
+                            maxHeight: '100%', 
+                            maxWidth: '100%', 
+                            transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                            filter: `brightness(${brightness}%) contrast(${contrast}%)`,
+                            transition: 'transform 0.1s ease'
+                          }} 
+                        />
+                      </div>
+                    ))}
                   </div>
                   
                   {/* Adjustment Controls */}
@@ -1036,24 +1051,53 @@ export default function ReviewQueue() {
             </div>
 
             <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af' }}>
-                <span>Question Diagram / Photo</span>
-                {imagePath && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label className="form-label" style={{ color: '#9ca3af', margin: 0 }}>
+                  Question Diagrams & Photos ({parseImagePaths(imagePath).length} Attached)
+                </label>
+                {parseImagePaths(imagePath).length > 0 && (
                   <button 
                     type="button" 
                     onClick={() => setImagePath('')} 
                     style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
                   >
-                    Remove Diagram
+                    Clear All Photos
                   </button>
                 )}
-              </label>
-              {imagePath ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '10px' }}>
-                  <img src={getAssetUrl(imagePath)} alt="Diagram Preview" style={{ width: '64px', height: '64px', objectFit: 'contain', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #334155' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f3f4f6', margin: 0 }}>Diagram Attached</p>
-                    <p style={{ fontSize: '0.7rem', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: '2px 0 0 0' }}>{imagePath}</p>
+              </div>
+
+              {parseImagePaths(imagePath).length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
+                    {parseImagePaths(imagePath).map((url, idx) => (
+                      <div key={idx} style={{ position: 'relative', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
+                        <img src={getAssetUrl(url)} alt={`Diagram ${idx + 1}`} style={{ width: '100%', height: '70px', objectFit: 'contain', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #334155' }} />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(url)}
+                          style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ef4444', border: 'none', color: '#fff', width: '20px', height: '20px', borderRadius: '50%', cursor: 'pointer', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Remove Photo"
+                        >
+                          ×
+                        </button>
+                        <span style={{ fontSize: '0.65rem', color: '#9ca3af', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '4px' }}>
+                          Photo {idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <input 
+                      type="file" 
+                      id="diagram-upload-more" 
+                      accept="image/*" 
+                      multiple
+                      onChange={handleImageUpload} 
+                      style={{ display: 'none' }} 
+                    />
+                    <label htmlFor="diagram-upload-more" style={{ cursor: 'pointer', backgroundColor: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      ➕ Add More Photos / Diagrams
+                    </label>
                   </div>
                 </div>
               ) : (
@@ -1062,11 +1106,12 @@ export default function ReviewQueue() {
                     type="file" 
                     id="diagram-upload" 
                     accept="image/*" 
+                    multiple
                     onChange={handleImageUpload} 
                     style={{ display: 'none' }} 
                   />
                   <label htmlFor="diagram-upload" style={{ cursor: 'pointer', display: 'block' }}>
-                    <span style={{ color: '#38bdf8', fontSize: '0.8rem', fontWeight: 600 }}>Click to Upload Diagram Image</span>
+                    <span style={{ color: '#38bdf8', fontSize: '0.8rem', fontWeight: 600 }}>📷 Click to Upload Photo(s) [Select 1 or Multiple]</span>
                   </label>
                 </div>
               )}

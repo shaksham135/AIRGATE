@@ -82,8 +82,8 @@ public class Question {
     @Column(name = "pdf_page_number", nullable = false)
     private Integer pdfPageNumber;
 
-    @Column(name = "image_path", length = 255)
-    private String imagePath; // Path to extracted diagram image on local filesystem
+    @Column(name = "image_path", columnDefinition = "TEXT")
+    private String imagePath; // Comma-separated paths/URLs to diagram images
 
     @Column(nullable = false, length = 20)
     private String status; // UPLOADED, PARSED, AI_PROCESSED, AI_FAILED, PENDING_REVIEW, APPROVED, PUBLISHED, ARCHIVED

@@ -139,6 +139,7 @@ public class QuestionMapper {
                 .pdfSourcePath(question.getPdfSourcePath())
                 .pdfPageNumber(question.getPdfPageNumber())
                 .imagePath(question.getImagePath())
+                .imagePaths(parseImagePathsList(question.getImagePath()))
                 .status(question.getStatus())
                 .options(options)
                 .tags(tags)
@@ -158,5 +159,20 @@ public class QuestionMapper {
                 .helpfulVotes(helpful)
                 .notHelpfulVotes(notHelpful)
                 .build();
+    }
+
+    private static List<String> parseImagePathsList(String rawImagePath) {
+        if (rawImagePath == null || rawImagePath.isBlank()) {
+            return new ArrayList<>();
+        }
+        List<String> list = new ArrayList<>();
+        String[] parts = rawImagePath.split("[,;]+");
+        for (String p : parts) {
+            String trimmed = p.trim();
+            if (!trimmed.isEmpty() && !list.contains(trimmed)) {
+                list.add(trimmed);
+            }
+        }
+        return list;
     }
 }
