@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthService from '../services/AuthService';
 import API_CONFIG from '../config/api';
+import AIRGATELoader from '../components/AIRGATELoader';
 import '../styles/aiSettingsManager.css';
 import { 
   FiCpu, FiKey, FiServer, FiCheckCircle, FiAlertTriangle, 
@@ -316,11 +317,8 @@ export default function AiSettingsManager() {
 
   if (loading) {
     return (
-      <div className="ai-settings-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <FiRefreshCw style={{ width: 32, height: 32, color: '#38bdf8' }} className="animate-spin" />
-          <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>Loading AI Engine Configurations...</p>
-        </div>
+      <div className="ai-settings-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
+        <AIRGATELoader hideTip />
       </div>
     );
   }

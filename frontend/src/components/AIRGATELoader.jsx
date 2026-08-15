@@ -24,42 +24,19 @@ const DYNAMIC_GATE_MESSAGES = [
   { category: "Strategy", text: "🚀 Turn weak topics into your strongest weapons." },
   { category: "Operating Systems", text: "🧠 Banker's Algorithm = Deadlock Avoidance." },
   { category: "Mindset", text: "⚡ Master the basics; the rank will follow." },
-  { category: "MSQ Trick", text: "🎯 Read every option before submitting MSQs." },
-  { category: "Motivation", text: "💪 Doubt today, derivation tomorrow, excellence soon." },
-  { category: "ToC", text: "🔥 Regular languages are closed under Kleene Star." },
   { category: "Dream High", text: "✨ Push through the struggle—IISc is waiting!" },
-  { category: "Compounding", text: "⏳ Hard work compounds just like interest." },
   { category: "Motivation", text: "🏆 Every PYQ solved brings you closer to IIT." },
   { category: "Data Structures", text: "⚡ AVL Tree Height is strictly $< 1.44 \\log_2 n$." },
-  { category: "Analysis", text: "🎯 Analyze your mock test mistakes deeply." },
   { category: "CoA", text: "💡 Cache Hit Ratio improves with locality of reference." },
-  { category: "Inspiration", text: "🚀 You didn't come this far to only come this far." },
   { category: "Operating Systems", text: "🧠 Page Fault Rate determines Effective Access Time." },
-  { category: "Data Structures", text: "⚡ B-Trees keep all leaf nodes at the exact same depth." },
   { category: "Consistency", text: "🎯 Small steps daily yield giant GATE results." },
   { category: "Algorithms", text: "🔥 Dijkstra's algorithm uses non-negative edge weights." },
-  { category: "Confidence", text: "💪 Believe in your prep—stay calm under pressure." },
   { category: "Motivation", text: "✨ 1 mark can jump your GATE rank by 500 spots!" },
-  { category: "Mindset", text: "⏳ Practice like you're #2, perform like you're #1." },
   { category: "Dream High", text: "🏆 IIT Bombay, IISc, IIT Madras—keep the dream alive!" },
-  { category: "Algorithms", text: "⚡ Greedy choice property yields optimal MSTs." },
-  { category: "Digital Logic", text: "🎯 Quick tip: 2's complement of 0 is always 0." },
-  { category: "Operating Systems", text: "💡 Paging eliminates External Fragmentation completely." },
-  { category: "Exam Strategy", text: "🚀 Precision over panic—read questions twice." },
-  { category: "Data Structures", text: "🧠 Topological sort works ONLY on DAGs." },
-  { category: "Algorithms", text: "⚡ Heapify takes $O(n)$ time, sorting takes $O(n \\log n)$." },
-  { category: "Strategy", text: "🎯 Solve 2-mark questions with laser focus." },
-  { category: "Drive", text: "🔥 Your competition is resting—keep pushing!" },
-  { category: "Motivation", text: "💪 Tough times don't last; tough GATE aspirants do." },
-  { category: "CoA", text: "✨ Maximum frequency = $1 / \\text{Clock Period}$." },
-  { category: "Exam Strategy", text: "⏳ 100 marks, 65 questions, 3 hours—own it!" },
-  { category: "AIRGATE", text: "🏆 AIRGATE is with you on every single step." },
-  { category: "Operating Systems", text: "⚡ Semaphore signal() increments value atomically." },
-  { category: "Focus", text: "🎯 Keep calm and solve the next question!" },
-  { category: "Motivation", text: "🚀 Greatness is earned in silent study hours." }
+  { category: "Operating Systems", text: "💡 Paging eliminates External Fragmentation completely." }
 ];
 
-export default function AIRGATELoader({ text, size = "normal" }) {
+export default function AIRGATELoader({ text, size = "normal", hideTip = false }) {
   const isCompact = size === "small";
 
   const [tipsList, setTipsList] = useState(DYNAMIC_GATE_MESSAGES);
@@ -69,6 +46,7 @@ export default function AIRGATELoader({ text, size = "normal" }) {
   const [fade, setFade] = useState(true);
 
   useEffect(() => {
+    if (hideTip) return;
     let isMounted = true;
     const fetchLiveTips = async () => {
       const cached = CacheService.get('active_gate_tips');
@@ -89,9 +67,9 @@ export default function AIRGATELoader({ text, size = "normal" }) {
     };
     fetchLiveTips();
     return () => { isMounted = false; };
-  }, []);
+  }, [hideTip]);
 
-  // Lock 1 single random message per loading screen (no auto-rotating loop)
+  // Lock 1 single random message per loading screen
   const activeMsg = tipsList[currentMsgIndex] || DYNAMIC_GATE_MESSAGES[0];
 
   return (
@@ -114,7 +92,7 @@ export default function AIRGATELoader({ text, size = "normal" }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: isCompact ? '10px' : '14px'
+        marginBottom: (text || !hideTip) ? (isCompact ? '10px' : '14px') : 0
       }}>
         {/* Outer Rotating Gradient Ring */}
         <div 
@@ -167,23 +145,25 @@ export default function AIRGATELoader({ text, size = "normal" }) {
       )}
 
       {/* Dynamic 1-Line GATE Motivation / Micro-Tip Pill */}
-      <div style={{
-        opacity: fade ? 1 : 0,
-        transition: 'opacity 0.25s ease-in-out',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px',
-        backgroundColor: 'rgba(139, 92, 246, 0.08)',
-        border: '1px solid rgba(139, 92, 246, 0.25)',
-        borderRadius: '20px',
-        padding: '6px 14px',
-        maxWidth: '100%'
-      }}>
-        <FiBookOpen style={{ color: '#06b6d4', flexShrink: 0, fontSize: '0.82rem' }} />
-        <span style={{ fontSize: isCompact ? '0.78rem' : '0.84rem', color: '#f8fafc', fontWeight: 600, lineHeight: 1.3 }}>
-          {formatMathText(activeMsg.text)}
-        </span>
-      </div>
+      {!hideTip && (
+        <div style={{
+          opacity: fade ? 1 : 0,
+          transition: 'opacity 0.25s ease-in-out',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          backgroundColor: 'rgba(139, 92, 246, 0.08)',
+          border: '1px solid rgba(139, 92, 246, 0.25)',
+          borderRadius: '20px',
+          padding: '6px 14px',
+          maxWidth: '100%'
+        }}>
+          <FiBookOpen style={{ color: '#06b6d4', flexShrink: 0, fontSize: '0.82rem' }} />
+          <span style={{ fontSize: isCompact ? '0.78rem' : '0.84rem', color: '#f8fafc', fontWeight: 600, lineHeight: 1.3 }}>
+            {formatMathText(activeMsg.text)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

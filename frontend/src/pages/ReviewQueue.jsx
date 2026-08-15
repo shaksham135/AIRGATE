@@ -8,6 +8,7 @@ import {
   FiRotateCw, FiZoomIn, FiSun, FiEye, FiSliders, FiCornerUpLeft, FiEdit, FiTrash 
 } from 'react-icons/fi';
 import { formatMathText, renderQuestionText, getAssetUrl } from '../utils/mathRenderer';
+import AIRGATELoader from '../components/AIRGATELoader';
 import './ReviewQueue.css';
 
 export default function ReviewQueue() {
@@ -704,11 +705,8 @@ export default function ReviewQueue() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh', color: 'var(--text-secondary)' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="spinner" style={{ border: '4px solid rgba(56,189,248,0.1)', borderTop: '4px solid #38bdf8', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }}></div>
-          <div>Syncing Queue...</div>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <AIRGATELoader hideTip />
       </div>
     );
   }
