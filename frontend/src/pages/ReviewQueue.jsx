@@ -27,6 +27,7 @@ export default function ReviewQueue() {
   const [marks, setMarks] = useState(1);
   const [negativeMarks, setNegativeMarks] = useState(-0.33);
   const [year, setYear] = useState(2024);
+  const [questionNumber, setQuestionNumber] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
   const [tagString, setTagString] = useState('');
@@ -119,6 +120,7 @@ export default function ReviewQueue() {
       }
 
       setYear(q.year || 2024);
+      setQuestionNumber(q.questionNumber || '');
       setImagePath(q.imagePath || '');
       setAiSuggestedAnswer(q.aiSuggestedAnswer != null && q.aiSuggestedAnswer !== '' ? q.aiSuggestedAnswer : (detectedType === 'NAT' ? '' : 'A'));
       setAiSuggestedExplanation(q.aiSuggestedExplanation || '');
@@ -345,6 +347,7 @@ export default function ReviewQueue() {
       marks: parseInt(marks) || 1,
       negativeMarks: Math.abs(parseFloat(negativeMarks)) || 0,
       year: parseInt(year) || 2026,
+      questionNumber: parseInt(questionNumber) || null,
       subjectId: parseInt(subjectId),
       topicId: parseInt(topicId),
       pdfSourceName: q.pdfSourceName || "Manual Entry",
@@ -394,6 +397,7 @@ export default function ReviewQueue() {
         marks,
         negativeMarks,
         year,
+        questionNumber: parseInt(questionNumber) || null,
         subjectId: parseInt(subjectId),
         topicId: parseInt(topicId),
         status: 'ARCHIVED',
@@ -416,13 +420,14 @@ export default function ReviewQueue() {
         setCurrentIndex(currentIndex + 1);
       }, 1000);
     } catch (e) {
-      setError('Failed to archive/reject question.');
+      setError(e.response?.data?.message || 'Failed to reject question!');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleSaveDraft = async () => {
+    if (isSubmitting) return;
     setError('');
     setSuccess('');
     const q = questions[currentIndex];
@@ -434,6 +439,7 @@ export default function ReviewQueue() {
       marks: parseInt(marks),
       negativeMarks: Math.abs(parseFloat(negativeMarks)) || 0,
       year: parseInt(year),
+      questionNumber: parseInt(questionNumber) || null,
       subjectId: parseInt(subjectId),
       topicId: parseInt(topicId),
       pdfSourceName: q.pdfSourceName,

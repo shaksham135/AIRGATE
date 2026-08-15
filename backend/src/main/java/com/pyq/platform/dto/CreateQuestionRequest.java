@@ -28,6 +28,8 @@ public class CreateQuestionRequest {
 
     private Integer year = 2026;
 
+    private Integer questionNumber;
+
     @NotNull(message = "Subject ID is required")
     @Positive(message = "Subject ID must be positive")
     private Long subjectId;

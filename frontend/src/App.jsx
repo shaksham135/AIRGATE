@@ -13,6 +13,7 @@ const ReviewQueue = lazy(() => import('./pages/ReviewQueue'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
 const AiGeneratorHub = lazy(() => import('./pages/AiGeneratorHub'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
+const AiSettingsManager = lazy(() => import('./pages/AiSettingsManager'));
 const Bookmarks = lazy(() => import('./pages/Bookmarks'));
 const QuestionDetail = lazy(() => import('./pages/QuestionDetail'));
 const PracticeArena = lazy(() => import('./pages/PracticeArena'));
@@ -28,7 +29,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const QuestionRedirector = lazy(() => import('./components/QuestionRedirector'));
 import ErrorBoundary from './components/ErrorBoundary';
 import { Analytics } from '@vercel/analytics/react';
-import { FiHome, FiUpload, FiLock, FiLogOut, FiFolder, FiGrid, FiUser, FiCheckSquare, FiMenu, FiChevronLeft, FiChevronRight, FiClock, FiList, FiStar, FiCpu } from 'react-icons/fi';
+import { FiHome, FiUpload, FiLock, FiLogOut, FiFolder, FiGrid, FiUser, FiCheckSquare, FiMenu, FiChevronLeft, FiChevronRight, FiClock, FiList, FiStar, FiCpu, FiSliders } from 'react-icons/fi';
 import PremiumGateModal from './components/PremiumGateModal';
 import PromoBannerHeader from './components/PromoBannerHeader';
 import BugReportModal from './components/BugReportModal';
@@ -105,6 +106,7 @@ function DashboardLayout({ children }) {
     if (AuthService.isAdminOrEditor()) {
       import('./pages/AdminPanel');
       import('./pages/AiGeneratorHub');
+      import('./pages/AiSettingsManager');
       import('./pages/ReviewQueue');
       import('./pages/UserManagement');
       import('./pages/UploadManager');
@@ -337,6 +339,9 @@ function DashboardLayout({ children }) {
                 <Link to="/admin/ai-generator" className={`sidebar-link ${location.pathname === '/admin/ai-generator' ? 'active' : ''}`} onClick={() => setIsMobileOpen(false)} style={{ color: '#c4b5fd', fontWeight: 600 }} title="AI Generator Hub">
                   <FiCpu size={18} style={{ color: '#8b5cf6' }} /> <span>AI Generator Hub 🤖</span>
                 </Link>
+                <Link to="/admin/ai-config" className={`sidebar-link ${location.pathname === '/admin/ai-config' ? 'active' : ''}`} onClick={() => setIsMobileOpen(false)} style={{ color: '#38bdf8', fontWeight: 600 }} title="AI Models & Keys">
+                  <FiSliders size={18} style={{ color: '#38bdf8' }} /> <span>AI Models & Keys ⚙️</span>
+                </Link>
                 <Link to="/admin/review-queue" className={`sidebar-link ${location.pathname === '/admin/review-queue' ? 'active' : ''}`} onClick={() => setIsMobileOpen(false)} title="Review Queue">
                   <FiCheckSquare size={18} /> <span>Review Queue</span>
                 </Link>
@@ -542,6 +547,7 @@ function AppRoutes() {
       <Route path="/admin/questions/:id/edit" element={<ProtectedAdminRoute><DashboardLayout><AdminQuestionEditor /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/panel" element={<ProtectedAdminRoute><DashboardLayout><AdminPanel /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/ai-generator" element={<ProtectedAdminRoute><DashboardLayout><AiGeneratorHub /></DashboardLayout></ProtectedAdminRoute>} />
+      <Route path="/admin/ai-config" element={<ProtectedAdminRoute><DashboardLayout><AiSettingsManager /></DashboardLayout></ProtectedAdminRoute>} />
       <Route path="/admin/users" element={<ProtectedAdminRoute><DashboardLayout><UserManagement /></DashboardLayout></ProtectedAdminRoute>} />
 
       {/* Bookmarks & Solves Route */}

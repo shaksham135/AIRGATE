@@ -88,7 +88,7 @@ export function getQuestionUrl(q) {
     return q.seoUrl;
   }
 
-  const qId = q.id || q.questionId;
+  const qId = q.questionNumber || q.id || q.questionId;
   if (!qId) return '/gate/cse';
 
   const pdfSource = (q.pdfSourceName || '').toLowerCase();

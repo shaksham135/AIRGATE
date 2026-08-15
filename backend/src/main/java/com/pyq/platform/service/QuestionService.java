@@ -275,6 +275,7 @@ public class QuestionService {
         if (updatedData.getMarks() != null) existing.setMarks(updatedData.getMarks());
         if (updatedData.getNegativeMarks() != null) existing.setNegativeMarks(updatedData.getNegativeMarks());
         if (updatedData.getYear() != null) existing.setYear(updatedData.getYear());
+        if (updatedData.getQuestionNumber() != null) existing.setQuestionNumber(updatedData.getQuestionNumber());
         if (updatedData.getSubject() != null) existing.setSubject(updatedData.getSubject());
         if (updatedData.getTopic() != null) existing.setTopic(updatedData.getTopic());
         if (updatedData.getPdfSourceName() != null) existing.setPdfSourceName(updatedData.getPdfSourceName());

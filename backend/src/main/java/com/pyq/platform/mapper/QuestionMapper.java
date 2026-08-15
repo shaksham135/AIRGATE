@@ -101,7 +101,8 @@ public class QuestionMapper {
         String subjectSlug = SubjectSlugUtils.toSlug(subjectName);
         String branch = question.getBranch() != null && !question.getBranch().isBlank() ? question.getBranch() : "cse";
         Integer paperSet = question.getPaperSet() != null ? question.getPaperSet() : 1;
-        Integer questionNumber = question.getQuestionNumber() != null ? question.getQuestionNumber() : (int) (question.getId() % 1000 + 1);
+        Integer questionNumber = question.getQuestionNumber();
+        int displayQNum = (questionNumber != null && questionNumber > 0) ? questionNumber : (int) (question.getId() % 1000 + 1);
 
         String pdfSource = question.getPdfSourceName();
         boolean isAiPractice = pdfSource != null && (
@@ -110,9 +111,11 @@ public class QuestionMapper {
                 pdfSource.toLowerCase().contains("practice")
         );
 
+        int urlQNum = (questionNumber != null && questionNumber > 0) ? questionNumber : question.getId().intValue();
+
         String seoUrl = isAiPractice
-                ? "/practice/" + subjectSlug + "/q" + question.getId()
-                : "/gate/" + branch + "/" + (question.getYear() != null ? question.getYear() : 2025) + "/set-" + paperSet + "/q" + question.getId();
+                ? "/practice/" + subjectSlug + "/q" + urlQNum
+                : "/gate/" + branch + "/" + (question.getYear() != null ? question.getYear() : 2025) + "/set-" + paperSet + "/q" + urlQNum;
 
         return QuestionDTO.builder()
                 .id(question.getId())
@@ -124,7 +127,7 @@ public class QuestionMapper {
                 .year(question.getYear())
                 .branch(branch)
                 .paperSet(paperSet)
-                .questionNumber(questionNumber)
+                .questionNumber(questionNumber != null ? questionNumber : displayQNum)
                 .seoUrl(seoUrl)
                 .subjectSlug(subjectSlug)
                 .subjectId(question.getSubject() != null ? question.getSubject().getId() : null)

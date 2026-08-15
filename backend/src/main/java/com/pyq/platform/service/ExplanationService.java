@@ -24,15 +24,18 @@ public class ExplanationService {
     private final QuestionAIAnalysisRepository aiAnalysisRepository;
     private final AIFailureLogRepository aiFailureLogRepository;
     private final AIClassificationService aiClassificationService;
+    private final SystemSettingService systemSettingService;
 
     public ExplanationService(QuestionRepository questionRepository,
                               QuestionAIAnalysisRepository aiAnalysisRepository,
                               AIFailureLogRepository aiFailureLogRepository,
-                              AIClassificationService aiClassificationService) {
+                              AIClassificationService aiClassificationService,
+                              SystemSettingService systemSettingService) {
         this.questionRepository = questionRepository;
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.aiFailureLogRepository = aiFailureLogRepository;
         this.aiClassificationService = aiClassificationService;
+        this.systemSettingService = systemSettingService;
     }
 
     @Async
@@ -48,34 +51,41 @@ public class ExplanationService {
 
         Question question = questionOpt.get();
         Optional<QuestionAIAnalysis> analysisOpt = aiAnalysisRepository.findFirstByQuestionIdOrderByCreatedAtDesc(questionId);
-        if (analysisOpt.isEmpty()) {
-            log.error("ExplanationService: AI Analysis record not found for question ID: {}", questionId);
-            return;
+
+        QuestionAIAnalysis analysis;
+        if (analysisOpt.isPresent()) {
+            analysis = analysisOpt.get();
+        } else {
+            // Create pending placeholder
+            analysis = QuestionAIAnalysis.builder()
+                    .question(question)
+                    .suggestedAnswer("A")
+                    .suggestedExplanation("Generating detailed solution derivation...")
+                    .confidence(0.5)
+                    .modelName("fast-parse")
+                    .build();
+            analysis = aiAnalysisRepository.save(analysis);
         }
 
-        QuestionAIAnalysis analysis = analysisOpt.get();
-
-        // Collect images from question body and options
-        List<String> imageUrlsOrPaths = new ArrayList<>();
-        String questionImg = question.getImagePath();
-        if (questionImg != null && !questionImg.trim().isEmpty()) {
-            imageUrlsOrPaths.add(questionImg);
-        }
-        if (question.getOptions() != null) {
-            for (QuestionOption opt : question.getOptions()) {
-                String optText = opt.getOptionText();
-                if (optText != null && (optText.startsWith("/uploads/") || optText.startsWith("http://") || optText.startsWith("https://"))) {
-                    imageUrlsOrPaths.add(optText);
-                }
-            }
-        }
-
+        int maxRetries = 2;
         int attempt = 1;
-        int maxRetries = 2; // Fast model attempt, then fallback to heavy model
 
         while (attempt <= maxRetries) {
             try {
-                // Call AI service to generate solution
+                // Collect images if available
+                List<String> imageUrlsOrPaths = new ArrayList<>();
+                if (question.getImagePath() != null && !question.getImagePath().isBlank()) {
+                    imageUrlsOrPaths.add(question.getImagePath());
+                }
+                if (question.getOptions() != null) {
+                    for (QuestionOption opt : question.getOptions()) {
+                        if (opt.getOptionText() != null && (opt.getOptionText().startsWith("/uploads/") || opt.getOptionText().startsWith("http"))) {
+                            imageUrlsOrPaths.add(opt.getOptionText());
+                        }
+                    }
+                }
+
+                // Call AI classification service for high-quality mathematical solution
                 AIClassificationService.SolutionResult result = aiClassificationService.generateDetailedSolution(
                         question.getText(),
                         analysis.getSuggestedAnswer(),
@@ -84,7 +94,7 @@ public class ExplanationService {
 
                 analysis.setMentorInsights(result.shortSolution);
                 analysis.setSuggestedExplanation(result.detailedSolution);
-                analysis.setModelName("llama-3.1-8b-comprehensive");
+                analysis.setModelName(systemSettingService.getGroqHeavyModel());
                 aiAnalysisRepository.save(analysis);
 
                 log.info("ExplanationService: Successfully generated explanation for question ID: {}", questionId);
@@ -96,7 +106,7 @@ public class ExplanationService {
                 // Log failure to database
                 aiFailureLogRepository.save(AIFailureLog.builder()
                         .questionId(questionId)
-                        .modelName(attempt == 1 ? "llama-3.1-8b" : "llama-3.2-11b-vision")
+                        .modelName(systemSettingService.getGroqFastModel())
                         .promptVersion("v1")
                         .errorMessage(e.getMessage())
                         .retryCount(attempt)

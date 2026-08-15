@@ -213,6 +213,10 @@ public class UploadService {
 
                     // Save the question block, options, and tags in a dedicated short transaction
                     transactionTemplate.executeWithoutResult(status -> {
+                        Integer extractedQNum = extractQuestionNumberFromText(block.rawText);
+                        if (extractedQNum == null) {
+                            extractedQNum = extractQuestionNumberFromText(aiRes.questionText);
+                        }
                         aiRes.questionText = AIClassificationService.stripQuestionNumbering(aiRes.questionText);
 
                         List<String> optionTextsVal = aiRes.options;
@@ -255,6 +259,7 @@ public class UploadService {
                                 .negativeMarks(Math.abs(aiRes.negativeMarks))
                                 .difficulty(aiRes.difficulty != null ? aiRes.difficulty : "MEDIUM")
                                 .year(year)
+                                .questionNumber(extractedQNum)
                                 .subject(subject)
                                 .topic(topic)
                                 .checksumHash(checksum)
@@ -509,5 +514,17 @@ public class UploadService {
             return rawText.substring(0, m.start()).trim();
         }
         return rawText;
+    }
+
+    private Integer extractQuestionNumberFromText(String rawText) {
+        if (rawText == null || rawText.isBlank()) return null;
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("^(?i)\\s*(?:Question\\s*\\.?\\s*|Q\\s*\\.\\s*|Q\\s*|Q)?(\\d+)\\s*(?:\\.|:|-|\\))?");
+        java.util.regex.Matcher m = p.matcher(rawText);
+        if (m.find()) {
+            try {
+                return Integer.parseInt(m.group(1));
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 }

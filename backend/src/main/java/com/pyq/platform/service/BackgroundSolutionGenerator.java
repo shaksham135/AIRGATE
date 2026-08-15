@@ -29,6 +29,7 @@ public class BackgroundSolutionGenerator {
     private final AIClassificationService aiClassificationService;
     private final UploadJobRepository uploadJobRepository;
     private final TransactionTemplate transactionTemplate;
+    private final SystemSettingService systemSettingService;
 
     // Statuses that indicate an upload is actively consuming Groq API quota
     private static final List<String> ACTIVE_UPLOAD_STATUSES = List.of("PARSING", "CLASSIFYING");
@@ -36,11 +37,13 @@ public class BackgroundSolutionGenerator {
     public BackgroundSolutionGenerator(QuestionAIAnalysisRepository aiAnalysisRepository,
                                        AIClassificationService aiClassificationService,
                                        UploadJobRepository uploadJobRepository,
-                                       org.springframework.transaction.PlatformTransactionManager transactionManager) {
+                                       org.springframework.transaction.PlatformTransactionManager transactionManager,
+                                       SystemSettingService systemSettingService) {
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.aiClassificationService = aiClassificationService;
         this.uploadJobRepository = uploadJobRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.systemSettingService = systemSettingService;
     }
 
     private static class QuestionData {
@@ -139,7 +142,7 @@ public class BackgroundSolutionGenerator {
                 QuestionAIAnalysis record = aiAnalysisRepository.findById(data.id).orElseThrow();
                 record.setMentorInsights(result.shortSolution);        // Quick answer + GATE trick
                 record.setSuggestedExplanation(result.detailedSolution); // Full step-by-step
-                record.setModelName("llama-3.3-70b-comprehensive");
+                record.setModelName(systemSettingService.getGroqHeavyModel());
                 aiAnalysisRepository.save(record);
 
                 // Verification Gate: Check if AI's concluded answer matches ground-truth

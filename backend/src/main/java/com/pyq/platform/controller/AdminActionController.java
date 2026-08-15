@@ -420,7 +420,7 @@ public class AdminActionController {
             int pt = req.getPromptTokens();
             int ct = req.getCompletionTokens();
 
-            if ("llama-3.3-70b-versatile".equals(model)) {
+            if (model != null && model.contains("70b")) {
                 cost = (pt * 0.59 / 1_000_000.0) + (ct * 0.79 / 1_000_000.0);
             } else {
                 cost = (pt * 0.05 / 1_000_000.0) + (ct * 0.08 / 1_000_000.0);

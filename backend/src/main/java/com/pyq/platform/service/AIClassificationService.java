@@ -54,10 +54,12 @@ public class AIClassificationService {
     private RestTemplate restTemplate;
     private final GroqUsageService groqUsageService;
     private final GroqKeyManager groqKeyManager;
+    private final SystemSettingService systemSettingService;
 
-    public AIClassificationService(GroqUsageService groqUsageService, GroqKeyManager groqKeyManager) {
+    public AIClassificationService(GroqUsageService groqUsageService, GroqKeyManager groqKeyManager, SystemSettingService systemSettingService) {
         this.groqUsageService = groqUsageService;
         this.groqKeyManager = groqKeyManager;
+        this.systemSettingService = systemSettingService;
     }
 
     @PostConstruct
@@ -132,7 +134,7 @@ public class AIClassificationService {
                     headers.set("Authorization", "Bearer " + currentApiKey);
 
                     ObjectNode rootNode = objectMapper.createObjectNode();
-                    rootNode.put("model", heavyModel != null && !heavyModel.isBlank() ? heavyModel : "llama-3.3-70b-versatile");
+                    rootNode.put("model", systemSettingService.getGroqFastModel());
                     rootNode.put("temperature", 0.1);
                     rootNode.put("max_tokens", 1500);
 
@@ -149,7 +151,7 @@ public class AIClassificationService {
                     userMsg.put("content", userContent);
 
                     HttpEntity<String> entity = new HttpEntity<>(rootNode.toString(), headers);
-                    ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+                    ResponseEntity<String> response = restTemplate.exchange(systemSettingService.getGroqApiUrl(), HttpMethod.POST, entity, String.class);
 
                     JsonNode jsonResponse = objectMapper.readTree(response.getBody());
                     long tokenUsage = jsonResponse.path("usage").path("total_tokens").asLong(0);
@@ -717,7 +719,7 @@ public class AIClassificationService {
             rootNode.put("temperature", 0.05);
             rootNode.put("frequency_penalty", 0.2);
             rootNode.put("presence_penalty", 0.2);
-            rootNode.put("max_tokens", 3500);
+            rootNode.put("max_tokens", systemSettingService.getAiSolutionMaxTokens());
 
             ArrayNode messages = rootNode.putArray("messages");
             ObjectNode systemMsg = messages.addObject();
@@ -736,11 +738,11 @@ public class AIClassificationService {
                 }
             }
 
-            rootNode.put("model", heavyModel != null && !heavyModel.isBlank() ? heavyModel : "llama-3.3-70b-versatile");
+            rootNode.put("model", systemSettingService.getGroqHeavyModel());
             userMsg.put("content", userPrompt);
 
             HttpEntity<String> entity = new HttpEntity<>(rootNode.toString(), headers);
-            ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(systemSettingService.getGroqApiUrl(), HttpMethod.POST, entity, String.class);
 
             JsonNode jsonResponse = objectMapper.readTree(response.getBody());
             long tokenUsage = jsonResponse.path("usage").path("total_tokens").asLong(0);

@@ -15,7 +15,8 @@ export default function AdminQuestionEditor() {
   const [questionType, setQuestionType] = useState('MCQ');
   const [marks, setMarks] = useState(1);
   const [negativeMarks, setNegativeMarks] = useState(-0.33);
-  const [year, setYear] = useState(2024);
+  const [year, setYear] = useState(2026);
+  const [questionNumber, setQuestionNumber] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
   const [pdfSourceName, setPdfSourceName] = useState('Manual Entry');
@@ -90,6 +91,7 @@ export default function AdminQuestionEditor() {
       setTopics(flat);
     } catch (e) {
       console.error('Failed to load topics', e);
+      setTopics([]);
     }
   };
 
@@ -102,6 +104,7 @@ export default function AdminQuestionEditor() {
       setMarks(q.marks);
       setNegativeMarks(q.negativeMarks);
       setYear(q.year);
+      setQuestionNumber(q.questionNumber || '');
       setSubjectId(q.subjectId);
       setTopicId(q.topicId);
       setPdfSourceName(q.pdfSourceName);
@@ -155,6 +158,7 @@ export default function AdminQuestionEditor() {
       marks: parseInt(marks) || 1,
       negativeMarks: Math.abs(parseFloat(negativeMarks)) || 0,
       year: parseInt(year) || 2026,
+      questionNumber: parseInt(questionNumber) || null,
       subjectId: parseInt(subjectId),
       topicId: parseInt(topicId),
       pdfSourceName: pdfSourceName || "Manual Entry",
@@ -343,6 +347,17 @@ export default function AdminQuestionEditor() {
               onChange={(e) => setYear(parseInt(e.target.value))}
               placeholder="e.g. 2024"
               required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">GATE Question Number (e.g. 4 for Q.4)</label>
+            <input
+              type="number"
+              className="form-input"
+              value={questionNumber}
+              onChange={(e) => setQuestionNumber(e.target.value)}
+              placeholder="e.g. 4 or 12"
             />
           </div>
         </div>

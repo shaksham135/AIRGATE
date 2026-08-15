@@ -62,15 +62,18 @@ public class AiTutorChatController {
     private final com.pyq.platform.repository.UserRepository userRepository;
     private final com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository;
     private final com.pyq.platform.service.GroqKeyManager groqKeyManager;
+    private final com.pyq.platform.service.SystemSettingService systemSettingService;
 
     public AiTutorChatController(com.pyq.platform.repository.AiRequestRepository aiRequestRepository,
                                  com.pyq.platform.repository.UserRepository userRepository,
                                  com.pyq.platform.repository.SystemSettingsRepository systemSettingsRepository,
-                                 com.pyq.platform.service.GroqKeyManager groqKeyManager) {
+                                 com.pyq.platform.service.GroqKeyManager groqKeyManager,
+                                 com.pyq.platform.service.SystemSettingService systemSettingService) {
         this.aiRequestRepository = aiRequestRepository;
         this.userRepository = userRepository;
         this.systemSettingsRepository = systemSettingsRepository;
         this.groqKeyManager = groqKeyManager;
+        this.systemSettingService = systemSettingService;
     }
 
     @PostConstruct
@@ -197,7 +200,7 @@ public class AiTutorChatController {
                     payload.put("temperature", 0.1);
                     payload.put("frequency_penalty", 0.2);
                     payload.put("presence_penalty", 0.2);
-                    payload.put("max_tokens", 2000);
+                    payload.put("max_tokens", systemSettingService.getAiTutorMaxTokens());
 
                     ArrayNode messages = payload.putArray("messages");
                     messages.addObject().put("role", "system").put("content", systemPrompt);
@@ -297,11 +300,11 @@ public class AiTutorChatController {
             // ── 3. TERTIARY / FALLBACK: Groq Multi-Key Load Balancer ───────────
             log.info("🔌 [AI Tutor] Executing Groq Multi-Key Fallback...");
             ObjectNode payload = objectMapper.createObjectNode();
-            payload.put("model", fastModel);
+            payload.put("model", systemSettingService.getAiTutorModel());
             payload.put("temperature", 0.1);
             payload.put("frequency_penalty", 0.2);
             payload.put("presence_penalty", 0.2);
-            payload.put("max_tokens", 2000);
+            payload.put("max_tokens", systemSettingService.getAiTutorMaxTokens());
 
             ArrayNode messages = payload.putArray("messages");
             messages.addObject().put("role", "system").put("content", systemPrompt);

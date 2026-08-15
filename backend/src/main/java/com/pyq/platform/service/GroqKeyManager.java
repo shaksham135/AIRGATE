@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class GroqKeyManager {
 
+    private final SystemSettingService systemSettingService;
+
     @Value("${groq.api.key:}")
     private String key1;
 
@@ -42,22 +44,39 @@ public class GroqKeyManager {
 
     private static final long COOLDOWN_DURATION_SECONDS = 60;
 
+    public GroqKeyManager(SystemSettingService systemSettingService) {
+        this.systemSettingService = systemSettingService;
+        this.systemSettingService.setOnSettingsUpdatedListener(this::reloadKeys);
+    }
+
     @PostConstruct
     public void initKeys() {
+        reloadKeys();
+    }
+
+    public synchronized void reloadKeys() {
+        keyPool.clear();
+        cooldownMap.clear();
+
+        List<String> dynamicKeys = systemSettingService.getGroqApiKeys();
+        for (String k : dynamicKeys) {
+            addKeyIfValid(k);
+        }
+
+        // Environment Variable & Application Properties Fallbacks
         addKeyIfValid(key1);
         addKeyIfValid(key2);
         addKeyIfValid(key3);
         addKeyIfValid(key4);
         addKeyIfValid(key5);
 
-        // Environment Variable Fallbacks
         addKeyIfValid(System.getenv("GROQ_API_KEY"));
         addKeyIfValid(System.getenv("GROQ_API_KEY_2"));
         addKeyIfValid(System.getenv("GROQ_API_KEY_3"));
         addKeyIfValid(System.getenv("GROQ_API_KEY_4"));
         addKeyIfValid(System.getenv("GROQ_API_KEY_5"));
 
-        log.info("🔑 [GroqKeyManager] Initialized with {} active API keys for Round-Robin Load Balancing.", keyPool.size());
+        log.info("🔑 [GroqKeyManager] Live Reloaded with {} active API keys for Round-Robin Load Balancing.", keyPool.size());
     }
 
     private void addKeyIfValid(String k) {

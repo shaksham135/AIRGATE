@@ -37,6 +37,7 @@ export default function QuestionDetail() {
   const [question, setQuestion] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [selectedOption, setSelectedOption] = useState(locationState.preselectedOption || null);
+  const [pendingOption, setPendingOption] = useState(locationState.preselectedOption || null);
   const [tempSelectedMsq, setTempSelectedMsq] = useState([]);
   const [natInput, setNatInput] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
@@ -239,6 +240,7 @@ export default function QuestionDetail() {
   const loadQuestionData = async () => {
     // Reset state for new question
     setSelectedOption(locationState.preselectedOption || null);
+    setPendingOption(locationState.preselectedOption || null);
     setTempSelectedMsq([]);
     setNatInput('');
     setShowAnswer(false);
@@ -460,7 +462,7 @@ export default function QuestionDetail() {
     }
   };
 
-  const handleOptionClick = async (optionLabel) => {
+  const handleOptionClick = (optionLabel) => {
     if (selectedOption) return; // Locked!
     if (!currentUser && !checkGuestSolvePermission()) return;
 
@@ -475,35 +477,32 @@ export default function QuestionDetail() {
       return;
     }
 
-    setSelectedOption(optionLabel);
-
-    if (currentUser) {
-      try {
-        const timeTaken = Math.round((Date.now() - startTime) / 1000);
-        await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${id}/solve`, {
-          selectedOption: optionLabel,
-          timeTaken: String(timeTaken)
-        }, {
-          headers: AuthService.getAuthHeader()
-        });
-      } catch (e) {
-        console.error('Failed to log solve history', e);
-      }
-    }
+    setPendingOption(optionLabel);
   };
 
-  const handleSubmitMsq = async () => {
-    if (selectedOption || tempSelectedMsq.length === 0) return;
+  const handleLockAndSubmitAnswer = async () => {
+    if (selectedOption) return;
     if (!currentUser && !checkGuestSolvePermission()) return;
 
-    const selectedStr = tempSelectedMsq.join(', ');
-    setSelectedOption(selectedStr);
+    let finalChoice = '';
+    if (question && question.questionType === 'MSQ') {
+      if (tempSelectedMsq.length === 0) return;
+      finalChoice = tempSelectedMsq.join(', ');
+    } else if (question && question.questionType === 'NAT') {
+      if (!natInput || natInput.trim() === '') return;
+      finalChoice = natInput.trim();
+    } else {
+      if (!pendingOption) return;
+      finalChoice = pendingOption;
+    }
+
+    setSelectedOption(finalChoice);
 
     if (currentUser) {
       try {
         const timeTaken = Math.round((Date.now() - startTime) / 1000);
         await axios.post(`${API_CONFIG.BASE_URL}/api/questions/${id}/solve`, {
-          selectedOption: selectedStr,
+          selectedOption: finalChoice,
           timeTaken: String(timeTaken)
         }, {
           headers: AuthService.getAuthHeader()
@@ -900,7 +899,7 @@ export default function QuestionDetail() {
                   ? (selectedOption 
                       ? isLetterInSelectedAnswer(opt.optionLabel, selectedOption)
                       : tempSelectedMsq.includes(opt.optionLabel))
-                  : (selectedOption === opt.optionLabel);
+                  : (selectedOption ? selectedOption === opt.optionLabel : pendingOption === opt.optionLabel);
                   
                 const isCorrectAnswer = question.questionType === 'MSQ'
                   ? isLetterInCorrectAnswer(opt.optionLabel, question.aiSuggestedAnswer)
@@ -924,7 +923,7 @@ export default function QuestionDetail() {
                       ...(isImageOption ? { padding: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', minHeight: '120px' } : {}),
                       cursor: selectedOption ? 'default' : 'pointer',
                       pointerEvents: selectedOption ? 'none' : 'auto',
-                      ...(isSelected && !selectedOption ? { borderColor: 'var(--color-secondary)', backgroundColor: 'rgba(6, 182, 212, 0.05)' } : {})
+                      ...(isSelected && !selectedOption ? { borderColor: 'var(--color-primary)', backgroundColor: 'rgba(6, 182, 212, 0.12)', boxShadow: '0 0 0 2px var(--color-primary)' } : {})
                     }}
                   >
                     <span className="option-label" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
@@ -943,34 +942,65 @@ export default function QuestionDetail() {
                 );
               })}
             </div>
-        {/* MSQ Guidance Banner */}
-        {question.questionType === 'MSQ' && !selectedOption && (
-          <div style={{
-            background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)',
-            color: '#a78bfa', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem',
-            fontWeight: 600, margin: '16px 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-            <span>💡</span>
-            <span><strong>MSQ Guidance:</strong> Select one or more choices below, then click <strong>"Submit MSQ Answer"</strong>.</span>
-          </div>
-        )}
 
-        {question.questionType === 'MSQ' && !selectedOption && (
-          <div style={{ margin: '16px 0', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        {/* MCQ Lock & Submit Button */}
+        {question.questionType !== 'MSQ' && question.questionType !== 'NAT' && !selectedOption && (
+          <div style={{ margin: '16px 0 24px 0', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button 
               className="btn btn-primary" 
-              onClick={handleSubmitMsq}
-              disabled={tempSelectedMsq.length === 0}
-              style={{ padding: '10px 24px', height: '42px', borderRadius: '8px' }}
+              onClick={handleLockAndSubmitAnswer}
+              disabled={!pendingOption}
+              style={{
+                padding: '12px 28px',
+                height: '46px',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: pendingOption ? '0 4px 14px rgba(6, 182, 212, 0.35)' : 'none',
+                opacity: pendingOption ? 1 : 0.5,
+                cursor: pendingOption ? 'pointer' : 'not-allowed'
+              }}
             >
-              Submit MSQ Answer
+              🔒 Lock & Submit Answer
             </button>
-            {tempSelectedMsq.length > 0 && (
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Selected: {tempSelectedMsq.join(', ')}
+            {pendingOption && (
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                Selected Option: <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontSize: '1.05rem' }}>{pendingOption}</span>
               </span>
             )}
           </div>
+        )}
+
+        {/* MSQ Guidance Banner & Submit Button */}
+        {question.questionType === 'MSQ' && !selectedOption && (
+          <>
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)',
+              color: '#a78bfa', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem',
+              fontWeight: 600, margin: '16px 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px'
+            }}>
+              <span>💡</span>
+              <span><strong>MSQ Guidance:</strong> Select one or more choices below, then click <strong>"Lock & Submit MSQ Answer"</strong>.</span>
+            </div>
+            <div style={{ margin: '16px 0', display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleLockAndSubmitAnswer}
+                disabled={tempSelectedMsq.length === 0}
+                style={{ padding: '12px 28px', height: '46px', borderRadius: '10px', fontWeight: 700 }}
+              >
+                🔒 Lock & Submit MSQ Answer
+              </button>
+              {tempSelectedMsq.length > 0 && (
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Selected: {tempSelectedMsq.join(', ')}
+                </span>
+              )}
+            </div>
+          </>
         )}
       </div>
     )}
@@ -1001,14 +1031,11 @@ export default function QuestionDetail() {
               {!selectedOption && (
                 <button 
                   className="btn btn-primary"
-                  onClick={() => {
-                    if (natInput && natInput.trim() !== '') {
-                      handleOptionClick(natInput.trim());
-                    }
-                  }}
-                  style={{ padding: '0 20px', height: '44px', borderRadius: '8px' }}
+                  onClick={handleLockAndSubmitAnswer}
+                  disabled={!natInput || !natInput.trim()}
+                  style={{ padding: '0 24px', height: '44px', borderRadius: '8px', fontWeight: 700 }}
                 >
-                  Submit
+                  🔒 Lock & Submit
                 </button>
               )}
             </div>
@@ -1042,6 +1069,7 @@ export default function QuestionDetail() {
                       onClick={() => {
                         if (window.confirm(`Reset your answer for this question? You have ${remaining} retry attempt(s) remaining.`)) {
                           setSelectedOption(null);
+                          setPendingOption(null);
                           setTempSelectedMsq([]);
                           setNatInput('');
                           setShowAnswer(false);

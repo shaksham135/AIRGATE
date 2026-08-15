@@ -60,6 +60,7 @@ public class AiQuestionGeneratorService {
     private final GroqKeyManager groqKeyManager;
     private final TopicSeedRegistry topicSeedRegistry;
     private final TagRepository tagRepository;
+    private final SystemSettingService systemSettingService;
 
     public AiQuestionGeneratorService(
             SubjectRepository subjectRepository,
@@ -70,7 +71,8 @@ public class AiQuestionGeneratorService {
             GroqUsageService groqUsageService,
             GroqKeyManager groqKeyManager,
             TopicSeedRegistry topicSeedRegistry,
-            TagRepository tagRepository) {
+            TagRepository tagRepository,
+            SystemSettingService systemSettingService) {
         this.subjectRepository = subjectRepository;
         this.topicRepository = topicRepository;
         this.questionRepository = questionRepository;
@@ -80,6 +82,7 @@ public class AiQuestionGeneratorService {
         this.groqKeyManager = groqKeyManager;
         this.topicSeedRegistry = topicSeedRegistry;
         this.tagRepository = tagRepository;
+        this.systemSettingService = systemSettingService;
     }
 
     @PostConstruct
@@ -540,7 +543,7 @@ public class AiQuestionGeneratorService {
                 headers.setBearerAuth(apiKey);
 
                 ObjectNode req = objectMapper.createObjectNode();
-                req.put("model", isHeavyModel ? heavyModel : fastModel);
+                req.put("model", isHeavyModel ? systemSettingService.getGroqHeavyModel() : systemSettingService.getGroqFastModel());
                 req.put("temperature", 0.1);
                 req.put("max_tokens", currentMaxTokens);
                 req.put("response_format", objectMapper.createObjectNode().put("type", "json_object"));
@@ -550,7 +553,7 @@ public class AiQuestionGeneratorService {
                 messages.add(objectMapper.createObjectNode().put("role", "user").put("content", prompt));
                 req.set("messages", messages);
 
-                ResponseEntity<String> response = restTemplate.exchange(GROQ_API_URL, HttpMethod.POST, new HttpEntity<>(req.toString(), headers), String.class);
+                ResponseEntity<String> response = restTemplate.exchange(systemSettingService.getGroqApiUrl(), HttpMethod.POST, new HttpEntity<>(req.toString(), headers), String.class);
                 if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                     JsonNode root = objectMapper.readTree(response.getBody());
                     if (root != null) {

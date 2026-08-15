@@ -39,6 +39,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import javax.imageio.ImageIO;
 
 import com.pyq.platform.util.SubjectSlugUtils;
+import com.pyq.platform.service.SystemSettingService;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -57,6 +58,7 @@ public class QuestionController {
     private final BookmarkRepository bookmarkRepository;
     private final UserQuestionSolveRepository solveRepository;
     private final AIClassificationService aiClassificationService;
+    private final SystemSettingService systemSettingService;
 
     public QuestionController(QuestionService questionService, QuestionRepository questionRepository,
             SubjectRepository subjectRepository,
@@ -66,7 +68,8 @@ public class QuestionController {
             QuestionMapper questionMapper,
             BookmarkRepository bookmarkRepository,
             UserQuestionSolveRepository solveRepository,
-            AIClassificationService aiClassificationService) {
+            AIClassificationService aiClassificationService,
+            SystemSettingService systemSettingService) {
         this.questionService = questionService;
         this.questionRepository = questionRepository;
         this.subjectRepository = subjectRepository;
@@ -78,6 +81,7 @@ public class QuestionController {
         this.bookmarkRepository = bookmarkRepository;
         this.solveRepository = solveRepository;
         this.aiClassificationService = aiClassificationService;
+        this.systemSettingService = systemSettingService;
     }
 
     // Public search with filters (anonymous access mapped in SecurityConfig)
@@ -154,13 +158,13 @@ public class QuestionController {
         } catch (Exception ignored) {
         }
 
-        // Priority 1: Check by direct Primary Key ID (qNum in clean URLs is q.id)
-        Optional<Question> qOpt = questionRepository.findById((long) qNum);
+        // Priority 1: Check by exact branch + year + paperSet + questionNumber
+        Optional<Question> qOpt = questionRepository.findFirstByBranchAndYearAndPaperSetAndQuestionNumber(
+                branch.toLowerCase().trim(), year, setNum, qNum);
 
-        // Priority 2: Check by exact branch + year + paperSet + questionNumber
+        // Priority 2: Check by direct Primary Key ID
         if (qOpt.isEmpty()) {
-            qOpt = questionRepository.findFirstByBranchAndYearAndPaperSetAndQuestionNumber(
-                    branch.toLowerCase().trim(), year, setNum, qNum);
+            qOpt = questionRepository.findById((long) qNum);
         }
 
         // Priority 3: Check by questionNumber
@@ -189,18 +193,19 @@ public class QuestionController {
         } catch (Exception ignored) {
         }
 
-        // Priority 1: Check by direct Primary Key ID (qNum in clean URLs is q.id)
-        Optional<Question> qOpt = questionRepository.findById((long) qNum);
-
-        // Priority 2: Check by subject + questionNumber
-        if (qOpt.isEmpty()) {
-            String canonicalSubjectName = SubjectSlugUtils.toCanonicalSubjectName(subjectSlug);
-            if (canonicalSubjectName != null) {
-                Optional<Subject> subOpt = subjectRepository.findByName(canonicalSubjectName);
-                if (subOpt.isPresent()) {
-                    qOpt = questionRepository.findFirstBySubjectIdAndQuestionNumber(subOpt.get().getId(), qNum);
-                }
+        // Priority 1: Check by subject + questionNumber
+        String canonicalSubjectName = SubjectSlugUtils.toCanonicalSubjectName(subjectSlug);
+        Optional<Question> qOpt = Optional.empty();
+        if (canonicalSubjectName != null) {
+            Optional<Subject> subOpt = subjectRepository.findByName(canonicalSubjectName);
+            if (subOpt.isPresent()) {
+                qOpt = questionRepository.findFirstBySubjectIdAndQuestionNumber(subOpt.get().getId(), qNum);
             }
+        }
+
+        // Priority 2: Check by direct Primary Key ID
+        if (qOpt.isEmpty()) {
+            qOpt = questionRepository.findById((long) qNum);
         }
 
         // Priority 3: Check by questionNumber
@@ -318,6 +323,7 @@ public class QuestionController {
                 .marks(request.getMarks())
                 .negativeMarks(request.getNegativeMarks() != null ? Math.abs(request.getNegativeMarks()) : 0.0)
                 .year(request.getYear())
+                .questionNumber(request.getQuestionNumber())
                 .subject(subject)
                 .topic(topic)
                 .pdfSourceName(request.getPdfSourceName())
@@ -384,6 +390,7 @@ public class QuestionController {
                 .marks(request.getMarks() != null ? request.getMarks() : 1)
                 .negativeMarks(request.getNegativeMarks() != null ? Math.abs(request.getNegativeMarks()) : 0.0)
                 .year(request.getYear() != null ? request.getYear() : 2026)
+                .questionNumber(request.getQuestionNumber())
                 .subject(subject)
                 .topic(topic)
                 .pdfSourceName(request.getPdfSourceName() != null ? request.getPdfSourceName() : "Manual Entry")
@@ -866,13 +873,13 @@ public class QuestionController {
             aiAnalysis = QuestionAIAnalysis.builder()
                     .question(question)
                     .suggestedAnswer(correctOption)
-                    .modelName("llama-3.3-70b-comprehensive")
+                    .modelName(systemSettingService.getGroqHeavyModel())
                     .build();
         }
 
         aiAnalysis.setMentorInsights(result.shortSolution);
         aiAnalysis.setSuggestedExplanation(result.detailedSolution);
-        aiAnalysis.setModelName("llama-3.3-70b-comprehensive");
+        aiAnalysis.setModelName(systemSettingService.getGroqHeavyModel());
         aiAnalysisRepository.save(aiAnalysis);
 
         // Verification Gate
@@ -899,11 +906,13 @@ public class QuestionController {
         }
         Question question = qOpt.get();
         String rawText = question.getRawOcrText();
-        
-        // If rawOcrText is absent (e.g. for AI Practice Questions), construct text block from current question & options
+
+        // If rawOcrText is absent (e.g. for AI Practice Questions), construct text
+        // block from current question & options
         if (rawText == null || rawText.isBlank()) {
             StringBuilder sb = new StringBuilder();
-            if (question.getText() != null) sb.append(question.getText()).append("\n\n");
+            if (question.getText() != null)
+                sb.append(question.getText()).append("\n\n");
             if (question.getOptions() != null && !question.getOptions().isEmpty()) {
                 sb.append("Options:\n");
                 for (QuestionOption opt : question.getOptions()) {
@@ -920,9 +929,8 @@ public class QuestionController {
 
         try {
             AIClassificationService.AIAnalysisResult aiRes = aiClassificationService.classifyQuestion(
-                    rawText, 
-                    question.getPdfSourceName() != null ? question.getPdfSourceName() : "Manual Rephrase"
-            );
+                    rawText,
+                    question.getPdfSourceName() != null ? question.getPdfSourceName() : "Manual Rephrase");
             return ResponseEntity.ok(aiRes);
         } catch (Exception e) {
             log.error("Re-analysis failed for question {}: {}", id, e.getMessage(), e);
