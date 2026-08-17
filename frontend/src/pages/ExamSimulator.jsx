@@ -187,7 +187,9 @@ function MockTestArena() {
 
     setLoading(true);
     try {
-      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/simulator`);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/simulator`, {
+        headers: AuthService.getAuthHeader()
+      });
       if (!res.data || res.data.length === 0) {
         alert("The database is currently empty. Please ask the administrator to upload exam papers before starting mock tests.");
         setLoading(false);
@@ -228,7 +230,8 @@ function MockTestArena() {
               query: selectedSubject,
               page: 0,
               size: Math.max(20, customQuestionCount * 2)
-            }
+            },
+            headers: AuthService.getAuthHeader()
           });
           const subQs = subRes.data?.content || [];
           if (subQs.length > 0) {
