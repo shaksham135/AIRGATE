@@ -3,6 +3,7 @@ package com.pyq.platform.controller;
 import com.pyq.platform.entity.*;
 import com.pyq.platform.repository.MockAttemptRepository;
 import com.pyq.platform.repository.QuestionRepository;
+import com.pyq.platform.repository.QuestionAIAnalysisRepository;
 import com.pyq.platform.repository.UserRepository;
 import com.pyq.platform.security.UserDetailsImpl;
 import lombok.Data;
@@ -16,9 +17,11 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -29,13 +32,16 @@ public class MockAttemptController {
     private final MockAttemptRepository mockAttemptRepository;
     private final UserRepository userRepository;
     private final QuestionRepository questionRepository;
+    private final QuestionAIAnalysisRepository aiAnalysisRepository;
 
     public MockAttemptController(MockAttemptRepository mockAttemptRepository,
                                  UserRepository userRepository,
-                                 QuestionRepository questionRepository) {
+                                 QuestionRepository questionRepository,
+                                 QuestionAIAnalysisRepository aiAnalysisRepository) {
         this.mockAttemptRepository = mockAttemptRepository;
         this.userRepository = userRepository;
         this.questionRepository = questionRepository;
+        this.aiAnalysisRepository = aiAnalysisRepository;
     }
 
     @PostMapping("/submit")
@@ -177,9 +183,19 @@ public class MockAttemptController {
         }
     }
 
+    private String getCorrectAnswerForQuestion(Question q) {
+        try {
+            return aiAnalysisRepository.findFirstByQuestionIdOrderByCreatedAtDesc(q.getId())
+                    .map(QuestionAIAnalysis::getSuggestedAnswer)
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private boolean isAnswerCorrect(Question q, String userAns) {
         if (userAns == null || userAns.isBlank()) return false;
-        String correct = q.getAiSuggestedAnswer();
+        String correct = getCorrectAnswerForQuestion(q);
         if (correct == null || correct.isBlank()) return false;
 
         String c = correct.trim().toLowerCase().replaceFirst("^(option\\s+)", "");
