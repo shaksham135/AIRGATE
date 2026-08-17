@@ -282,6 +282,15 @@ function MockHistoryContent() {
                     }}>
                       {attempt.mode === 'custom' ? '🎯 Subject Practice' : attempt.mode === 'hybrid' ? '✨ Smart Hybrid' : '📜 PYQ Full Mock'}
                     </span>
+                    {attempt.estimatedRank && (
+                      <span style={{
+                        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px',
+                        background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8',
+                        border: '1px solid rgba(56, 189, 248, 0.3)'
+                      }}>
+                        AIR #{attempt.estimatedRank} ({attempt.percentile ? `${attempt.percentile}%` : 'Top %'})
+                      </span>
+                    )}
                   </div>
                   {attempt.autoSubmitted && (
                     <span style={{

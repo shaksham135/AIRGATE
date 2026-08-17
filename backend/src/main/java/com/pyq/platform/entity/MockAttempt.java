@@ -62,6 +62,12 @@ public class MockAttempt {
     @Column(name = "mode", length = 50)
     private String mode;
 
+    @Column(name = "estimated_rank")
+    private Integer estimatedRank;
+
+    @Column(name = "percentile")
+    private Double percentile;
+
     @OneToMany(mappedBy = "attempt", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @com.fasterxml.jackson.annotation.JsonIgnore

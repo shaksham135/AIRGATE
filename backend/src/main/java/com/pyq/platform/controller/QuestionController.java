@@ -40,6 +40,7 @@ import javax.imageio.ImageIO;
 
 import com.pyq.platform.util.SubjectSlugUtils;
 import com.pyq.platform.service.SystemSettingService;
+import com.pyq.platform.repository.MockAttemptAnswerRepository;
 
 @RestController
 @RequestMapping("/api/questions")
@@ -59,6 +60,7 @@ public class QuestionController {
     private final UserQuestionSolveRepository solveRepository;
     private final AIClassificationService aiClassificationService;
     private final SystemSettingService systemSettingService;
+    private final MockAttemptAnswerRepository mockAttemptAnswerRepository;
 
     public QuestionController(QuestionService questionService, QuestionRepository questionRepository,
             SubjectRepository subjectRepository,
@@ -69,7 +71,8 @@ public class QuestionController {
             BookmarkRepository bookmarkRepository,
             UserQuestionSolveRepository solveRepository,
             AIClassificationService aiClassificationService,
-            SystemSettingService systemSettingService) {
+            SystemSettingService systemSettingService,
+            MockAttemptAnswerRepository mockAttemptAnswerRepository) {
         this.questionService = questionService;
         this.questionRepository = questionRepository;
         this.subjectRepository = subjectRepository;
@@ -82,6 +85,7 @@ public class QuestionController {
         this.solveRepository = solveRepository;
         this.aiClassificationService = aiClassificationService;
         this.systemSettingService = systemSettingService;
+        this.mockAttemptAnswerRepository = mockAttemptAnswerRepository;
     }
 
     // Public search with filters (anonymous access mapped in SecurityConfig)
@@ -673,7 +677,8 @@ public class QuestionController {
         List<String> uploadedUrls = new ArrayList<>();
         try {
             for (org.springframework.web.multipart.MultipartFile file : files) {
-                if (file.isEmpty()) continue;
+                if (file.isEmpty())
+                    continue;
                 String imagePath;
                 if (cloudinaryService.isConfigured()) {
                     imagePath = cloudinaryService.uploadMultipartFile(file, "images");
@@ -712,29 +717,41 @@ public class QuestionController {
         return questionMapper.convertToDTOFast(question);
     }
 
-    // Get simulated exam with 65 questions matching standard GATE weightage
+    // Get simulated exam with 65 questions matching standard GATE weightage with
+    // unsolved question priority
     @GetMapping("/simulator")
     @Transactional(readOnly = true)
-    public ResponseEntity<?> getSimulatorExam() {
+    public ResponseEntity<?> getSimulatorExam(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal UserDetailsImpl userDetails) {
 
-        // GATE 2024 blueprint: [subjectKeyword, 1-mark count, 2-mark count]
-        // Each entry fetches directly from DB using ORDER BY RAND() — no full table
-        // load.
+        // Retrieve attempted question IDs for this user if logged in
+        List<Long> attemptedIds = new ArrayList<>();
+        if (userDetails != null && userDetails.getId() != null) {
+            try {
+                attemptedIds = mockAttemptAnswerRepository.findAttemptedQuestionIdsByUserId(userDetails.getId());
+            } catch (Exception e) {
+                log.warn("Failed to fetch attempted questions for user {}", userDetails.getId(), e);
+            }
+        }
+        final List<Long> excludeIds = attemptedIds;
+        final boolean hasExclude = !excludeIds.isEmpty();
+
         record BlueprintEntry(String keyword, int req1Mark, int req2Mark) {
         }
 
+        // GATE CSE baseline blueprint with dynamic fluctuation (+/- 1-2 per subject)
+        Random random = new Random();
         List<BlueprintEntry> blueprint = List.of(
                 new BlueprintEntry("aptitude", 5, 5),
-                new BlueprintEntry("math", 4, 5),
-                new BlueprintEntry("discrete", 0, 0), // covered by "math" keyword umbrella
-                new BlueprintEntry("digital", 2, 1),
-                new BlueprintEntry("organization", 2, 2),
+                new BlueprintEntry("math", 4 + random.nextInt(2), 5),
+                new BlueprintEntry("digital", 2, 1 + random.nextInt(2)),
+                new BlueprintEntry("organization", 2, 2 + random.nextInt(2)),
                 new BlueprintEntry("programming", 3, 3),
-                new BlueprintEntry("algorithm", 3, 3),
-                new BlueprintEntry("computation", 3, 3),
-                new BlueprintEntry("compiler", 2, 1),
-                new BlueprintEntry("operating", 3, 3),
-                new BlueprintEntry("database", 2, 2),
+                new BlueprintEntry("algorithm", 3, 3 + random.nextInt(2)),
+                new BlueprintEntry("computation", 3 + random.nextInt(2), 3),
+                new BlueprintEntry("compiler", 2, 1 + random.nextInt(2)),
+                new BlueprintEntry("operating", 3, 3 + random.nextInt(2)),
+                new BlueprintEntry("database", 2 + random.nextInt(2), 2),
                 new BlueprintEntry("network", 1, 4));
 
         List<QuestionDTO> selected = new ArrayList<>();
@@ -747,7 +764,6 @@ public class QuestionController {
             if (entry.req1Mark() == 0 && entry.req2Mark() == 0)
                 continue;
 
-            // Find matching subjects by keyword
             List<Long> matchingSubjectIds = allSubjects.stream()
                     .filter(s -> s.getName().toLowerCase().contains(entry.keyword()))
                     .map(com.pyq.platform.entity.Subject::getId)
@@ -757,13 +773,19 @@ public class QuestionController {
                 continue;
 
             int totalNeeded = entry.req1Mark() + entry.req2Mark();
-            // Fetch slightly more than needed to account for mark-split filtering, then
-            // trim
             int fetchLimit = totalNeeded * 3 + 10;
 
             List<Question> pool = new ArrayList<>();
             for (Long subjectId : matchingSubjectIds) {
-                pool.addAll(questionRepository.findRandomApprovedBySubject(subjectId, fetchLimit));
+                // 1. Try Unsolved questions first
+                List<Question> unsolvedPool = questionRepository.findRandomApprovedUnsolvedBySubject(subjectId,
+                        excludeIds, hasExclude, fetchLimit);
+                pool.addAll(unsolvedPool);
+
+                // 2. If unsolved pool has fewer items than needed, backfill with general pool
+                if (unsolvedPool.size() < fetchLimit) {
+                    pool.addAll(questionRepository.findRandomApprovedBySubject(subjectId, fetchLimit));
+                }
             }
 
             // Split by marks
@@ -797,7 +819,7 @@ public class QuestionController {
         // Fill any remaining slots up to 65 from general pool
         if (selected.size() < 65) {
             int remaining = 65 - selected.size();
-            List<Question> extras = questionRepository.findRandomApproved(remaining * 2);
+            List<Question> extras = questionRepository.findRandomApproved(remaining * 3);
             for (Question q : extras) {
                 if (selected.size() >= 65)
                     break;

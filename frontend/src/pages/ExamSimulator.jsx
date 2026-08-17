@@ -414,23 +414,52 @@ function MockTestArena() {
     }
   };
 
+  // Scientific Calculator state
+  const [angleMode, setAngleMode] = useState('DEG'); // 'DEG' or 'RAD'
+  const [calcMemory, setCalcMemory] = useState(0);
+
   // Calculator button evaluator
   const handleCalcBtn = (val) => {
     if (val === 'C') {
       setCalcInput('');
+    } else if (val === 'MC') {
+      setCalcMemory(0);
+    } else if (val === 'MR') {
+      setCalcInput(prev => prev + calcMemory);
+    } else if (val === 'MS') {
+      const num = parseFloat(calcInput);
+      if (!isNaN(num)) setCalcMemory(num);
+    } else if (val === 'M+') {
+      const num = parseFloat(calcInput);
+      if (!isNaN(num)) setCalcMemory(prev => prev + num);
+    } else if (val === 'M-') {
+      const num = parseFloat(calcInput);
+      if (!isNaN(num)) setCalcMemory(prev => prev - num);
+    } else if (val === 'DEG_RAD') {
+      setAngleMode(prev => prev === 'DEG' ? 'RAD' : 'DEG');
     } else if (val === '=') {
       try {
-        // Safe evaluation replacements
-        let expr = calcInput
-          .replace(/sin\(/g, 'Math.sin(')
-          .replace(/cos\(/g, 'Math.cos(')
-          .replace(/tan\(/g, 'Math.tan(')
-          .replace(/log\(/g, 'Math.log10(')
+        let expr = calcInput;
+        const toRad = angleMode === 'DEG' ? '(Math.PI/180)*' : '';
+
+        expr = expr
+          .replace(/asin\(/g, angleMode === 'DEG' ? '(180/Math.PI)*Math.asin(' : 'Math.asin(')
+          .replace(/acos\(/g, angleMode === 'DEG' ? '(180/Math.PI)*Math.acos(' : 'Math.acos(')
+          .replace(/atan\(/g, angleMode === 'DEG' ? '(180/Math.PI)*Math.atan(' : 'Math.atan(')
+          .replace(/sin\(/g, `Math.sin(${toRad}`)
+          .replace(/cos\(/g, `Math.cos(${toRad}`)
+          .replace(/tan\(/g, `Math.tan(${toRad}`)
+          .replace(/sinh\(/g, 'Math.sinh(')
+          .replace(/cosh\(/g, 'Math.cosh(')
+          .replace(/tanh\(/g, 'Math.tanh(')
+          .replace(/log10\(/g, 'Math.log10(')
           .replace(/ln\(/g, 'Math.log(')
-          .replace(/pi/g, 'Math.PI')
+          .replace(/exp\(/g, 'Math.exp(')
           .replace(/sqrt\(/g, 'Math.sqrt(')
+          .replace(/cbrt\(/g, 'Math.cbrt(')
+          .replace(/pi/g, 'Math.PI')
           .replace(/\^/g, '**');
-        
+
         const result = Function('"use strict"; return (' + expr + ')')();
         setCalcInput(Number(result).toFixed(4).toString());
       } catch (e) {
@@ -554,10 +583,11 @@ function MockTestArena() {
     });
 
     const nowStr = new Date().toISOString();
+    let backendData = null;
 
     // 2. Submit to Backend
     try {
-      await axios.post(`${API_CONFIG.BASE_URL}/api/simulator/submit`, {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/simulator/submit`, {
         startedAt: new Date(Date.now() - (timeTaken * 1000)).toISOString(),
         submittedAt: nowStr,
         timeTakenSeconds: timeTaken,
@@ -573,10 +603,32 @@ function MockTestArena() {
       }, {
         headers: AuthService.getAuthHeader()
       });
+      backendData = response.data;
       CacheService.invalidate('mock_history');
     } catch (e) {
       console.error('Failed to save mock attempt to database:', e);
     }
+
+    const finalScore = backendData?.score ?? res.score;
+    const finalCorrect = backendData?.correctCount ?? res.correctCount;
+    const finalIncorrect = backendData?.incorrectCount ?? res.incorrectCount;
+    const finalSkipped = backendData?.skippedCount ?? res.skippedCount;
+    const finalNegative = backendData?.negativeWastage ?? res.negativeWastage;
+    const finalPercentile = backendData?.percentile ?? (res.score > 50 ? 92.5 : 75.0);
+    const finalEstimatedRank = backendData?.estimatedRank ?? Math.max(1, Math.round(((100 - finalPercentile) / 100) * 110000));
+    const finalCutoffStatus = backendData?.cutoffStatus ?? (finalScore >= 28.5 ? "QUALIFIED (General)" : "NOT QUALIFIED");
+
+    setResults(prev => ({
+      ...prev,
+      score: finalScore,
+      correctCount: finalCorrect,
+      incorrectCount: finalIncorrect,
+      skippedCount: finalSkipped,
+      negativeWastage: finalNegative,
+      percentile: finalPercentile,
+      estimatedRank: finalEstimatedRank,
+      cutoffStatus: finalCutoffStatus
+    }));
 
     // 3. Fallback Local Storage
     try {
@@ -599,12 +651,15 @@ function MockTestArena() {
       history.unshift({
         id: Date.now(),
         date: nowStr,
-        score: res.score,
+        score: finalScore,
         totalQuestions: questions.length,
-        correctCount: res.correctCount,
-        incorrectCount: res.incorrectCount,
-        skippedCount: res.skippedCount,
-        negativeWastage: res.negativeWastage,
+        correctCount: finalCorrect,
+        incorrectCount: finalIncorrect,
+        skippedCount: finalSkipped,
+        negativeWastage: finalNegative,
+        percentile: finalPercentile,
+        estimatedRank: finalEstimatedRank,
+        cutoffStatus: finalCutoffStatus,
         subjectBreakdown: res.subjectBreakdown,
         timeTakenSeconds: timeTaken,
         autoSubmitted,
@@ -1001,21 +1056,23 @@ function MockTestArena() {
             : `Comprehensive subject strengths, accuracy ratios, and negative marking analysis below.`}
         </p>
 
-        {/* Highlight Score metrics */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Your Score</div>
-            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary)', marginTop: '8px' }}>{results.score} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ {totalMaxMarks}</span></div>
+        {/* AIR & Score Highlight Metrics */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Your Score</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--color-primary)', marginTop: '6px' }}>{results.score} <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ {totalMaxMarks}</span></div>
           </div>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Accuracy Rate</div>
-            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-secondary)', marginTop: '8px' }}>
-              {questions.length - results.skippedCount > 0 ? ((results.correctCount / (questions.length - results.skippedCount)) * 100).toFixed(1) : '0'}%
-            </div>
+          <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.75rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700 }}>Estimated AIR</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#38bdf8', marginTop: '6px' }}>AIR #{results.estimatedRank || 1500}</div>
           </div>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Negative Penalties</div>
-            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-error)', marginTop: '8px' }}>-{results.negativeWastage}</div>
+          <div style={{ backgroundColor: 'rgba(168, 85, 247, 0.08)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.75rem', color: '#c084fc', textTransform: 'uppercase', fontWeight: 700 }}>Percentile</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#c084fc', marginTop: '6px' }}>{results.percentile || 95.0}%</div>
+          </div>
+          <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.75rem', color: '#34d399', textTransform: 'uppercase', fontWeight: 700 }}>GATE Benchmark</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#34d399', marginTop: '12px' }}>{results.cutoffStatus || 'QUALIFIED'}</div>
           </div>
         </div>
 
@@ -1474,29 +1531,32 @@ function MockTestArena() {
           Question Palette
         </div>
 
-        {/* GATE-style Legend */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.7rem', color: '#6b7280', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block', flexShrink: 0 }} />
+        {/* TCS iON 5-Status Legend */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.68rem', color: '#374151', marginBottom: '16px', fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="tcs-poly-btn tcs-status-answered" style={{ width: '20px', height: '20px', fontSize: '0.55rem' }}>1</span>
             Answered
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#dc2626', display: 'inline-block', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="tcs-poly-btn tcs-status-not-answered" style={{ width: '20px', height: '20px', fontSize: '0.55rem' }}>2</span>
             Not Answered
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#9333ea', display: 'inline-block', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="tcs-poly-btn tcs-status-marked-review" style={{ width: '20px', height: '20px', fontSize: '0.55rem' }}>3</span>
             Marked Review
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: '#d1d5db', border: '1px solid #9ca3af', display: 'inline-block', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="tcs-poly-btn tcs-status-answered-marked-review" style={{ width: '20px', height: '20px', fontSize: '0.55rem' }}>4</span>
+            Ans & Marked
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', gridColumn: 'span 2' }}>
+            <span className="tcs-poly-btn tcs-status-not-visited" style={{ width: '20px', height: '20px', fontSize: '0.55rem' }}>5</span>
             Not Visited
           </div>
         </div>
 
         {/* Subject sections with question grid */}
         {(() => {
-          // Group questions by subject
           const sections = {};
           questions.forEach((q, idx) => {
             const subj = q.subjectName || 'General';
@@ -1515,33 +1575,26 @@ function MockTestArena() {
                   const isVis = visited.has(idx);
                   const isCurrent = idx === currentIndex;
 
-                  let bg = '#d1d5db'; // not visited — grey
-                  let textCol = '#374151';
-                  if (isFlag) { bg = '#9333ea'; textCol = '#fff'; }
-                  else if (hasAns) { bg = '#16a34a'; textCol = '#fff'; }
-                  else if (isVis) { bg = '#dc2626'; textCol = '#fff'; }
+                  let statusClass = 'tcs-status-not-visited';
+                  if (hasAns && isFlag) {
+                    statusClass = 'tcs-status-answered-marked-review';
+                  } else if (isFlag) {
+                    statusClass = 'tcs-status-marked-review';
+                  } else if (hasAns) {
+                    statusClass = 'tcs-status-answered';
+                  } else if (isVis) {
+                    statusClass = 'tcs-status-not-answered';
+                  }
 
                   return (
                     <button
                       key={q.id}
                       onClick={() => handleNav(idx)}
+                      className={`tcs-poly-btn ${statusClass}`}
                       style={{
-                        width: '100%',
-                        aspectRatio: '1',
-                        borderRadius: '50%',
-                        backgroundColor: bg,
-                        color: textCol,
-                        border: isCurrent ? '3px solid #1d4ed8' : '2px solid transparent',
-                        fontWeight: 700,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        outline: isCurrent ? '3px solid #1d4ed8' : 'none',
+                        outlineOffset: '1px',
                         boxShadow: isCurrent ? '0 0 0 2px #bfdbfe' : 'none',
-                        transition: 'all 0.1s ease',
-                        fontFamily: 'var(--font-body)',
-                        padding: 0,
                       }}
                     >
                       {idx + 1}

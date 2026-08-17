@@ -309,3 +309,153 @@
     border-radius: 12px !important;
   }
 }
+
+/* ==========================================================================
+   TCS iON GATE CBT POLYGON PALETTE & EXAM BANNER STYLES
+   ========================================================================== */
+
+/* Top Exam Header Banner */
+.tcs-exam-header {
+  height: 56px;
+  background: #1e293b;
+  border-bottom: 2px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  color: #f8fafc;
+  font-family: var(--font-body, sans-serif);
+}
+
+.tcs-candidate-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tcs-candidate-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #38bdf8 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #ffffff;
+  font-size: 0.85rem;
+}
+
+.tcs-timer-badge {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-family: monospace;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tcs-timer-badge.warning {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  animation: pulse 1.5s infinite;
+}
+
+/* TCS Section Nav Tabs */
+.tcs-section-bar {
+  display: flex;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  padding: 0 16px;
+}
+
+.tcs-section-tab {
+  padding: 10px 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #94a3b8;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.tcs-section-tab.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+/* Polygon Button Shapes for TCS Palette */
+.tcs-poly-btn {
+  width: 36px;
+  height: 36px;
+  font-weight: 800;
+  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s ease;
+}
+
+.tcs-poly-btn:hover {
+  transform: scale(1.08);
+}
+
+/* 1. Not Visited (Grey Square) */
+.tcs-status-not-visited {
+  background-color: #e5e7eb;
+  color: #374151;
+  border-radius: 4px;
+}
+
+/* 2. Not Answered (Red Downward Polygon) */
+.tcs-status-not-answered {
+  background-color: #dc2626;
+  color: #ffffff;
+  clip-path: polygon(0% 0%, 100% 0%, 100% 72%, 50% 100%, 0% 72%);
+}
+
+/* 3. Answered (Green Upward Polygon) */
+.tcs-status-answered {
+  background-color: #16a34a;
+  color: #ffffff;
+  clip-path: polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%);
+}
+
+/* 4. Marked for Review (Violet Circle) */
+.tcs-status-marked-review {
+  background-color: #9333ea;
+  color: #ffffff;
+  border-radius: 50%;
+}
+
+/* 5. Answered & Marked for Review (Violet Circle with Small Green Square) */
+.tcs-status-answered-marked-review {
+  background-color: #9333ea;
+  color: #ffffff;
+  border-radius: 50%;
+}
+
+.tcs-status-answered-marked-review::after {
+  content: '';
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 10px;
+  height: 10px;
+  background-color: #22c55e;
+  border: 1px solid #ffffff;
+  border-radius: 2px;
+}
+

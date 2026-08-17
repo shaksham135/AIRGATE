@@ -9,4 +9,10 @@ public interface MockAttemptRepository extends JpaRepository<MockAttempt, Long> 
     @EntityGraph(attributePaths = {"answers", "answers.question", "answers.question.subject"})
     List<MockAttempt> findByUserIdOrderBySubmittedAtDesc(Long userId);
     void deleteByUserId(Long userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(ma) FROM MockAttempt ma WHERE ma.totalQuestions >= 20")
+    long countFullMockAttempts();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(ma) FROM MockAttempt ma WHERE ma.totalQuestions >= 20 AND ma.score <= :score")
+    long countFullMockAttemptsWithScoreLessThanOrEqual(@org.springframework.data.repository.query.Param("score") Double score);
 }

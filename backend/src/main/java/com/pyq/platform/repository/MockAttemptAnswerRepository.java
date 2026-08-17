@@ -21,4 +21,7 @@ public interface MockAttemptAnswerRepository extends JpaRepository<MockAttemptAn
     @Transactional
     @Query("DELETE FROM MockAttemptAnswer maa WHERE maa.question.id IN :questionIds")
     void deleteByQuestionIdIn(@Param("questionIds") List<Long> questionIds);
+
+    @Query("SELECT DISTINCT maa.question.id FROM MockAttemptAnswer maa WHERE maa.attempt.user.id = :userId")
+    List<Long> findAttemptedQuestionIdsByUserId(@Param("userId") Long userId);
 }

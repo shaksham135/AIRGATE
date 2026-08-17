@@ -48,8 +48,27 @@ public class MockAttemptController {
         try {
             User user = userRepository.findById(userDetails.getId()).orElseThrow();
 
-            LocalDateTime start = LocalDateTime.parse(dto.getStartedAt(), DateTimeFormatter.ISO_DATE_TIME);
-            LocalDateTime end = LocalDateTime.parse(dto.getSubmittedAt(), DateTimeFormatter.ISO_DATE_TIME);
+            LocalDateTime start;
+            LocalDateTime end;
+            try {
+                start = LocalDateTime.parse(dto.getStartedAt(), DateTimeFormatter.ISO_DATE_TIME);
+            } catch (Exception e) {
+                start = LocalDateTime.now().minusSeconds(dto.getTimeTakenSeconds());
+            }
+            try {
+                end = LocalDateTime.parse(dto.getSubmittedAt(), DateTimeFormatter.ISO_DATE_TIME);
+            } catch (Exception e) {
+                end = LocalDateTime.now();
+            }
+
+            // Server-side Score Recalculation (Anti-Cheat)
+            double serverScore = 0.0;
+            double negativeWastage = 0.0;
+            int correctCount = 0;
+            int incorrectCount = 0;
+            int skippedCount = 0;
+
+            List<MockAttemptAnswer> attemptAnswers = new ArrayList<>();
 
             MockAttempt attempt = MockAttempt.builder()
                     .user(user)
@@ -57,16 +76,10 @@ public class MockAttemptController {
                     .submittedAt(end)
                     .timeTakenSeconds(dto.getTimeTakenSeconds())
                     .totalQuestions(dto.getTotalQuestions())
-                    .correctCount(dto.getCorrectCount())
-                    .incorrectCount(dto.getIncorrectCount())
-                    .skippedCount(dto.getSkippedCount())
-                    .score(dto.getScore())
-                    .negativeWastage(dto.getNegativeWastage())
                     .autoSubmitted(dto.getAutoSubmitted() != null ? dto.getAutoSubmitted() : false)
                     .mode(dto.getMode() != null ? dto.getMode() : "FULL_MOCK")
                     .build();
 
-            List<MockAttemptAnswer> attemptAnswers = new ArrayList<>();
             if (dto.getAnswers() != null && !dto.getAnswers().isEmpty()) {
                 List<Long> qIds = dto.getAnswers().stream()
                         .map(MockAttemptAnswerDTO::getQuestionId)
@@ -79,27 +92,124 @@ public class MockAttemptController {
                 for (MockAttemptAnswerDTO aDto : dto.getAnswers()) {
                     Question q = questionMap.get(aDto.getQuestionId());
                     if (q != null) {
+                        String userAns = aDto.getSelectedAnswer();
+                        boolean isCorrect = false;
+                        double marksAwarded = 0.0;
+
+                        if (userAns == null || userAns.isBlank()) {
+                            skippedCount++;
+                        } else {
+                            isCorrect = isAnswerCorrect(q, userAns);
+                            int qMarks = (q.getMarks() != null && q.getMarks() > 0) ? q.getMarks() : 1;
+
+                            if (isCorrect) {
+                                correctCount++;
+                                marksAwarded = qMarks;
+                                serverScore += qMarks;
+                            } else {
+                                incorrectCount++;
+                                if ("MCQ".equalsIgnoreCase(q.getQuestionType())) {
+                                    double penalty = qMarks == 1 ? (1.0 / 3.0) : (2.0 / 3.0);
+                                    marksAwarded = -penalty;
+                                    serverScore -= penalty;
+                                    negativeWastage += penalty;
+                                }
+                            }
+                        }
+
                         MockAttemptAnswer answer = MockAttemptAnswer.builder()
                                 .attempt(attempt)
                                 .question(q)
-                                .selectedAnswer(aDto.getSelectedAnswer())
-                                .isCorrect(aDto.getIsCorrect())
-                                .marksAwarded(aDto.getMarksAwarded())
+                                .selectedAnswer(userAns)
+                                .isCorrect(isCorrect)
+                                .marksAwarded(marksAwarded)
                                 .build();
                         attemptAnswers.add(answer);
                     }
                 }
             }
 
+            serverScore = Math.max(0.0, Math.round(serverScore * 100.0) / 100.0);
+            negativeWastage = Math.round(negativeWastage * 100.0) / 100.0;
+
+            attempt.setScore(serverScore);
+            attempt.setCorrectCount(correctCount);
+            attempt.setIncorrectCount(incorrectCount);
+            attempt.setSkippedCount(skippedCount);
+            attempt.setNegativeWastage(negativeWastage);
+
+            // Compute Percentile & Estimated All-India Rank (AIR)
+            long totalMockAttempts = mockAttemptRepository.countFullMockAttempts() + 1;
+            long lowerAttempts = mockAttemptRepository.countFullMockAttemptsWithScoreLessThanOrEqual(serverScore) + 1;
+            double percentile = Math.min(99.9, Math.max(1.0, ((double) lowerAttempts / (double) totalMockAttempts) * 100.0));
+            percentile = Math.round(percentile * 100.0) / 100.0;
+
+            int totalGateCandidates = 110000;
+            int estimatedRank = (int) Math.max(1, Math.round(((100.0 - percentile) / 100.0) * totalGateCandidates));
+
+            attempt.setPercentile(percentile);
+            attempt.setEstimatedRank(estimatedRank);
             attempt.setAnswers(attemptAnswers);
+
             mockAttemptRepository.save(attempt);
 
-            return ResponseEntity.ok(Map.of("success", true, "attemptId", attempt.getId()));
+            String cutoffStatus = serverScore >= 28.5 ? "QUALIFIED (General)" 
+                                : serverScore >= 25.6 ? "QUALIFIED (OBC/EWS)" 
+                                : serverScore >= 19.0 ? "QUALIFIED (SC/ST)" 
+                                : "NOT QUALIFIED";
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "attemptId", attempt.getId(),
+                    "score", serverScore,
+                    "correctCount", correctCount,
+                    "incorrectCount", incorrectCount,
+                    "skippedCount", skippedCount,
+                    "negativeWastage", negativeWastage,
+                    "percentile", percentile,
+                    "estimatedRank", estimatedRank,
+                    "cutoffStatus", cutoffStatus
+            ));
         } catch (Exception e) {
-            log.error("Failed to submit mock attempt: {}", e.getMessage());
+            log.error("Failed to submit mock attempt: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to save mock attempt: " + e.getMessage()));
         }
+    }
+
+    private boolean isAnswerCorrect(Question q, String userAns) {
+        if (userAns == null || userAns.isBlank()) return false;
+        String correct = q.getAiSuggestedAnswer();
+        if (correct == null || correct.isBlank()) return false;
+
+        String c = correct.trim().toLowerCase().replaceFirst("^(option\\s+)", "");
+        String s = userAns.trim().toLowerCase().replaceFirst("^(option\\s+)", "");
+        if (c.equals(s)) return true;
+
+        if ("MSQ".equalsIgnoreCase(q.getQuestionType())) {
+            String cLetters = c.toUpperCase().replaceAll("[^A-D]", "");
+            char[] cArr = cLetters.toCharArray();
+            Arrays.sort(cArr);
+            String sLetters = s.toUpperCase().replaceAll("[^A-D]", "");
+            char[] sArr = sLetters.toCharArray();
+            Arrays.sort(sArr);
+            return new String(cArr).equals(new String(sArr)) && cArr.length > 0;
+        }
+
+        try {
+            double sVal = Double.parseDouble(s);
+            String[] parts = c.split("[-:to]+");
+            if (parts.length == 2) {
+                double min = Double.parseDouble(parts[0].trim());
+                double max = Double.parseDouble(parts[1].trim());
+                return sVal >= min && sVal <= max;
+            } else if (parts.length == 1) {
+                double cVal = Double.parseDouble(c);
+                return Math.abs(cVal - sVal) < 1e-4;
+            }
+        } catch (Exception ignored) {}
+
+        return false;
     }
 
     @GetMapping("/history")

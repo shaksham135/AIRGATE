@@ -159,6 +159,15 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
         @Param("limit") int limit);
 
     @Query(
+        value = "SELECT * FROM questions WHERE status = 'APPROVED' AND subject_id = :subjectId AND (:hasExclude = FALSE OR id NOT IN (:excludeIds)) ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomApprovedUnsolvedBySubject(
+        @Param("subjectId") Long subjectId,
+        @Param("excludeIds") List<Long> excludeIds,
+        @Param("hasExclude") boolean hasExclude,
+        @Param("limit") int limit);
+
+    @Query(
         value = "SELECT * FROM questions WHERE status = 'APPROVED' AND subject_id = :subjectId AND topic_id = :topicId ORDER BY RAND() LIMIT :limit",
         nativeQuery = true)
     List<Question> findRandomApprovedBySubjectAndTopic(
