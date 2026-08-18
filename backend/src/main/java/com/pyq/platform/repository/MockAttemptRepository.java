@@ -9,6 +9,7 @@ public interface MockAttemptRepository extends JpaRepository<MockAttempt, Long> 
     @EntityGraph(attributePaths = {"answers", "answers.question", "answers.question.subject"})
     List<MockAttempt> findByUserIdOrderBySubmittedAtDesc(Long userId);
     void deleteByUserId(Long userId);
+    long countByUserIdAndMode(Long userId, String mode);
 
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(ma) FROM MockAttempt ma WHERE ma.totalQuestions >= 20")
     long countFullMockAttempts();

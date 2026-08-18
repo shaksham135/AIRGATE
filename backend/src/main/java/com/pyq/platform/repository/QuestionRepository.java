@@ -205,6 +205,10 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
         nativeQuery = true)
     List<Question> findRandomAnyCandidates(@Param("limit") int limit);
 
+    @EntityGraph(attributePaths = {"options", "subject", "topic"})
+    @Query("SELECT DISTINCT q FROM Question q WHERE q.id IN :ids")
+    List<Question> findAllByIdInWithOptions(@Param("ids") List<Long> ids);
+
     @Query(
         value = "SELECT * FROM questions WHERE status = 'APPROVED' AND subject_id = :subjectId AND topic_id = :topicId ORDER BY RAND() LIMIT :limit",
         nativeQuery = true)

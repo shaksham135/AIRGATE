@@ -803,7 +803,6 @@ public class QuestionController {
             if (aptDrawn1 >= 7)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTOFast(q));
                 aptDrawn1++;
             }
         }
@@ -812,21 +811,17 @@ public class QuestionController {
             if (aptDrawn2 >= 8)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTOFast(q));
                 aptDrawn2++;
             }
         }
         // Fill remaining Aptitude slots up to 15
         for (Question q : finalAptPool) {
-            if (selected.size() >= 15)
+            if (selectedIds.size() >= 15)
                 break;
-            if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTOFast(q));
-            }
+            selectedIds.add(q.getId());
         }
 
-        // ── SECTION 2: Computer Science & IT (Target: Exactly 50 Questions = Total 65)
-        // ──
+        // ── SECTION 2: Computer Science & IT (Target: Exactly 50 Questions = Total 65) ──
         List<Question> tech1 = finalTechPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 1).distinct()
                 .collect(Collectors.toList());
         List<Question> tech2 = finalTechPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 2).distinct()
@@ -837,7 +832,6 @@ public class QuestionController {
             if (techDrawn1 >= 25)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTOFast(q));
                 techDrawn1++;
             }
         }
@@ -846,54 +840,49 @@ public class QuestionController {
             if (techDrawn2 >= 25)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTOFast(q));
                 techDrawn2++;
             }
         }
 
         // Fail-safe 1: Backfill remaining Technical slots up to 65 from finalTechPool
-        if (selected.size() < 65) {
+        if (selectedIds.size() < 65) {
             for (Question q : finalTechPool) {
-                if (selected.size() >= 65)
+                if (selectedIds.size() >= 65)
                     break;
-                if (selectedIds.add(q.getId())) {
-                    selected.add(questionMapper.convertToDTOFast(q));
-                }
+                selectedIds.add(q.getId());
             }
         }
 
         // Fail-safe 2: Backfill remaining slots up to 65 from aptPool
-        if (selected.size() < 65) {
+        if (selectedIds.size() < 65) {
             for (Question q : aptPool) {
-                if (selected.size() >= 65)
+                if (selectedIds.size() >= 65)
                     break;
-                if (selectedIds.add(q.getId())) {
-                    selected.add(questionMapper.convertToDTOFast(q));
-                }
+                selectedIds.add(q.getId());
             }
         }
 
-        // Fail-safe 3: Ultimate backfill from ANY questions in DB to ALWAYS guarantee
-        // 65 items
-        if (selected.size() < 65) {
+        // Fail-safe 3: Ultimate backfill from ANY questions in DB to ALWAYS guarantee 65 items
+        if (selectedIds.size() < 65) {
             List<Question> anyExtras = questionRepository.findRandomAnyCandidates(150);
             for (Question q : anyExtras) {
-                if (selected.size() >= 65)
+                if (selectedIds.size() >= 65)
                     break;
-                if (selectedIds.add(q.getId())) {
-                    selected.add(questionMapper.convertToDTOFast(q));
-                }
+                selectedIds.add(q.getId());
             }
         }
 
-        // Hard cap at 65 questions
-        if (selected.size() > 65) {
-            selected = new ArrayList<>(selected.subList(0, 65));
+        List<Long> targetIds = new ArrayList<>(selectedIds);
+        if (targetIds.size() > 65) {
+            targetIds = targetIds.subList(0, 65);
         }
 
-        // Sanitize DTOs for test security — strip correct answers and explanations
-        // during test-taking
-        List<QuestionDTO> sanitized = selected.stream().map(dto -> {
+        // 🚀 BULK FETCH: Load all 65 questions WITH options, subject, and topic in 1 SINGLE SQL QUERY!
+        List<Question> fullyLoaded = targetIds.isEmpty() ? new ArrayList<>() : questionRepository.findAllByIdInWithOptions(targetIds);
+
+        // Sanitize DTOs for test security — strip correct answers and explanations during test-taking
+        List<QuestionDTO> sanitized = fullyLoaded.stream().map(q -> {
+            QuestionDTO dto = questionMapper.convertToDTOFast(q);
             dto.setAiSuggestedAnswer(null);
             dto.setAiSuggestedExplanation(null);
             dto.setAiMentorInsights(null);

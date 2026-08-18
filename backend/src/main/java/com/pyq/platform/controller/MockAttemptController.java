@@ -228,6 +228,24 @@ public class MockAttemptController {
         return false;
     }
 
+    @GetMapping("/attempts-count")
+    @PreAuthorize("isAuthenticated()")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<?> getAttemptCounts(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+        try {
+            long standard = mockAttemptRepository.countByUserIdAndMode(userDetails.getId(), "standard");
+            long hybrid = mockAttemptRepository.countByUserIdAndMode(userDetails.getId(), "hybrid");
+            long custom = mockAttemptRepository.countByUserIdAndMode(userDetails.getId(), "custom");
+            return ResponseEntity.ok(Map.of(
+                    "standardAttempts", standard,
+                    "hybridAttempts", hybrid,
+                    "customAttempts", custom
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("standardAttempts", 0, "hybridAttempts", 0, "customAttempts", 0));
+        }
+    }
+
     @GetMapping("/history")
     @PreAuthorize("isAuthenticated()")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)

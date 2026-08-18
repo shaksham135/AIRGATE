@@ -148,39 +148,33 @@ function MockTestArena() {
     // Enforce DB-backed limits for free users (Bypass-proof against LocalStorage clearing)
     if (!AuthService.isPremium()) {
       try {
-        let history = [];
+        let counts = { standardAttempts: 0, hybridAttempts: 0, customAttempts: 0 };
         try {
-          const res = await axios.get(`${API_CONFIG.BASE_URL}/api/simulator/history`, {
+          const res = await axios.get(`${API_CONFIG.BASE_URL}/api/simulator/attempts-count`, {
             headers: AuthService.getAuthHeader()
           });
-          if (Array.isArray(res.data)) {
-            history = res.data;
+          if (res.data) {
+            counts = res.data;
           }
         } catch (dbErr) {
-          history = JSON.parse(localStorage.getItem('gate_mock_history') || '[]');
+          const history = JSON.parse(localStorage.getItem('gate_mock_history') || '[]');
+          counts.standardAttempts = history.filter(h => h.mode === 'standard' || (!h.mode && (h.totalQuestions > 20 || h.totalQuestions === 0))).length;
+          counts.hybridAttempts = history.filter(h => h.mode === 'hybrid').length;
+          counts.customAttempts = history.filter(h => h.mode === 'custom').length;
         }
 
-        if (activeTab === 'standard') {
-          const standardAttempts = history.filter(h => h.mode === 'standard' || (!h.mode && (h.totalQuestions > 20 || h.totalQuestions === 0))).length;
-          if (standardAttempts >= 3) {
-            alert(`You have used your 3 Free Full-Syllabus PYQ Mock attempts! Upgrade to Aspirant Pro for unlimited mock sessions.`);
-            setShowPremiumModal(true);
-            return;
-          }
-        } else if (activeTab === 'hybrid') {
-          const hybridAttempts = history.filter(h => h.mode === 'hybrid').length;
-          if (hybridAttempts >= 2) {
-            alert(`You have used your 2 Free Smart Hybrid Mock attempts! Upgrade to Aspirant Pro for unlimited access.`);
-            setShowPremiumModal(true);
-            return;
-          }
-        } else if (activeTab === 'custom') {
-          const customAttempts = history.filter(h => h.mode === 'custom').length;
-          if (customAttempts >= 2) {
-            alert(`You have used your 2 Free Subject Practice Mocks! Upgrade to Aspirant Pro at ₹99/mo to unlock unlimited Subject-wise practice mocks.`);
-            setShowPremiumModal(true);
-            return;
-          }
+        if (activeTab === 'standard' && counts.standardAttempts >= 3) {
+          alert(`You have used your 3 Free Full-Syllabus PYQ Mock attempts! Upgrade to Aspirant Pro for unlimited mock sessions.`);
+          setShowPremiumModal(true);
+          return;
+        } else if (activeTab === 'hybrid' && counts.hybridAttempts >= 2) {
+          alert(`You have used your 2 Free Smart Hybrid Mock attempts! Upgrade to Aspirant Pro for unlimited access.`);
+          setShowPremiumModal(true);
+          return;
+        } else if (activeTab === 'custom' && counts.customAttempts >= 2) {
+          alert(`You have used your 2 Free Subject Practice Mocks! Upgrade to Aspirant Pro at ₹99/mo to unlock unlimited Subject-wise practice mocks.`);
+          setShowPremiumModal(true);
+          return;
         }
       } catch (e) {
         console.error("Failed to check free mock limits", e);
