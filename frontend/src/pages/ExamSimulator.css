@@ -459,45 +459,38 @@
   border-radius: 2px;
 }
 
-/* Animated High-Tech Mock Test Loader */
-@keyframes techSpin {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.08); }
-  100% { transform: rotate(360deg) scale(1); }
+/* Soft & Subtle High-Tech Loading Modal Animation */
+@keyframes softPulse {
+  0%, 100% { opacity: 0.9; transform: scale(1); box-shadow: 0 0 20px rgba(56, 189, 248, 0.15); }
+  50% { opacity: 1; transform: scale(1.03); box-shadow: 0 0 35px rgba(56, 189, 248, 0.3); }
 }
 
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.4), 0 0 50px rgba(139, 92, 246, 0.2); }
-  50% { box-shadow: 0 0 45px rgba(56, 189, 248, 0.7), 0 0 80px rgba(139, 92, 246, 0.4); }
-}
-
-@keyframes shimmerBar {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.tech-loader-ring {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 20px auto;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15));
-  border: 3px solid transparent;
-  border-top-color: #38bdf8;
-  border-right-color: #c084fc;
-  border-bottom-color: #34d399;
+.soft-loader-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px auto;
+  border-radius: 20px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: techSpin 1.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite, pulseGlow 2.5s ease-in-out infinite;
+  animation: softPulse 2.5s ease-in-out infinite;
 }
 
-.tech-progress-bar-fill {
+.soft-progress-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.soft-progress-bar {
   height: 100%;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #38bdf8, #8b5cf6, #ec4899, #38bdf8);
-  background-size: 200% 100%;
-  animation: shimmerBar 2s linear infinite;
+  background: linear-gradient(90deg, #38bdf8, #8b5cf6);
+  border-radius: 10px;
   transition: width 0.3s ease;
 }
 

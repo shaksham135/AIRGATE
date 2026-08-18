@@ -5,6 +5,7 @@ import CacheService from '../services/CacheService';
 import { useNavigate } from 'react-router-dom';
 import { FiClock, FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiGrid, FiList, FiCpu, FiPlus, FiMonitor } from 'react-icons/fi';
 import { formatMathText, renderQuestionText, renderOptionContent, getAssetUrl } from '../utils/mathRenderer';
+import { parseImagePaths } from '../utils/urlUtils';
 import API_CONFIG from '../config/api';
 import LoginGate from '../components/LoginGate';
 import PremiumGateModal from '../components/PremiumGateModal';
@@ -731,14 +732,14 @@ function MockTestArena() {
     return (
       <div className="mock-arena-container">
         
-        {/* Step-by-Step Progressive Loading Overlay Modal */}
+        {/* Soft Glassmorphism Progressive Loading Overlay Modal */}
         {loading && (
           <div style={{
             position: 'fixed',
             inset: 0,
             zIndex: 99999,
-            backgroundColor: 'rgba(11, 15, 25, 0.92)',
-            backdropFilter: 'blur(16px)',
+            backgroundColor: 'rgba(11, 15, 25, 0.85)',
+            backdropFilter: 'blur(14px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -746,54 +747,36 @@ function MockTestArena() {
           }}>
             <div style={{
               backgroundColor: '#131826',
-              border: '1px solid rgba(56, 189, 248, 0.35)',
-              borderRadius: '28px',
-              padding: '40px 44px',
-              maxWidth: '480px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '24px',
+              padding: '36px 40px',
+              maxWidth: '440px',
               width: '100%',
               textAlign: 'center',
-              boxShadow: '0 25px 70px -10px rgba(0, 0, 0, 0.85), 0 0 40px rgba(56, 189, 248, 0.15)'
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
             }}>
-              {/* High-Tech Animated Spinning Ring */}
-              <div className="tech-loader-ring">
-                <FiCpu size={36} color="#38bdf8" />
+              {/* Soft Pulsing Icon */}
+              <div className="soft-loader-icon">
+                <FiCpu size={30} color="#38bdf8" />
               </div>
 
-              <div style={{ display: 'inline-block', padding: '4px 14px', borderRadius: '50px', backgroundColor: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-                ⚡ AIRGATE AI MOCK ENGINE
-              </div>
-
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '8px', letterSpacing: '-0.01em' }}>
-                {activeTab === 'custom' ? 'Generating Subject Practice Test' : activeTab === 'hybrid' ? 'Assembling Smart Hybrid Mock' : 'Assembling Official GATE PYQ Paper'}
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', marginBottom: '6px', letterSpacing: '-0.01em' }}>
+                {activeTab === 'custom' ? 'Preparing Subject Practice' : activeTab === 'hybrid' ? 'Preparing Smart Hybrid Mock' : 'Preparing Official GATE PYQ Test'}
               </h3>
 
-              <p style={{ color: '#c084fc', fontSize: '0.92rem', fontWeight: 700, margin: '0 0 24px 0', minHeight: '24px' }}>
+              <p style={{ color: '#94a3b8', fontSize: '0.88rem', fontWeight: 500, margin: '0 0 20px 0', minHeight: '22px' }}>
                 {loadingStep}
               </p>
 
-              {/* Shimmer Animated Progress Bar */}
-              <div style={{
-                width: '100%',
-                height: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                marginBottom: '20px'
-              }}>
-                <div className="tech-progress-bar-fill" style={{ width: '100%' }} />
+              {/* Soft Progress Track & Bar */}
+              <div className="soft-progress-track" style={{ marginBottom: '18px' }}>
+                <div className="soft-progress-bar" style={{ width: '85%' }} />
               </div>
 
-              {/* Step Checklist Badges */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '14px 18px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 600 }}>
-                  <span>✓</span> Unsolved Question Filtering Applied
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontWeight: 600 }}>
-                  <span>✓</span> GATE 100-Mark Weightage Balanced (15 GA + 50 CS/IT)
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', fontWeight: 600 }}>
-                  <span>✓</span> Server Anti-Cheat Ground Truth Encrypted
-                </div>
+              {/* Est. Time Remaining Badge */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '6px 16px', borderRadius: '50px', color: '#38bdf8', fontSize: '0.8rem', fontWeight: 600 }}>
+                <FiClock size={14} />
+                <span>Est. Time Remaining: ~0.8s</span>
               </div>
             </div>
           </div>
@@ -1358,15 +1341,24 @@ function MockTestArena() {
                 {renderQuestionText(activeQuestion.text)}
               </div>
 
-              {/* Question diagram/image (from imagePath field) */}
-              {activeQuestion.imagePath && (
-                <div style={{ marginBottom: '24px', backgroundColor: '#fff', borderRadius: '10px', padding: '12px', border: '1px solid #e5e7eb', display: 'inline-block', maxWidth: '100%' }}>
-                  <img
-                    src={getAssetUrl(activeQuestion.imagePath)}
-                    alt="Question Diagram"
-                    style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', display: 'block', borderRadius: '6px' }}
-                    onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }}
-                  />
+              {/* Question diagram/images (supports multiple diagrams per question) */}
+              {parseImagePaths(activeQuestion.imagePath).length > 0 && (
+                <div style={{ marginBottom: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                  {parseImagePaths(activeQuestion.imagePath).map((imgUrl, idx) => (
+                    <div key={idx} style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '12px', border: '1px solid #e5e7eb', maxWidth: '100%', textAlign: 'center' }}>
+                      {parseImagePaths(activeQuestion.imagePath).length > 1 && (
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, marginBottom: '6px' }}>
+                          Diagram {idx + 1}
+                        </div>
+                      )}
+                      <img
+                        src={getAssetUrl(imgUrl)}
+                        alt={`Question Diagram ${idx + 1}`}
+                        style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', display: 'block', borderRadius: '6px', margin: '0 auto' }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
 
