@@ -459,3 +459,45 @@
   border-radius: 2px;
 }
 
+/* Animated High-Tech Mock Test Loader */
+@keyframes techSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.4), 0 0 50px rgba(139, 92, 246, 0.2); }
+  50% { box-shadow: 0 0 45px rgba(56, 189, 248, 0.7), 0 0 80px rgba(139, 92, 246, 0.4); }
+}
+
+@keyframes shimmerBar {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.tech-loader-ring {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px auto;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15));
+  border: 3px solid transparent;
+  border-top-color: #38bdf8;
+  border-right-color: #c084fc;
+  border-bottom-color: #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: techSpin 1.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite, pulseGlow 2.5s ease-in-out infinite;
+}
+
+.tech-progress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #38bdf8, #8b5cf6, #ec4899, #38bdf8);
+  background-size: 200% 100%;
+  animation: shimmerBar 2s linear infinite;
+  transition: width 0.3s ease;
+}
+

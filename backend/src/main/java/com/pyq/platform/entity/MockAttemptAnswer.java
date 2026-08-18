@@ -24,7 +24,6 @@ public class MockAttemptAnswer {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
-    @JsonIgnore
     private Question question;
 
     @Column(name = "selected_answer", length = 512)

@@ -70,6 +70,5 @@ public class MockAttempt {
 
     @OneToMany(mappedBy = "attempt", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<MockAttemptAnswer> answers = new ArrayList<>();
 }

@@ -192,10 +192,10 @@ function MockTestArena() {
     const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
     try {
-      await delay(250);
-      setLoadingStep('🔥 Selecting Best High-Yield GATE CSE Questions for You...');
+      setLoadingStep('🔥 Selecting Best High-Yield GATE Questions for You...');
 
       const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/simulator`, {
+        params: { mode: activeTab },
         headers: AuthService.getAuthHeader()
       });
       if (!res.data || res.data.length === 0) {
@@ -204,42 +204,9 @@ function MockTestArena() {
         return;
       }
 
-      await delay(300);
-      setLoadingStep('🛡️ Excluding Previously Solved PYQs to Guarantee 100% Unseen Practice...');
-
       let finalQuestions = res.data;
 
-      const isAiGeneratedQuestion = (q) => {
-        if (!q || !q.pdfSourceName) return false;
-        const src = q.pdfSourceName.toLowerCase();
-        return src.startsWith('ai_nightly') || src.startsWith('ai_generated') || src.includes('ai generator');
-      };
-
-      if (activeTab === 'standard') {
-        // Mode 1: 100% Official PYQs (with fallback backfill to guarantee 65 questions)
-        const pyqOnly = finalQuestions.filter(q => !isAiGeneratedQuestion(q));
-        if (pyqOnly.length >= 65) {
-          finalQuestions = pyqOnly.slice(0, 65);
-        } else if (pyqOnly.length > 0) {
-          const rest = finalQuestions.filter(q => isAiGeneratedQuestion(q));
-          finalQuestions = [...pyqOnly, ...rest].slice(0, 65);
-        }
-      } else if (activeTab === 'hybrid') {
-        // Mode 2: Smart Hybrid Mock (70% Double-Verified + 30% PYQ)
-        const doubleVerified = finalQuestions.filter(q => isAiGeneratedQuestion(q));
-        const officialPyqs = finalQuestions.filter(q => !isAiGeneratedQuestion(q));
-        
-        if (doubleVerified.length > 0) {
-          const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
-          const targetVerified = Math.min(doubleVerified.length, Math.floor(finalQuestions.length * 0.7));
-          const targetPyq = Math.max(0, finalQuestions.length - targetVerified);
-
-          const pickedVerified = shuffle(doubleVerified).slice(0, targetVerified);
-          const pickedPyq = shuffle(officialPyqs).slice(0, targetPyq);
-          finalQuestions = shuffle([...pickedVerified, ...pickedPyq]);
-        }
-      } else if (activeTab === 'custom' && selectedSubject) {
-        // Mode 3: Subject Practice Mock — fetch questions specifically for this subject
+      if (activeTab === 'custom' && selectedSubject) {
         try {
           const subRes = await axios.get(`${API_CONFIG.BASE_URL}/api/questions`, {
             params: {
@@ -253,14 +220,6 @@ function MockTestArena() {
           if (subQs.length > 0) {
             const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
             finalQuestions = shuffle(subQs).slice(0, customQuestionCount);
-          } else {
-            // Fallback to client-side filter
-            const subFiltered = finalQuestions.filter(q => 
-              q.subjectName && q.subjectName.toLowerCase().includes(selectedSubject.toLowerCase())
-            );
-            if (subFiltered.length > 0) {
-              finalQuestions = subFiltered.slice(0, customQuestionCount);
-            }
           }
         } catch (e) {
           const subFiltered = finalQuestions.filter(q => 
@@ -270,14 +229,12 @@ function MockTestArena() {
         }
       }
 
-      await delay(300);
-      setLoadingStep('⚖️ Balancing Marks Weightage: 10 General Aptitude + 55 Technical Items...');
-
-      await delay(250);
+      setLoadingStep('⚖️ Balancing Marks Weightage: 15 General Aptitude + 50 Technical Items...');
+      await delay(80);
       setLoadingStep('🎯 Calibrating Exam Console to TCS iON Official Blueprint...');
-
-      await delay(200);
-      setLoadingStep('✨ 65-Item GATE Test Sheet Ready! Launching Exam...');
+      await delay(80);
+      setLoadingStep('✨ Test Sheet Ready! Launching Exam...');
+      await delay(50);
 
       setQuestions(finalQuestions);
       setAnswers({});
@@ -780,61 +737,64 @@ function MockTestArena() {
             position: 'fixed',
             inset: 0,
             zIndex: 99999,
-            backgroundColor: 'rgba(15, 23, 42, 0.88)',
-            backdropFilter: 'blur(10px)',
+            backgroundColor: 'rgba(11, 15, 25, 0.92)',
+            backdropFilter: 'blur(16px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: '24px'
           }}>
             <div style={{
-              backgroundColor: '#1e293b',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
-              borderRadius: '24px',
-              padding: '36px 40px',
-              maxWidth: '460px',
+              backgroundColor: '#131826',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '28px',
+              padding: '40px 44px',
+              maxWidth: '480px',
               width: '100%',
               textAlign: 'center',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)'
+              boxShadow: '0 25px 70px -10px rgba(0, 0, 0, 0.85), 0 0 40px rgba(56, 189, 248, 0.15)'
             }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                margin: '0 auto 20px auto',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.2))',
-                border: '2px solid #38bdf8',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'spin 2s linear infinite'
-              }}>
-                <FiCpu size={32} color="#38bdf8" />
+              {/* High-Tech Animated Spinning Ring */}
+              <div className="tech-loader-ring">
+                <FiCpu size={36} color="#38bdf8" />
               </div>
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
-                Preparing GATE Mock Exam
+
+              <div style={{ display: 'inline-block', padding: '4px 14px', borderRadius: '50px', backgroundColor: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                ⚡ AIRGATE AI MOCK ENGINE
+              </div>
+
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '8px', letterSpacing: '-0.01em' }}>
+                {activeTab === 'custom' ? 'Generating Subject Practice Test' : activeTab === 'hybrid' ? 'Assembling Smart Hybrid Mock' : 'Assembling Official GATE PYQ Paper'}
               </h3>
-              <p style={{ color: '#38bdf8', fontSize: '0.92rem', fontWeight: 700, margin: '0 0 20px 0' }}>
+
+              <p style={{ color: '#c084fc', fontSize: '0.92rem', fontWeight: 700, margin: '0 0 24px 0', minHeight: '24px' }}>
                 {loadingStep}
               </p>
+
+              {/* Shimmer Animated Progress Bar */}
               <div style={{
                 width: '100%',
-                height: '6px',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                borderRadius: '3px',
-                overflow: 'hidden'
+                height: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                marginBottom: '20px'
               }}>
-                <div style={{
-                  height: '100%',
-                  width: '70%',
-                  background: 'linear-gradient(90deg, #38bdf8, #8b5cf6)',
-                  borderRadius: '3px',
-                  animation: 'pulse 1.5s ease-in-out infinite'
-                }} />
+                <div className="tech-progress-bar-fill" style={{ width: '100%' }} />
               </div>
-              <p style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '16px', margin: '16px 0 0 0' }}>
-                Fetching 65 verified questions & initializing CBT environment...
-              </p>
+
+              {/* Step Checklist Badges */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8', backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '14px 18px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34d399', fontWeight: 600 }}>
+                  <span>✓</span> Unsolved Question Filtering Applied
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontWeight: 600 }}>
+                  <span>✓</span> GATE 100-Mark Weightage Balanced (15 GA + 50 CS/IT)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#c084fc', fontWeight: 600 }}>
+                  <span>✓</span> Server Anti-Cheat Ground Truth Encrypted
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1373,7 +1333,7 @@ function MockTestArena() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '0.8rem', backgroundColor: 'rgba(99, 102, 241, 0.12)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '4px 14px', borderRadius: '50px', fontWeight: 700 }}>
-                    {activeTab === 'custom' ? `Practice: ${selectedSubject || 'Subject Test'}` : currentIndex < 10 ? 'Section 1: General Aptitude' : 'Section 2: Computer Science & IT'}
+                    {activeTab === 'custom' ? `Practice: ${selectedSubject || 'Subject Test'}` : currentIndex < 15 ? 'Section 1: General Aptitude' : 'Section 2: Computer Science & IT'}
                   </span>
 
                   {/* Question Source Badge (Double Verified vs Official PYQ) */}
@@ -1665,7 +1625,7 @@ function MockTestArena() {
             const sec1 = [];
             const sec2 = [];
             questions.forEach((q, idx) => {
-              if (idx < 10) {
+              if (idx < 15) {
                 sec1.push({ q, idx });
               } else {
                 sec2.push({ q, idx });

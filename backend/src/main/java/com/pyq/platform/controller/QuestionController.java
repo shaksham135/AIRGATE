@@ -715,11 +715,10 @@ public class QuestionController {
         return questionMapper.convertToDTOFast(question);
     }
 
-    // Get simulated exam with 65 questions matching GATE CSE 100-mark specification
-    // (< 300ms execution)
     @GetMapping("/simulator")
     @Transactional(readOnly = true)
     public ResponseEntity<?> getSimulatorExam(
+            @RequestParam(value = "mode", defaultValue = "standard") String mode,
             @org.springframework.security.core.annotation.AuthenticationPrincipal UserDetailsImpl userDetails) {
 
         long startTime = System.currentTimeMillis();
@@ -746,21 +745,54 @@ public class QuestionController {
         List<QuestionDTO> selected = new ArrayList<>();
         Set<Long> selectedIds = new HashSet<>();
 
-        // 2. Fetch Aptitude Candidate Pool (Unsolved first, fallback to all candidates)
-        List<Question> aptPool = questionRepository.findRandomAptitudeCandidates(60);
+        boolean isStandardPyqMode = "standard".equalsIgnoreCase(mode);
+        boolean isHybridMode = "hybrid".equalsIgnoreCase(mode);
+
+        List<Question> aptPool;
+        List<Question> techPool;
+
+        if (isStandardPyqMode) {
+            // Mode 1: 100% Official PYQs ONLY (No practice/AI questions allowed!)
+            aptPool = questionRepository.findRandomOfficialPyqAptitudeCandidates(60);
+            techPool = questionRepository.findRandomOfficialPyqTechnicalCandidates(180);
+        } else if (isHybridMode) {
+            // Mode 2: Smart Hybrid Mock (70% Fresh Practice + 30% Official PYQs)
+            List<Question> freshPractice = questionRepository.findRandomFreshPracticeCandidates(100);
+            List<Question> officialPyqs = questionRepository.findRandomAptitudeCandidates(60);
+            officialPyqs.addAll(questionRepository.findRandomTechnicalCandidates(100));
+
+            aptPool = new ArrayList<>();
+            techPool = new ArrayList<>();
+
+            for (Question q : freshPractice) {
+                String sName = q.getSubject() != null ? q.getSubject().getName().toLowerCase() : "";
+                if (sName.contains("aptitude"))
+                    aptPool.add(q);
+                else
+                    techPool.add(q);
+            }
+            for (Question q : officialPyqs) {
+                String sName = q.getSubject() != null ? q.getSubject().getName().toLowerCase() : "";
+                if (sName.contains("aptitude"))
+                    aptPool.add(q);
+                else
+                    techPool.add(q);
+            }
+        } else {
+            aptPool = questionRepository.findRandomAptitudeCandidates(60);
+            techPool = questionRepository.findRandomTechnicalCandidates(180);
+        }
+
+        // Unsolved Priority Filter
         List<Question> aptUnsolved = aptPool.stream().filter(q -> !attemptedSet.contains(q.getId()))
                 .collect(Collectors.toList());
-        List<Question> finalAptPool = aptUnsolved.size() >= 10 ? aptUnsolved : aptPool;
+        List<Question> finalAptPool = aptUnsolved.size() >= 15 ? aptUnsolved : aptPool;
 
-        // 3. Fetch Technical Candidate Pool (Unsolved first, fallback to all
-        // candidates)
-        List<Question> techPool = questionRepository.findRandomTechnicalCandidates(180);
         List<Question> techUnsolved = techPool.stream().filter(q -> !attemptedSet.contains(q.getId()))
                 .collect(Collectors.toList());
-        List<Question> finalTechPool = techUnsolved.size() >= 55 ? techUnsolved : techPool;
+        List<Question> finalTechPool = techUnsolved.size() >= 50 ? techUnsolved : techPool;
 
-        // ── SECTION 1: General Aptitude (Target: 10 Questions = 15 Marks: 5x 1-mark,
-        // 5x 2-mark) ──
+        // ── SECTION 1: General Aptitude (Target: Exactly 15 Questions) ──
         List<Question> apt1 = finalAptPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 1).distinct()
                 .collect(Collectors.toList());
         List<Question> apt2 = finalAptPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 2).distinct()
@@ -768,33 +800,33 @@ public class QuestionController {
 
         int aptDrawn1 = 0;
         for (Question q : apt1) {
-            if (aptDrawn1 >= 5)
+            if (aptDrawn1 >= 7)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTO(q));
+                selected.add(questionMapper.convertToDTOFast(q));
                 aptDrawn1++;
             }
         }
         int aptDrawn2 = 0;
         for (Question q : apt2) {
-            if (aptDrawn2 >= 5)
+            if (aptDrawn2 >= 8)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTO(q));
+                selected.add(questionMapper.convertToDTOFast(q));
                 aptDrawn2++;
             }
         }
-        // Fill remaining Aptitude slots up to 10 if mark pools were thin
+        // Fill remaining Aptitude slots up to 15
         for (Question q : finalAptPool) {
-            if (selected.size() >= 10)
+            if (selected.size() >= 15)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTO(q));
+                selected.add(questionMapper.convertToDTOFast(q));
             }
         }
 
-        // ── SECTION 2: Computer Science & IT (Target: 55 Questions = 85 Marks: 25x
-        // 1-mark, 30x 2-mark) ──
+        // ── SECTION 2: Computer Science & IT (Target: Exactly 50 Questions = Total 65)
+        // ──
         List<Question> tech1 = finalTechPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 1).distinct()
                 .collect(Collectors.toList());
         List<Question> tech2 = finalTechPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 2).distinct()
@@ -805,16 +837,16 @@ public class QuestionController {
             if (techDrawn1 >= 25)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTO(q));
+                selected.add(questionMapper.convertToDTOFast(q));
                 techDrawn1++;
             }
         }
         int techDrawn2 = 0;
         for (Question q : tech2) {
-            if (techDrawn2 >= 30)
+            if (techDrawn2 >= 25)
                 break;
             if (selectedIds.add(q.getId())) {
-                selected.add(questionMapper.convertToDTO(q));
+                selected.add(questionMapper.convertToDTOFast(q));
                 techDrawn2++;
             }
         }
@@ -825,7 +857,7 @@ public class QuestionController {
                 if (selected.size() >= 65)
                     break;
                 if (selectedIds.add(q.getId())) {
-                    selected.add(questionMapper.convertToDTO(q));
+                    selected.add(questionMapper.convertToDTOFast(q));
                 }
             }
         }
@@ -836,7 +868,7 @@ public class QuestionController {
                 if (selected.size() >= 65)
                     break;
                 if (selectedIds.add(q.getId())) {
-                    selected.add(questionMapper.convertToDTO(q));
+                    selected.add(questionMapper.convertToDTOFast(q));
                 }
             }
         }
@@ -849,7 +881,7 @@ public class QuestionController {
                 if (selected.size() >= 65)
                     break;
                 if (selectedIds.add(q.getId())) {
-                    selected.add(questionMapper.convertToDTO(q));
+                    selected.add(questionMapper.convertToDTOFast(q));
                 }
             }
         }
@@ -869,8 +901,8 @@ public class QuestionController {
             return dto;
         }).collect(Collectors.toList());
 
-        log.info("Assembled GATE simulator exam with {} questions in {}ms for user {}",
-                sanitized.size(), System.currentTimeMillis() - startTime,
+        log.info("Assembled GATE simulator exam (mode: {}) with {} questions in {}ms for user {}",
+                mode, sanitized.size(), System.currentTimeMillis() - startTime,
                 userDetails != null ? userDetails.getId() : "GUEST");
 
         return ResponseEntity.ok(sanitized);

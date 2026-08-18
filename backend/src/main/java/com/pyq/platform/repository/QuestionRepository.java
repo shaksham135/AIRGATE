@@ -178,6 +178,29 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
     List<Question> findRandomTechnicalCandidates(@Param("limit") int limit);
 
     @Query(
+        value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id " +
+                "WHERE LOWER(COALESCE(s.name, '')) LIKE '%aptitude%' " +
+                "AND (q.pdf_source_name IS NULL OR (q.pdf_source_name NOT LIKE 'AI_NIGHTLY%' AND q.pdf_source_name NOT LIKE 'AI_GENERATED%' AND q.pdf_source_name NOT LIKE '%AI Generator%' AND q.pdf_source_name NOT LIKE '%PRACTICE%')) " +
+                "ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomOfficialPyqAptitudeCandidates(@Param("limit") int limit);
+
+    @Query(
+        value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id " +
+                "WHERE LOWER(COALESCE(s.name, '')) NOT LIKE '%aptitude%' " +
+                "AND (q.pdf_source_name IS NULL OR (q.pdf_source_name NOT LIKE 'AI_NIGHTLY%' AND q.pdf_source_name NOT LIKE 'AI_GENERATED%' AND q.pdf_source_name NOT LIKE '%AI Generator%' AND q.pdf_source_name NOT LIKE '%PRACTICE%')) " +
+                "ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomOfficialPyqTechnicalCandidates(@Param("limit") int limit);
+
+    @Query(
+        value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id " +
+                "WHERE (q.pdf_source_name LIKE 'AI_NIGHTLY%' OR q.pdf_source_name LIKE 'AI_GENERATED%' OR q.pdf_source_name LIKE '%AI Generator%' OR q.pdf_source_name LIKE '%PRACTICE%') " +
+                "ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomFreshPracticeCandidates(@Param("limit") int limit);
+
+    @Query(
         value = "SELECT * FROM questions ORDER BY RAND() LIMIT :limit",
         nativeQuery = true)
     List<Question> findRandomAnyCandidates(@Param("limit") int limit);
