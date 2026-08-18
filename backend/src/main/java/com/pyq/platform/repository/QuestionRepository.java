@@ -195,10 +195,19 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
 
     @Query(
         value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id " +
-                "WHERE (q.pdf_source_name LIKE 'AI_NIGHTLY%' OR q.pdf_source_name LIKE 'AI_GENERATED%' OR q.pdf_source_name LIKE '%AI Generator%' OR q.pdf_source_name LIKE '%PRACTICE%') " +
+                "WHERE LOWER(COALESCE(s.name, '')) LIKE '%aptitude%' " +
+                "AND (q.pdf_source_name LIKE 'AI_NIGHTLY%' OR q.pdf_source_name LIKE 'AI_GENERATED%' OR q.pdf_source_name LIKE '%AI Generator%' OR q.pdf_source_name LIKE '%PRACTICE%') " +
                 "ORDER BY RAND() LIMIT :limit",
         nativeQuery = true)
-    List<Question> findRandomFreshPracticeCandidates(@Param("limit") int limit);
+    List<Question> findRandomFreshPracticeAptitudeCandidates(@Param("limit") int limit);
+
+    @Query(
+        value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id " +
+                "WHERE LOWER(COALESCE(s.name, '')) NOT LIKE '%aptitude%' " +
+                "AND (q.pdf_source_name LIKE 'AI_NIGHTLY%' OR q.pdf_source_name LIKE 'AI_GENERATED%' OR q.pdf_source_name LIKE '%AI Generator%' OR q.pdf_source_name LIKE '%PRACTICE%') " +
+                "ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomFreshPracticeTechnicalCandidates(@Param("limit") int limit);
 
     @Query(
         value = "SELECT * FROM questions ORDER BY RAND() LIMIT :limit",

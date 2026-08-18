@@ -757,27 +757,11 @@ public class QuestionController {
             techPool = questionRepository.findRandomOfficialPyqTechnicalCandidates(180);
         } else if (isHybridMode) {
             // Mode 2: Smart Hybrid Mock (70% Fresh Practice + 30% Official PYQs)
-            List<Question> freshPractice = questionRepository.findRandomFreshPracticeCandidates(100);
-            List<Question> officialPyqs = questionRepository.findRandomAptitudeCandidates(60);
-            officialPyqs.addAll(questionRepository.findRandomTechnicalCandidates(100));
+            aptPool = new ArrayList<>(questionRepository.findRandomFreshPracticeAptitudeCandidates(45));
+            aptPool.addAll(questionRepository.findRandomOfficialPyqAptitudeCandidates(15));
 
-            aptPool = new ArrayList<>();
-            techPool = new ArrayList<>();
-
-            for (Question q : freshPractice) {
-                String sName = q.getSubject() != null ? q.getSubject().getName().toLowerCase() : "";
-                if (sName.contains("aptitude"))
-                    aptPool.add(q);
-                else
-                    techPool.add(q);
-            }
-            for (Question q : officialPyqs) {
-                String sName = q.getSubject() != null ? q.getSubject().getName().toLowerCase() : "";
-                if (sName.contains("aptitude"))
-                    aptPool.add(q);
-                else
-                    techPool.add(q);
-            }
+            techPool = new ArrayList<>(questionRepository.findRandomFreshPracticeTechnicalCandidates(130));
+            techPool.addAll(questionRepository.findRandomOfficialPyqTechnicalCandidates(50));
         } else {
             aptPool = questionRepository.findRandomAptitudeCandidates(60);
             techPool = questionRepository.findRandomTechnicalCandidates(180);
