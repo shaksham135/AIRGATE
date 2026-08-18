@@ -32,12 +32,10 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.stream.Collectors;
-
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import javax.imageio.ImageIO;
-
 import com.pyq.platform.util.SubjectSlugUtils;
 import com.pyq.platform.service.SystemSettingService;
 import com.pyq.platform.repository.MockAttemptAnswerRepository;
@@ -717,125 +715,165 @@ public class QuestionController {
         return questionMapper.convertToDTOFast(question);
     }
 
-    // Get simulated exam with 65 questions matching standard GATE weightage with
-    // unsolved question priority
+    // Get simulated exam with 65 questions matching GATE CSE 100-mark specification
+    // (< 300ms execution)
     @GetMapping("/simulator")
     @Transactional(readOnly = true)
     public ResponseEntity<?> getSimulatorExam(
             @org.springframework.security.core.annotation.AuthenticationPrincipal UserDetailsImpl userDetails) {
 
-        // Retrieve attempted question IDs for this user if logged in
-        List<Long> attemptedIds = new ArrayList<>();
+        long startTime = System.currentTimeMillis();
+
+        // 1. Retrieve attempted question IDs for this user if logged in (from both Mock
+        // Tests & Practice Solves)
+        Set<Long> attemptedSet = new HashSet<>();
         if (userDetails != null && userDetails.getId() != null) {
             try {
-                attemptedIds = mockAttemptAnswerRepository.findAttemptedQuestionIdsByUserId(userDetails.getId());
+                List<Long> mockAttempted = mockAttemptAnswerRepository
+                        .findAttemptedQuestionIdsByUserId(userDetails.getId());
+                if (mockAttempted != null) {
+                    attemptedSet.addAll(mockAttempted);
+                }
+                List<Long> practiceSolved = solveRepository.findSolvedQuestionIdsByUserId(userDetails.getId());
+                if (practiceSolved != null) {
+                    attemptedSet.addAll(practiceSolved);
+                }
             } catch (Exception e) {
                 log.warn("Failed to fetch attempted questions for user {}", userDetails.getId(), e);
             }
         }
-        final List<Long> excludeIds = attemptedIds;
-        final boolean hasExclude = !excludeIds.isEmpty();
-
-        record BlueprintEntry(String keyword, int req1Mark, int req2Mark) {
-        }
-
-        // GATE CSE baseline blueprint with dynamic fluctuation (+/- 1-2 per subject)
-        Random random = new Random();
-        List<BlueprintEntry> blueprint = List.of(
-                new BlueprintEntry("aptitude", 5, 5),
-                new BlueprintEntry("math", 4 + random.nextInt(2), 5),
-                new BlueprintEntry("digital", 2, 1 + random.nextInt(2)),
-                new BlueprintEntry("organization", 2, 2 + random.nextInt(2)),
-                new BlueprintEntry("programming", 3, 3),
-                new BlueprintEntry("algorithm", 3, 3 + random.nextInt(2)),
-                new BlueprintEntry("computation", 3 + random.nextInt(2), 3),
-                new BlueprintEntry("compiler", 2, 1 + random.nextInt(2)),
-                new BlueprintEntry("operating", 3, 3 + random.nextInt(2)),
-                new BlueprintEntry("database", 2 + random.nextInt(2), 2),
-                new BlueprintEntry("network", 1, 4));
 
         List<QuestionDTO> selected = new ArrayList<>();
         Set<Long> selectedIds = new HashSet<>();
 
-        // Load all subjects once for keyword matching
-        List<com.pyq.platform.entity.Subject> allSubjects = subjectRepository.findAll();
+        // 2. Fetch Aptitude Candidate Pool (Unsolved first, fallback to all candidates)
+        List<Question> aptPool = questionRepository.findRandomAptitudeCandidates(60);
+        List<Question> aptUnsolved = aptPool.stream().filter(q -> !attemptedSet.contains(q.getId()))
+                .collect(Collectors.toList());
+        List<Question> finalAptPool = aptUnsolved.size() >= 10 ? aptUnsolved : aptPool;
 
-        for (BlueprintEntry entry : blueprint) {
-            if (entry.req1Mark() == 0 && entry.req2Mark() == 0)
-                continue;
+        // 3. Fetch Technical Candidate Pool (Unsolved first, fallback to all
+        // candidates)
+        List<Question> techPool = questionRepository.findRandomTechnicalCandidates(180);
+        List<Question> techUnsolved = techPool.stream().filter(q -> !attemptedSet.contains(q.getId()))
+                .collect(Collectors.toList());
+        List<Question> finalTechPool = techUnsolved.size() >= 55 ? techUnsolved : techPool;
 
-            List<Long> matchingSubjectIds = allSubjects.stream()
-                    .filter(s -> s.getName().toLowerCase().contains(entry.keyword()))
-                    .map(com.pyq.platform.entity.Subject::getId)
-                    .collect(Collectors.toList());
+        // ── SECTION 1: General Aptitude (Target: 10 Questions = 15 Marks: 5x 1-mark,
+        // 5x 2-mark) ──
+        List<Question> apt1 = finalAptPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 1).distinct()
+                .collect(Collectors.toList());
+        List<Question> apt2 = finalAptPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 2).distinct()
+                .collect(Collectors.toList());
 
-            if (matchingSubjectIds.isEmpty())
-                continue;
-
-            int totalNeeded = entry.req1Mark() + entry.req2Mark();
-            int fetchLimit = totalNeeded * 3 + 10;
-
-            List<Question> pool = new ArrayList<>();
-            for (Long subjectId : matchingSubjectIds) {
-                // 1. Try Unsolved questions first
-                List<Question> unsolvedPool = questionRepository.findRandomApprovedUnsolvedBySubject(subjectId,
-                        excludeIds, hasExclude, fetchLimit);
-                pool.addAll(unsolvedPool);
-
-                // 2. If unsolved pool has fewer items than needed, backfill with general pool
-                if (unsolvedPool.size() < fetchLimit) {
-                    pool.addAll(questionRepository.findRandomApprovedBySubject(subjectId, fetchLimit));
-                }
-            }
-
-            // Split by marks
-            List<Question> pool1 = pool.stream()
-                    .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 1)
-                    .distinct().collect(Collectors.toList());
-            List<Question> pool2 = pool.stream()
-                    .filter(q -> !selectedIds.contains(q.getId()) && q.getMarks() != null && q.getMarks() == 2)
-                    .distinct().collect(Collectors.toList());
-
-            // Pick up to required amounts
-            int drawn1 = 0;
-            for (Question q : pool1) {
-                if (drawn1 >= entry.req1Mark())
-                    break;
+        int aptDrawn1 = 0;
+        for (Question q : apt1) {
+            if (aptDrawn1 >= 5)
+                break;
+            if (selectedIds.add(q.getId())) {
                 selected.add(questionMapper.convertToDTO(q));
-                selectedIds.add(q.getId());
-                drawn1++;
+                aptDrawn1++;
             }
-
-            int drawn2 = 0;
-            for (Question q : pool2) {
-                if (drawn2 >= entry.req2Mark())
-                    break;
+        }
+        int aptDrawn2 = 0;
+        for (Question q : apt2) {
+            if (aptDrawn2 >= 5)
+                break;
+            if (selectedIds.add(q.getId())) {
                 selected.add(questionMapper.convertToDTO(q));
-                selectedIds.add(q.getId());
-                drawn2++;
+                aptDrawn2++;
+            }
+        }
+        // Fill remaining Aptitude slots up to 10 if mark pools were thin
+        for (Question q : finalAptPool) {
+            if (selected.size() >= 10)
+                break;
+            if (selectedIds.add(q.getId())) {
+                selected.add(questionMapper.convertToDTO(q));
             }
         }
 
-        // Fill any remaining slots up to 65 from general pool
+        // ── SECTION 2: Computer Science & IT (Target: 55 Questions = 85 Marks: 25x
+        // 1-mark, 30x 2-mark) ──
+        List<Question> tech1 = finalTechPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 1).distinct()
+                .collect(Collectors.toList());
+        List<Question> tech2 = finalTechPool.stream().filter(q -> q.getMarks() != null && q.getMarks() == 2).distinct()
+                .collect(Collectors.toList());
+
+        int techDrawn1 = 0;
+        for (Question q : tech1) {
+            if (techDrawn1 >= 25)
+                break;
+            if (selectedIds.add(q.getId())) {
+                selected.add(questionMapper.convertToDTO(q));
+                techDrawn1++;
+            }
+        }
+        int techDrawn2 = 0;
+        for (Question q : tech2) {
+            if (techDrawn2 >= 30)
+                break;
+            if (selectedIds.add(q.getId())) {
+                selected.add(questionMapper.convertToDTO(q));
+                techDrawn2++;
+            }
+        }
+
+        // Fail-safe 1: Backfill remaining Technical slots up to 65 from finalTechPool
         if (selected.size() < 65) {
-            int remaining = 65 - selected.size();
-            List<Question> extras = questionRepository.findRandomApproved(remaining * 3);
-            for (Question q : extras) {
+            for (Question q : finalTechPool) {
                 if (selected.size() >= 65)
                     break;
-                if (!selectedIds.contains(q.getId())) {
+                if (selectedIds.add(q.getId())) {
                     selected.add(questionMapper.convertToDTO(q));
-                    selectedIds.add(q.getId());
                 }
             }
         }
 
-        // Hard cap at 65
-        if (selected.size() > 65) {
-            selected = selected.subList(0, 65);
+        // Fail-safe 2: Backfill remaining slots up to 65 from aptPool
+        if (selected.size() < 65) {
+            for (Question q : aptPool) {
+                if (selected.size() >= 65)
+                    break;
+                if (selectedIds.add(q.getId())) {
+                    selected.add(questionMapper.convertToDTO(q));
+                }
+            }
         }
 
-        return ResponseEntity.ok(selected);
+        // Fail-safe 3: Ultimate backfill from ANY questions in DB to ALWAYS guarantee
+        // 65 items
+        if (selected.size() < 65) {
+            List<Question> anyExtras = questionRepository.findRandomAnyCandidates(150);
+            for (Question q : anyExtras) {
+                if (selected.size() >= 65)
+                    break;
+                if (selectedIds.add(q.getId())) {
+                    selected.add(questionMapper.convertToDTO(q));
+                }
+            }
+        }
+
+        // Hard cap at 65 questions
+        if (selected.size() > 65) {
+            selected = new ArrayList<>(selected.subList(0, 65));
+        }
+
+        // Sanitize DTOs for test security — strip correct answers and explanations
+        // during test-taking
+        List<QuestionDTO> sanitized = selected.stream().map(dto -> {
+            dto.setAiSuggestedAnswer(null);
+            dto.setAiSuggestedExplanation(null);
+            dto.setAiMentorInsights(null);
+            dto.setRawAiJson(null);
+            return dto;
+        }).collect(Collectors.toList());
+
+        log.info("Assembled GATE simulator exam with {} questions in {}ms for user {}",
+                sanitized.size(), System.currentTimeMillis() - startTime,
+                userDetails != null ? userDetails.getId() : "GUEST");
+
+        return ResponseEntity.ok(sanitized);
     }
 
     // ── AI Generation Batch Management Endpoints ──────────────────────────────

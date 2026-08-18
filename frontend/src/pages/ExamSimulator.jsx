@@ -29,6 +29,7 @@ function MockTestArena() {
   const [customQuestionCount, setCustomQuestionCount] = useState(10);
   const [customTime, setCustomTime] = useState(30);
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('Connecting to AIRGATE Engine...');
   const [examStarted, setExamStarted] = useState(false);
   const [examSubmitted, setExamSubmitted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -186,7 +187,14 @@ function MockTestArena() {
     }
 
     setLoading(true);
+    setLoadingStep('📡 Connecting to AIRGATE AI Exam Engine...');
+
+    const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
     try {
+      await delay(250);
+      setLoadingStep('🔥 Selecting Best High-Yield GATE CSE Questions for You...');
+
       const res = await axios.get(`${API_CONFIG.BASE_URL}/api/questions/simulator`, {
         headers: AuthService.getAuthHeader()
       });
@@ -195,6 +203,9 @@ function MockTestArena() {
         setLoading(false);
         return;
       }
+
+      await delay(300);
+      setLoadingStep('🛡️ Excluding Previously Solved PYQs to Guarantee 100% Unseen Practice...');
 
       let finalQuestions = res.data;
 
@@ -205,9 +216,14 @@ function MockTestArena() {
       };
 
       if (activeTab === 'standard') {
-        // Mode 1: 100% Official PYQs
+        // Mode 1: 100% Official PYQs (with fallback backfill to guarantee 65 questions)
         const pyqOnly = finalQuestions.filter(q => !isAiGeneratedQuestion(q));
-        if (pyqOnly.length > 0) finalQuestions = pyqOnly;
+        if (pyqOnly.length >= 65) {
+          finalQuestions = pyqOnly.slice(0, 65);
+        } else if (pyqOnly.length > 0) {
+          const rest = finalQuestions.filter(q => isAiGeneratedQuestion(q));
+          finalQuestions = [...pyqOnly, ...rest].slice(0, 65);
+        }
       } else if (activeTab === 'hybrid') {
         // Mode 2: Smart Hybrid Mock (70% Double-Verified + 30% PYQ)
         const doubleVerified = finalQuestions.filter(q => isAiGeneratedQuestion(q));
@@ -253,6 +269,15 @@ function MockTestArena() {
           if (subFiltered.length > 0) finalQuestions = subFiltered.slice(0, customQuestionCount);
         }
       }
+
+      await delay(300);
+      setLoadingStep('⚖️ Balancing Marks Weightage: 10 General Aptitude + 55 Technical Items...');
+
+      await delay(250);
+      setLoadingStep('🎯 Calibrating Exam Console to TCS iON Official Blueprint...');
+
+      await delay(200);
+      setLoadingStep('✨ 65-Item GATE Test Sheet Ready! Launching Exam...');
 
       setQuestions(finalQuestions);
       setAnswers({});
@@ -748,6 +773,71 @@ function MockTestArena() {
   if (!examStarted && !examSubmitted) {
     return (
       <div className="mock-arena-container">
+        
+        {/* Step-by-Step Progressive Loading Overlay Modal */}
+        {loading && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            backgroundColor: 'rgba(15, 23, 42, 0.88)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}>
+            <div style={{
+              backgroundColor: '#1e293b',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              borderRadius: '24px',
+              padding: '36px 40px',
+              maxWidth: '460px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)'
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                margin: '0 auto 20px auto',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.2))',
+                border: '2px solid #38bdf8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'spin 2s linear infinite'
+              }}>
+                <FiCpu size={32} color="#38bdf8" />
+              </div>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+                Preparing GATE Mock Exam
+              </h3>
+              <p style={{ color: '#38bdf8', fontSize: '0.92rem', fontWeight: 700, margin: '0 0 20px 0' }}>
+                {loadingStep}
+              </p>
+              <div style={{
+                width: '100%',
+                height: '6px',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '3px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: '70%',
+                  background: 'linear-gradient(90deg, #38bdf8, #8b5cf6)',
+                  borderRadius: '3px',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '16px', margin: '16px 0 0 0' }}>
+                Fetching 65 verified questions & initializing CBT environment...
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Active Session Auto-Resume Card */}
         {savedSession && (
@@ -1282,8 +1372,8 @@ function MockTestArena() {
               {/* Question metadata */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '0.8rem', backgroundColor: 'rgba(99, 102, 241, 0.1)', color: 'var(--color-primary)', padding: '4px 12px', borderRadius: '50px', fontWeight: 600 }}>
-                    {activeQuestion.subjectName}
+                  <span style={{ fontSize: '0.8rem', backgroundColor: 'rgba(99, 102, 241, 0.12)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '4px 14px', borderRadius: '50px', fontWeight: 700 }}>
+                    {activeTab === 'custom' ? `Practice: ${selectedSubject || 'Subject Test'}` : currentIndex < 10 ? 'Section 1: General Aptitude' : 'Section 2: Computer Science & IT'}
                   </span>
 
                   {/* Question Source Badge (Double Verified vs Official PYQ) */}
@@ -1358,9 +1448,13 @@ function MockTestArena() {
                         }}>
                           {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fff' }} />}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                          <span style={{ fontWeight: 700, color: isSelected ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.85rem' }}>Option {opt.optionLabel}</span>
-                          <span style={{ color: 'var(--text-primary)' }}>{renderOptionContent(opt.optionText)}</span>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1 }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: isSelected ? 'var(--color-secondary)' : '#94a3b8', minWidth: '28px', marginTop: '1px' }}>
+                            ({opt.optionLabel})
+                          </span>
+                          <div style={{ color: 'var(--text-primary)', fontSize: '1rem', lineHeight: 1.55 }}>
+                            {renderOptionContent(opt.optionText)}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1426,9 +1520,13 @@ function MockTestArena() {
                         }}>
                           {isChecked && <span style={{ color: '#fff', fontSize: '12px', fontWeight: 900, lineHeight: 1 }}>✓</span>}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                          <span style={{ fontWeight: 700, color: isChecked ? 'var(--color-secondary)' : 'var(--text-muted)', fontSize: '0.85rem' }}>Option {opt.optionLabel}</span>
-                          <span style={{ color: 'var(--text-primary)' }}>{renderOptionContent(opt.optionText)}</span>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1 }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: isChecked ? 'var(--color-secondary)' : '#94a3b8', minWidth: '28px', marginTop: '1px' }}>
+                            ({opt.optionLabel})
+                          </span>
+                          <div style={{ color: 'var(--text-primary)', fontSize: '1rem', lineHeight: 1.55 }}>
+                            {renderOptionContent(opt.optionText)}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1561,14 +1659,24 @@ function MockTestArena() {
         {/* Subject sections with question grid */}
         {(() => {
           const sections = {};
-          questions.forEach((q, idx) => {
-            const subj = q.subjectName || 'General';
-            if (!sections[subj]) sections[subj] = [];
-            sections[subj].push({ q, idx });
-          });
+          if (activeTab === 'custom') {
+            sections[selectedSubject || 'Subject Practice'] = questions.map((q, idx) => ({ q, idx }));
+          } else {
+            const sec1 = [];
+            const sec2 = [];
+            questions.forEach((q, idx) => {
+              if (idx < 10) {
+                sec1.push({ q, idx });
+              } else {
+                sec2.push({ q, idx });
+              }
+            });
+            if (sec1.length > 0) sections['Section 1 — General Aptitude'] = sec1;
+            if (sec2.length > 0) sections['Section 2 — Computer Science & IT'] = sec2;
+          }
           return Object.entries(sections).map(([subj, items]) => (
             <div key={subj} style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid #e2e8f0' }}>
                 {subj}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>

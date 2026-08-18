@@ -168,6 +168,21 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
         @Param("limit") int limit);
 
     @Query(
+        value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id WHERE LOWER(COALESCE(s.name, '')) LIKE '%aptitude%' ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomAptitudeCandidates(@Param("limit") int limit);
+
+    @Query(
+        value = "SELECT q.* FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id WHERE LOWER(COALESCE(s.name, '')) NOT LIKE '%aptitude%' ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomTechnicalCandidates(@Param("limit") int limit);
+
+    @Query(
+        value = "SELECT * FROM questions ORDER BY RAND() LIMIT :limit",
+        nativeQuery = true)
+    List<Question> findRandomAnyCandidates(@Param("limit") int limit);
+
+    @Query(
         value = "SELECT * FROM questions WHERE status = 'APPROVED' AND subject_id = :subjectId AND topic_id = :topicId ORDER BY RAND() LIMIT :limit",
         nativeQuery = true)
     List<Question> findRandomApprovedBySubjectAndTopic(
